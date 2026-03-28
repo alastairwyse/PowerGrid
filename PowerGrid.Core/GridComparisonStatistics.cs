@@ -21,15 +21,10 @@ namespace PowerGrid.Core
     /// <summary>
     /// Model/container class holding statistics resulting from comparing two grids.
     /// </summary>
-    public record GridComparisonStatistics
+    /// <param name="ItemsAddedCount">The number of items added to the first grid in order to make it match the second.</param>
+    /// <param name="ItemsUpdatedCount">The number of items updated in the first grid in order to make it match the second.</param>
+    /// <param name="ItemsDeletedCount">The number of items deleted from the first grid in order to make it match the second.</param>
+    public record GridComparisonStatistics(Int32 ItemsAddedCount, Int32 ItemsUpdatedCount, Int32 ItemsDeletedCount)
     {
-        /// <summary>The number of items added to the first grid in order to make it match the second.</summary>
-        public required Int32 ItemsAddedCount { get; set; }
-
-        /// <summary>The number of items updated in the first grid in order to make it match the second.</summary>
-        public required Int32 ItemsUpdatedCount { get; set; }
-
-        /// <summary>The number of items deleted from the first grid in order to make it match the second.</summary>
-        public required Int32 ItemsDeletedCount { get; set; }
     }
 }

@@ -23,7 +23,13 @@ namespace PowerGrid.Core
     /// </summary>
     /// <typeparam name="T">The type of objects to be compared.</typeparam>
     /// <remarks>Value properties refer to a set of properties of the object which do not uniquely identify the object, but hold its data.</remarks>
-    public interface IValuePropertyComparable<T> : IEquatable<T>
+    public interface IValuePropertyEquatable<T>
     {
+        /// <summary>
+        /// Indicates whether the value properties of the current object instance are equal to the value properties of another.
+        /// </summary>
+        /// <param name="other">The object instance to compare with the current.</param>
+        /// <returns>True if the value properties of the current object instance are equal to the value properties of the other, otherwise false.</returns>
+        Boolean ValuePropertiesEqual(T other);
     }
 }

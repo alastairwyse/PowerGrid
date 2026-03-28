@@ -23,7 +23,14 @@ namespace PowerGrid.Core
     /// </summary>
     /// <typeparam name="T">The type of objects to be compared.</typeparam>
     /// <remarks>Key properties refer to a set of properties of the object which uniquely identify the object.</remarks>
-    public interface IKeyPropertyComparable<T> : IComparable<T>
+    public interface IKeyPropertyComparable<T> 
     {
+        /// <summary>
+        /// Compares the key properties of this object instance with the key properties of another and returns an integer that indicates whether the current instance precedes, follows, or occurs in the same position in the sort order as the other object.
+        /// </summary>
+        /// <param name="other">The object instance to compare with the current.</param>
+        /// <returns>A value that indicates the relative order of the objects being compared.</returns>
+        /// <remarks>The values and meanings of the returned integer match those of the <see cref="IComparable{T}.CompareTo(T?)"/> method.</remarks>
+        Int32 KeyCompareTo(T other);
     }
 }

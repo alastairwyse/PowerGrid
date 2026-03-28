@@ -24,7 +24,7 @@ namespace PowerGrid.Core
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
     public class GridComparer<T>
-        where T : IKeyPropertyComparable<T>, IValuePropertyComparable<T>
+        where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
     {
         /// <summary>An <see cref="IEmitter{T}"/> instance to which items added to the existing grid are outputted during the comparison process.</summary>
         protected IEmitter<T> addedItemsEmitter;
@@ -54,11 +54,67 @@ namespace PowerGrid.Core
         /// <returns>Statistics containing counts of the items emitted.</returns>
         public GridComparisonStatistics Compare(IEnumerable<T> existingGridContents, IEnumerable<T> newGridContents)
         {
+            Int32 itemsAddedCount = 0, itemsUpdatedCount = 0, itemsDeletedCount = 0;
             IEnumerator<T> existingEnumerator = existingGridContents.GetEnumerator();
             IEnumerator<T> newEnumerator = newGridContents.GetEnumerator();
+            existingEnumerator.Reset();
+            newEnumerator.Reset();
+            Boolean existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
+            Boolean newEnumeratorMoveNextResult = newEnumerator.MoveNext();
 
-            // https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ienumerator-1?view=net-10.0
-            // Need to experiment with IEnumerator... see what 'Current contains' when already consumed
+            while (existingEnumeratorMoveNextResult == true || newEnumeratorMoveNextResult == true)
+            {
+                T existingItem = existingEnumerator.Current;
+                T newItem = newEnumerator.Current;
+
+                if (existingEnumeratorMoveNextResult == true && newEnumeratorMoveNextResult == true)
+                {
+                    Int32 keyComparisonResult = existingItem.KeyCompareTo(newItem);
+                    if (keyComparisonResult == 0)
+                    {
+                        Boolean valueComparisonResult = existingItem.ValuePropertiesEqual(newItem);
+                        if (valueComparisonResult == true)
+                        {
+                            // The exsting and new items full match, so no need to change/update
+                        }
+                        else
+                        {
+                            updatedItemsEmitter.Emit(newItem);
+                            itemsUpdatedCount++;
+                        }
+                        existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
+                        newEnumeratorMoveNextResult = newEnumerator.MoveNext();
+                    }
+                    else if (keyComparisonResult > 0)
+                    {
+                        // The existing item follows the new item
+                        addedItemsEmitter.Emit(newItem);
+                        itemsAddedCount++;
+                        newEnumeratorMoveNextResult = newEnumerator.MoveNext();
+                    }
+                    else
+                    {
+                        // The new item preceeds the new item
+                        deletedItemsEmitter.Emit(existingItem);
+                        itemsDeletedCount++;
+                        existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
+                    }
+                }
+                else if (existingEnumeratorMoveNextResult == true)
+                {
+                    addedItemsEmitter.Emit(existingItem);
+                    itemsAddedCount++;
+                    existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
+                }
+                else
+                {
+                    addedItemsEmitter.Emit(newItem);
+                    itemsAddedCount++;
+                    newEnumeratorMoveNextResult = newEnumerator.MoveNext();
+                }
+            }
+
+            return new GridComparisonStatistics(itemsAddedCount, itemsUpdatedCount, itemsDeletedCount);
         }
     }
 }

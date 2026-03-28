@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Authors>Alastair Wyse</Authors>
+    <Description>Core functionality for the PowerGrid framework.</Description>
+    <Copyright>Copyright © Alastair Wyse 2026.</Copyright>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
