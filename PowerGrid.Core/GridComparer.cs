@@ -23,8 +23,7 @@ namespace PowerGrid.Core
     /// Analyzes and outputs the differences between the sorted contents of two grids.
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridComparer<T>
-        where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public class GridComparer<T> where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
     {
         /// <summary>An <see cref="IEmitter{T}"/> instance to which items added to the existing grid are outputted during the comparison process.</summary>
         protected IEmitter<T> addedItemsEmitter;
@@ -103,7 +102,7 @@ namespace PowerGrid.Core
                 else if (existingEnumeratorMoveNextResult == true)
                 {
                     deletedItemsEmitter.Emit(existingItem);
-                    itemsAddedCount++;
+                    itemsDeletedCount++;
                     existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
                 }
                 else

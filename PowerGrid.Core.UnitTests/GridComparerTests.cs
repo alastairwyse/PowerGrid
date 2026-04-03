@@ -67,12 +67,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 1);
             Assert.That(deletedItems.Count == 0);
             Assert.That(updatedItems[0] == newGridContents[0]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 1);
+            Assert.That(statistics.ItemsDeletedCount == 0);
         }
 
         [Test]
@@ -91,12 +94,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 1);
             Assert.That(deletedItems.Count == 0);
             Assert.That(updatedItems[0] == newGridContents[1]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 1);
+            Assert.That(statistics.ItemsDeletedCount == 0);
         }
 
         [Test]
@@ -115,12 +121,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3208)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 1);
             Assert.That(deletedItems.Count == 0);
             Assert.That(updatedItems[0] == newGridContents[2]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 1);
+            Assert.That(statistics.ItemsDeletedCount == 0);
         }
 
         [Test]
@@ -138,12 +147,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 1);
             Assert.That(updatedItems.Count == 0);
             Assert.That(deletedItems.Count == 0);
             Assert.That(addedItems[0] == newGridContents[0]);
+            Assert.That(statistics.ItemsAddedCount == 1);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 0);
         }
 
         [Test]
@@ -161,12 +173,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 1);
             Assert.That(updatedItems.Count == 0);
             Assert.That(deletedItems.Count == 0);
             Assert.That(addedItems[0] == newGridContents[1]);
+            Assert.That(statistics.ItemsAddedCount == 1);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 0);
         }
 
         [Test]
@@ -184,12 +199,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 1);
             Assert.That(updatedItems.Count == 0);
             Assert.That(deletedItems.Count == 0);
             Assert.That(addedItems[0] == newGridContents[2]);
+            Assert.That(statistics.ItemsAddedCount == 1);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 0);
         }
 
         [Test]
@@ -207,12 +225,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 0);
             Assert.That(deletedItems.Count == 1);
             Assert.That(deletedItems[0] == existingGridContents[0]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 1);
         }
 
         [Test]
@@ -230,12 +251,15 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 0);
             Assert.That(deletedItems.Count == 1);
             Assert.That(deletedItems[0] == existingGridContents[1]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 1);
         }
 
         [Test]
@@ -253,15 +277,102 @@ namespace PowerGrid.Core.UnitTests
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
             };
 
-            testGridComparer.Compare(existingGridContents, newGridContents);
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
 
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 0);
             Assert.That(deletedItems.Count == 1);
             Assert.That(deletedItems[0] == existingGridContents[2]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 1);
         }
 
-        // TODO: Realistic test with large grid
+        [Test]
+        public void Compare_NoDifferences()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 0);
+        }
+
+        [Test]
+        public void Compare_NewGridCompletelyDifferent()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
+            };
+
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 2);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 2);
+            Assert.That(addedItems[0] == newGridContents[0]);
+            Assert.That(addedItems[1] == newGridContents[1]);
+            Assert.That(deletedItems[0] == existingGridContents[0]);
+            Assert.That(deletedItems[1] == existingGridContents[1]);
+            Assert.That(statistics.ItemsAddedCount == 2);
+            Assert.That(statistics.ItemsUpdatedCount == 0);
+            Assert.That(statistics.ItemsDeletedCount == 2);
+        }
+
+        [Test]
+        public void Compare_AllNewGridUpdated()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209), 
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+            };
+
+            GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 4);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(updatedItems[0] == newGridContents[0]);
+            Assert.That(updatedItems[1] == newGridContents[1]);
+            Assert.That(updatedItems[2] == newGridContents[2]);
+            Assert.That(updatedItems[3] == newGridContents[3]);
+            Assert.That(statistics.ItemsAddedCount == 0);
+            Assert.That(statistics.ItemsUpdatedCount == 4);
+            Assert.That(statistics.ItemsDeletedCount == 0);
+        }
 
         #region Nested Classes
 
