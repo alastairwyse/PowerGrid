@@ -14,28 +14,28 @@
 * limitations under the License.
 */
 
-using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using NUnit.Framework;
 
 namespace PowerGrid.Core.UnitTests
 {
     /// <summary>
     /// Unit tests for the PowerGrid.Core.GridComparer class.
     /// </summary>
+    [TestFixture]
     public class GridComparerTests
     {
-        private const String reutersDataSource = "Reuters";
         private const String bloombergDataSource = "Bloomberg";
-        private const String refinitivDataSource = "Refinitiv";
-        private const String sonyCompany = "Sony";
         private const String canonCompany = "Canon";
+        private const String hitachiCompany = "Hitachi";
+        private const String sonyCompany = "Sony";
         private const String toyotaCompany = "Toyota";
 
-
-
+        private TestUtilities utils;
         private List<StockPrice> existingGridContents;
+        private List<StockPrice> newGridContents;
         private List<StockPrice> addedItems;
         private List<StockPrice> updatedItems;
         private List<StockPrice> deletedItems;
@@ -44,13 +44,7 @@ namespace PowerGrid.Core.UnitTests
         [SetUp]
         protected void SetUp()
         {
-            existingGridContents = new List<StockPrice>()
-            {
-                new StockPrice(reutersDataSource, CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209),
-                new StockPrice(reutersDataSource, CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(reutersDataSource, CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 7203),
-            };
-
+            utils = new TestUtilities();
             addedItems = new List<StockPrice>();
             updatedItems = new List<StockPrice>();
             deletedItems = new List<StockPrice>();
@@ -58,28 +52,220 @@ namespace PowerGrid.Core.UnitTests
         }
 
         [Test]
-        public void Compare()
+        public void Compare_ItemUpdatedAtStartOfExistingGrid()
         {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
 
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 1);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(updatedItems[0] == newGridContents[0]);
         }
 
-        #region Private/Protected Methods
-
-        /// <summary>
-        /// Creates a DateOnly from the specified yyyy-MM-dd format string.
-        /// </summary>
-        /// <param name="stringifiedDateOnly">The stringified date to convert.</param>
-        /// <returns></returns>
-        protected DateOnly CreateDateOnlyFromString(String stringifiedDateOnly)
+        [Test]
+        public void Compare_ItemUpdatedInMiddleOfExistingGrid()
         {
-            return DateOnly.ParseExact(stringifiedDateOnly, "yyyy-MM-dd", DateTimeFormatInfo.InvariantInfo);
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 1);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(updatedItems[0] == newGridContents[1]);
         }
 
-        #endregion
+        [Test]
+        public void Compare_ItemUpdatedAtEndOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3208)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 1);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(updatedItems[0] == newGridContents[2]);
+        }
+
+        [Test]
+        public void Compare_ItemAddedAtStartOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 1);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(addedItems[0] == newGridContents[0]);
+        }
+
+        [Test]
+        public void Compare_ItemAddedInMiddleOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 1);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(addedItems[0] == newGridContents[1]);
+        }
+
+        [Test]
+        public void Compare_ItemAddedAtEndOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 1);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 0);
+            Assert.That(addedItems[0] == newGridContents[2]);
+        }
+
+        [Test]
+        public void Compare_ItemDeletedAtStartOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 1);
+            Assert.That(deletedItems[0] == existingGridContents[0]);
+        }
+
+        [Test]
+        public void Compare_ItemDeletedInMiddleOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 1);
+            Assert.That(deletedItems[0] == existingGridContents[1]);
+        }
+
+        [Test]
+        public void Compare_ItemDeletedAtEndOfExistingGrid()
+        {
+            existingGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+            };
+            newGridContents = new List<StockPrice>()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
+            };
+
+            testGridComparer.Compare(existingGridContents, newGridContents);
+
+            Assert.That(addedItems.Count == 0);
+            Assert.That(updatedItems.Count == 0);
+            Assert.That(deletedItems.Count == 1);
+            Assert.That(deletedItems[0] == existingGridContents[2]);
+        }
+
+        // TODO: Realistic test with large grid
 
         #region Nested Classes
 
-#pragma warning disable 1591
+        #pragma warning disable 1591
 
         /// <summary>
         /// Implementation of <see cref="IEmitter{T}"/> which emits/outputs objects to a <see cref="List{T}"/>
@@ -97,7 +283,7 @@ namespace PowerGrid.Core.UnitTests
             /// <inheritdoc/>
             public void Emit(T instance)
             {
-                throw new NotImplementedException();
+                list.Add(instance);
             }
         }
 

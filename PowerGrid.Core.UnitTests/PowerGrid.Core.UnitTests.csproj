@@ -15,4 +15,8 @@
     <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PowerGrid.Core\PowerGrid.Core.csproj" />
+  </ItemGroup>
+
 </Project>

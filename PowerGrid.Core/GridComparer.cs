@@ -94,7 +94,7 @@ namespace PowerGrid.Core
                     }
                     else
                     {
-                        // The new item preceeds the new item
+                        // The existing item preceeds the new item
                         deletedItemsEmitter.Emit(existingItem);
                         itemsDeletedCount++;
                         existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
@@ -102,7 +102,7 @@ namespace PowerGrid.Core
                 }
                 else if (existingEnumeratorMoveNextResult == true)
                 {
-                    addedItemsEmitter.Emit(existingItem);
+                    deletedItemsEmitter.Emit(existingItem);
                     itemsAddedCount++;
                     existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
                 }
