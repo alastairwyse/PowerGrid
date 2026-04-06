@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Authors>Alastair Wyse</Authors>
+    <Description>Classes which read and write Powergrid grids from and to Microsoft SQL Server databases.</Description>
+    <Copyright>Copyright © Alastair Wyse 2026.</Copyright>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+</Project>
