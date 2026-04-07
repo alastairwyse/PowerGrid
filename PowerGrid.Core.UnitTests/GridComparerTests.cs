@@ -17,6 +17,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using PowerGrid.Core;
+using PowerGrid.Grids;
 using NUnit.Framework;
 
 namespace PowerGrid.Core.UnitTests

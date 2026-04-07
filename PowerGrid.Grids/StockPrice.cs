@@ -15,8 +15,9 @@
 */
 
 using System;
+using PowerGrid.Core;
 
-namespace PowerGrid.Core.UnitTests
+namespace PowerGrid.Grids
 {
     /// <summary>
     /// Model/container class holding a stock price.

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Authors>Alastair Wyse</Authors>
-    <Description>Unit tests for classes in the PowerGrid.Core namespace.</Description>
+    <Description>Unit tests for classes in the PowerGrid.Grids namespace.</Description>
     <Copyright>Copyright © Alastair Wyse 2026.</Copyright>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PowerGrid.Core\PowerGrid.Core.csproj" />
+    <ProjectReference Include="..\PowerGrid.Core.UnitTests\PowerGrid.Core.UnitTests.csproj" />
     <ProjectReference Include="..\PowerGrid.Grids\PowerGrid.Grids.csproj" />
   </ItemGroup>
 

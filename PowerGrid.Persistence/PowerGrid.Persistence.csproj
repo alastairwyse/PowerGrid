@@ -9,4 +9,8 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PowerGrid.Core\PowerGrid.Core.csproj" />
+  </ItemGroup>
+
 </Project>

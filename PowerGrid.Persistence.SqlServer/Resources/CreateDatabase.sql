@@ -8,8 +8,8 @@
 
 :Setvar DatabaseName PowerGrid
 
-CREATE DATABASE $(DatabaseName);
-GO
+--CREATE DATABASE $(DatabaseName);
+--GO
 
 USE $(DatabaseName);
 GO 
@@ -22,22 +22,25 @@ GO
 
 CREATE TABLE $(DatabaseName).dbo.StockPrices
 (
-    Id               bigint        AUTO_INCREMENT PRIMARY KEY NOT NULL, 
+    Id               bigint        IDENTITY(1,1) PRIMARY KEY NOT NULL, 
     DataSource       nvarchar(50)  NOT NULL, 
-    Date             date          NOT NULL, 
+    [Date]           date          NOT NULL, 
     Company          nvarchar(50)  NOT NULL, 
-    Price            money         NOT NULL, -- Could use numeric
+    Price            money         NOT NULL, 
     TransactionFrom  datetime2     NOT NULL, 
     TransactionTo    datetime2     NOT NULL
 );
 
--- Indexes on temporal columns and others
+CREATE INDEX StockPricesOuterKeysIndex ON $(DatabaseName).dbo.StockPrices (DataSource, [Date], TransactionTo);
+CREATE INDEX StockPricesTransactionIndex ON $(DatabaseName).dbo.StockPrices (TransactionTo, TransactionFrom);
 
 CREATE TABLE $(DatabaseName).dbo.StockPriceGrids
 (
-    Id                    bigint        AUTO_INCREMENT PRIMARY KEY NOT NULL, 
+    Id                    bigint        IDENTITY(1,1) PRIMARY KEY  NOT NULL, 
     DataSource            nvarchar(50)  NOT NULL, 
-    Date                  date          NOT NULL, 
-    Version               int           NOT NULL, 
+    [Date]                date          NOT NULL, 
+    [Version]             int           NOT NULL, 
     TransactionTimestamp  datetime2     NOT NULL
 );
+
+CREATE INDEX StockPriceGridsOuterKeysIndex ON $(DatabaseName).dbo.StockPriceGrids (DataSource, [Date], [Version]);

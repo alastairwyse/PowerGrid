@@ -15,11 +15,22 @@
 */
 
 using System;
-using System.Collections.Generic;
+using PowerGrid.Core;
+using PowerGrid.Grids;
 
 namespace PowerGrid.Persistence
 {
-    public record GridItemOuterKeyPropertySet(Type GridItemType) : IEquatable<GridItemOuterKeyPropertySet>
+    /// <summary>
+    /// Defines methods to read and write <see cref="StockPrice"/> objects from and to persistent storage;
+    /// </summary>
+    public interface IStockPricePersister
     {
+        // TODO:
+        //   Add StockPrice, Update StockPrice, Delete StockPrice
+        //   Get StockPriceGrid
+        //   List All StockPriceGrids for a given data source and date
+        //   Create a new grid
+
+        //   Implementation should wrap multiple steps to create a dataset in a transaction
     }
 }
