@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PowerGrid.Core\PowerGrid.Core.csproj" />
+    <ProjectReference Include="..\PowerGrid.Grids\PowerGrid.Grids.csproj" />
   </ItemGroup>
 
 </Project>

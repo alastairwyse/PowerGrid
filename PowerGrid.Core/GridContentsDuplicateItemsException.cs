@@ -19,16 +19,16 @@ using System;
 namespace PowerGrid.Core
 {
     /// <summary>
-    /// The exception that is thrown when an item in a grid fails validation.
+    /// The exception that is thrown when a grid contains duplicate items.
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridContentsValidationException<T> : Exception where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public class GridContentsDuplicateItemsException<T> : Exception where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
     {
-        /// <summary>The item in the grid which failed to validate.</summary>
+        /// <summary>The item in the grid which was duplicated (based on <see cref="IKeyPropertyComparable{T}">key properties</see>).</summary>
         protected T gridItem;
 
         /// <summary>
-        /// The item in the grid which failed to validate.
+        /// The item in the grid which was duplicated (based on <see cref="IKeyPropertyComparable{T}">key properties</see>).
         /// </summary>
         public T GridItem
         {
@@ -39,13 +39,12 @@ namespace PowerGrid.Core
         }
 
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Core.GridContentsValidationException class.
+        /// Initialises a new instance of the PowerGrid.Core.GridContentsDuplicateItemsException class.
         /// </summary>
         /// <param name="message">The message that describes the error.</param>
-        /// <param name="gridItem">The item in the grid which failed to validate.</param>
-        /// <param name="innerException">The exception that is the cause of the current exception.</param>
-        public GridContentsValidationException(String message, T gridItem, Exception innerException)
-            : base(message, innerException)
+        /// <param name="gridItem">The item in the grid which was duplicated (based on <see cref="IKeyPropertyComparable{T}">key properties</see>)</param>
+        public GridContentsDuplicateItemsException(String message, T gridItem)
+            : base(message)
         {
             this.gridItem = gridItem;
         }

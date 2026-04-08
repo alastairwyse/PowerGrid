@@ -31,6 +31,7 @@ namespace PowerGrid.Core
         /// <param name="gridContents">The items in the grid.</param>
         /// <param name="validationAction">An <see cref="Action{T}"/> used to validate each item.  Accepts an item as input, and should succeed if the item is valid, and throw an exception if the item in invalid (with the exception detailing the reason for validation failure).</param>
         /// <returns>The validated grid items.</returns>
+        /// <exception cref="GridContentsValidationException{T}">One of the items in the grid failed validation.</exception>
         public IEnumerable<T> ValidateItems(IEnumerable<T> gridContents, Action<T> validationAction)
         {
             foreach (T currentItem in gridContents)
@@ -41,7 +42,7 @@ namespace PowerGrid.Core
                 }
                 catch (Exception e)
                 {
-                    throw new GridContentsValidationException<T>("Failed to validate item in grid", currentItem, e);
+                    throw new GridContentsValidationException<T>("Failed to validate item in grid.", currentItem, e);
                 }
 
                 yield return currentItem;
