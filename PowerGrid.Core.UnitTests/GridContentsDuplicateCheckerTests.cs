@@ -16,6 +16,8 @@
 
 using System;
 using System.Collections.Generic;
+using PowerGrid.Core;
+using PowerGrid.Grids;
 using NUnit.Framework;
 
 namespace PowerGrid.Core.UnitTests
@@ -26,10 +28,88 @@ namespace PowerGrid.Core.UnitTests
     [TestFixture]
     public class GridContentsDuplicateCheckerTests
     {
-        [Test]
-        public void TODO()
+        private const String bloombergDataSource = "Bloomberg";
+        private const String canonCompany = "Canon";
+        private const String hitachiCompany = "Hitachi";
+        private const String sonyCompany = "Sony";
+        private const String toyotaCompany = "Toyota";
+
+        private TestUtilities utils;
+        private GridContentsDuplicateChecker<StockPrice> testGridContentsDuplicateChecker;
+
+        [SetUp]
+        protected void SetUp()
         {
-            throw new NotImplementedException();
+            utils = new TestUtilities();
+            testGridContentsDuplicateChecker = new GridContentsDuplicateChecker<StockPrice>();
+        }
+
+        [Test]
+        public void CheckForDuplicates()
+        {
+            List<StockPrice> gridContents = new()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+            };
+
+            List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
+        }
+
+        [Test]
+        public void CheckForDuplicates_DuplicatesExist()
+        {
+            List<StockPrice> gridContents = new()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4733),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+            };
+
+            var e = Assert.Throws<GridContentsDuplicateItemsException<StockPrice>>(delegate
+            {
+                List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
+            });
+
+            Assert.That(e.Message, Does.StartWith("Grid contains items with duplicate key values."));
+            Assert.That(e.GridItem == gridContents[1]);
+
+
+            gridContents = new()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 3210),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+            };
+
+            e = Assert.Throws<GridContentsDuplicateItemsException<StockPrice>>(delegate
+            {
+                List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
+            });
+
+            Assert.That(e.Message, Does.StartWith("Grid contains items with duplicate key values."));
+            Assert.That(e.GridItem == gridContents[2]);
+
+
+            gridContents = new()
+            {
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3210),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+            };
+
+            e = Assert.Throws<GridContentsDuplicateItemsException<StockPrice>>(delegate
+            {
+                List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
+            });
+
+            Assert.That(e.Message, Does.StartWith("Grid contains items with duplicate key values."));
+            Assert.That(e.GridItem == gridContents[3]);
         }
     }
 }
