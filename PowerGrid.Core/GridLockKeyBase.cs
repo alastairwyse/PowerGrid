@@ -21,26 +21,37 @@ namespace PowerGrid.Core
     /// <summary>
     /// Base for classes which implement <see cref="IGridLockKey"/>.
     /// </summary>
+    /// <typeparam name="T">The type of grid item the class creates a key for.</typeparam>
     public abstract class GridLockKeyBase<T> : IGridLockKey where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
     {
-        /// <summary>The type of the object that this class creates a mutual-exclusion lock for.</summary>
-        protected abstract Type UnderlyingObjectType
-        { 
-            get; 
-        }
+        /// <summary>The grid item object to generate key for.</summary>
+        protected T underlyingGridItem;
 
-        /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the object that this class creates a mutual-exclusion lock for.</summary>
-        protected abstract Object[] UnderlyingObjectKeyPropertyValues
+        /// <summary>The type of the object that this class creates a key for.</summary>
+        protected Type underlyingGridItemType;
+
+        /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the object that this class creates a key for.</summary>
+        protected abstract Object[] UnderlyingGridItemKeyPropertyValues
         {
             get;
         }
 
-        /// <summary>The complete set of <see cref="IKeyPropertyComparable{T}">key properties</see> used to create the mutual-exclusion lock.</summary>
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Core.GridLockKeyBase class.
+        /// </summary>
+        /// <param name="underlyingGridItem">The type of grid item the class creates a key for.</param>
+        public GridLockKeyBase(T underlyingGridItem)
+        {
+            this.underlyingGridItem = underlyingGridItem;
+            this.underlyingGridItemType = underlyingGridItem.GetType();
+        }
+
+        /// <inheritdoc/>
         public Object[] KeyPropertyValues
         {
             get
             {
-                return [UnderlyingObjectType, .. UnderlyingObjectKeyPropertyValues];
+                return [underlyingGridItemType, .. UnderlyingGridItemKeyPropertyValues];
             }
         }
 

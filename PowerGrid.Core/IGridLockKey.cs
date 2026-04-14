@@ -15,15 +15,17 @@
 */
 
 using System;
+using System.Collections.Generic;
 
 namespace PowerGrid.Core
 {
     /// <summary>
-    /// Defines properties which enable the creation of mutual-exclusion locks, which are applied to a persistent store of grids so that the grids can be safely modified concurrently.
+    /// Defines properties of a class, instances of which can be used as keys in a <see cref="Dictionary{TKey, TValue}"/> where the values in the dictionary are mutual-exclusion lock objects, which can be used to apply locks to safely modify a persistent store of grids concurrently.
     /// </summary>
+    /// <remarks>The properties defined in the interface should be implemented in conjunction with implementations of <see cref="IEquatable{T}"/> and <see cref="Object.GetHashCode">GetHashCode()</see> to allow implementations of this interface to act as keys in a <see cref="Dictionary{TKey, TValue}"/>.</remarks>
     public interface IGridLockKey : IEquatable<IGridLockKey>
     {
-        /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the object that this interface creates mutual-exclusion locks for.</summary>
+        /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the grid item to apply locks for.</summary>
         public abstract Object[] KeyPropertyValues
         {
             get;

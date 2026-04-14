@@ -24,37 +24,22 @@ namespace PowerGrid.Grids
     /// </summary>
     public class StockPriceGridLockKey : GridLockKeyBase<StockPrice>
     {
-        /// <summary>The stock price object to generate the lock for.</summary>
-        protected StockPrice underlyingStockPrice;
-        /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the <see cref="StockPrice"/> that this class creates a mutual-exclusion lock for.</summary>
-        private Object[] underlyingObjectKeyPropertyValues;
-
         /// <inheritdoc/>
-        protected override Type UnderlyingObjectType
+        protected override Object[] UnderlyingGridItemKeyPropertyValues
         {
             get
             {
-                return underlyingStockPrice.GetType();
-            }
-        }
-
-        /// <inheritdoc/>
-        protected override Object[] UnderlyingObjectKeyPropertyValues
-        {
-            get
-            {
-                return underlyingObjectKeyPropertyValues;
+                return new Object[2] { underlyingGridItem.DataSource, underlyingGridItem.Date };
             }
         }
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridLockKey class.
         /// </summary>
-        /// <param name="underlyingStockPrice">The stock price object to generate the lock for.</param>
+        /// <param name="underlyingStockPrice">The stock price object to create a key for.</param>
         public StockPriceGridLockKey(StockPrice underlyingStockPrice)
+            : base(underlyingStockPrice)
         {
-            this.underlyingStockPrice = underlyingStockPrice;
-            underlyingObjectKeyPropertyValues = new Object[2] { underlyingStockPrice.DataSource, underlyingStockPrice.Date };
         }
     }
 }

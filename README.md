@@ -15,6 +15,8 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Should we introduce an IGridItem&lt;T&gt; interface which implements both IKeyPropertyComparable&lt;T&gt; and IValuePropertyEquatable&lt;T&gt;?
 * Review StockPriceGridLockKey... abstract, protected properties, and private members... could these be done better?
 * Review XML comments on IGridLockKey.  Could these be made better after 2nd read?
+* Should 'StockPriceGrids' table in database just be 'Grids' and have a column which denotes the grid type (e.g. 'StockPrice')?
+* Should PersistenceConcurrencyManager accept a Func rather than Action?
 
 #### Longer Term TODO
 * Add another type of grid item (other than StockPrice), and use to push common functionality into 'Core' project, generic classes and methods, etc...

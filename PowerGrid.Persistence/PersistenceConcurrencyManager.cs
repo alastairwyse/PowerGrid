@@ -14,6 +14,10 @@
 * limitations under the License.
 */
 
+using System;
+using System.Collections.Concurrent;
+using PowerGrid.Core;
+
 namespace PowerGrid.Persistence
 {
     /// <summary>
@@ -21,13 +25,29 @@ namespace PowerGrid.Persistence
     /// </summary>
     public class PersistenceConcurrencyManager
     {
-        /*
-... can we have a Dictionary whose key is somethign that represents the 'outside set' field... 'outer key values' and inside is a lock object
-        The fully qualified name of the class, and the outer key values of class being persisted
+        /// <summary>Maps <see cref="IGridLockKey"/> implementations to lock objects for the sets of grid items the <see cref="IGridLockKey"/> implementation represents.</summary>
+        protected ConcurrentDictionary<IGridLockKey, Object> lockDictionary;
 
-acquire lock
-  If they key doesn't exist needs to be added
-  If it does exist need to lock the lock object and do action... maybe needs to be a Func<>?... in real case return a ComparisonStatistics?
-         */
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.PersistenceConcurrencyManager class.
+        /// </summary>
+        public PersistenceConcurrencyManager()
+        {
+            lockDictionary = new ConcurrentDictionary<IGridLockKey, Object>();
+        }
+
+        /// <summary>
+        /// Acquires an exclusive lock using the specified grid lock key, and invokes the specified action.
+        /// </summary>
+        /// <param name="gridLockKey">A key representing the set of grid items to obtain an exclusive lock for.</param>
+        /// <param name="action">The action to invoke.</param>
+        public void AcquireLockAndInvokeAction(IGridLockKey gridLockKey, Action action)
+        {
+            Object lockObject = lockDictionary.GetOrAdd(gridLockKey, new Object());
+            lock (lockObject)
+            {
+                action();
+            }
+        }
     }
 }

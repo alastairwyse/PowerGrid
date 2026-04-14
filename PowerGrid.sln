@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Grids", "PowerGri
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Grids.UnitTests", "PowerGrid.Grids.UnitTests\PowerGrid.Grids.UnitTests.csproj", "{46B40751-1E4C-4D69-B7A7-8D5F606B5680}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Persistence.UnitTests", "PowerGrid.Persistence.UnitTests\PowerGrid.Persistence.UnitTests.csproj", "{FCF22E57-1F40-492A-B4AC-87928A51D1E7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{46B40751-1E4C-4D69-B7A7-8D5F606B5680}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{46B40751-1E4C-4D69-B7A7-8D5F606B5680}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{46B40751-1E4C-4D69-B7A7-8D5F606B5680}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FCF22E57-1F40-492A-B4AC-87928A51D1E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FCF22E57-1F40-492A-B4AC-87928A51D1E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FCF22E57-1F40-492A-B4AC-87928A51D1E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FCF22E57-1F40-492A-B4AC-87928A51D1E7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
