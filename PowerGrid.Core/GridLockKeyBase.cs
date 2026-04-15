@@ -66,7 +66,7 @@ namespace PowerGrid.Core
             {
                 for (Int32 i = 0; i < this.KeyPropertyValues.Length; i++)
                 {
-                    if (this.KeyPropertyValues[i] != other.KeyPropertyValues[i])
+                    if (this.KeyPropertyValues[i].Equals(other.KeyPropertyValues[i]) == false)
                     {
                         return false;
                     }

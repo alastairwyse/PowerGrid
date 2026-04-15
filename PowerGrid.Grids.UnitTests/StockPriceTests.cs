@@ -32,6 +32,7 @@ namespace PowerGrid.Core.UnitTests
         private const String refinitivDataSource = "Refinitiv";
         private const String canonCompany = "Canon";
         private const String sonyCompany = "Sony";
+
         private TestUtilities utils;
 
         [SetUp]
