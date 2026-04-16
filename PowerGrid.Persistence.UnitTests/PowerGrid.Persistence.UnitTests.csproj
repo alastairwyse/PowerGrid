@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PowerGrid.Core.UnitTests\PowerGrid.Core.UnitTests.csproj" />
     <ProjectReference Include="..\PowerGrid.Persistence\PowerGrid.Persistence.csproj" />
   </ItemGroup>
 

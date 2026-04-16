@@ -84,5 +84,26 @@ namespace PowerGrid.Core.UnitTests
 
             Assert.That(result == false);
         }
+
+        [Test]
+        public void GetHashCode()
+        {
+            StockPrice otherStockPrice = new(bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-14"), canonCompany, 4431);
+            StockPriceGridLockKey otherStockPriceGridLockKey = new StockPriceGridLockKey(otherStockPrice);
+
+            Int32 result1 = testStockPriceGridLockKey.GetHashCode();
+            Int32 result2 = otherStockPriceGridLockKey.GetHashCode();
+
+            Assert.That(result1 != result2);
+
+
+            otherStockPrice = new(bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), sonyCompany, 4432);
+            otherStockPriceGridLockKey = new StockPriceGridLockKey(otherStockPrice);
+
+            result1 = testStockPriceGridLockKey.GetHashCode();
+            result2 = otherStockPriceGridLockKey.GetHashCode();
+
+            Assert.That(result1 == result2);
+        }
     }
 }
