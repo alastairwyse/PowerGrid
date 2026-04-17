@@ -23,7 +23,7 @@ namespace PowerGrid.Core
     /// Checks that no items exist in the sorted contents of a grid that have duplicate <see cref="IKeyPropertyComparable{T}">key properties</see>.
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridContentsDuplicateChecker<T> where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public class GridContentsDuplicateChecker<T> where T : IGridItem<T>
     {
         /// <summary>
         /// Checks that no items exist in a grid that have duplicate <see cref="IKeyPropertyComparable{T}">key properties</see>.

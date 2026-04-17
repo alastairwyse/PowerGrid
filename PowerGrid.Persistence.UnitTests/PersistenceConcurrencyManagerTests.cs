@@ -67,12 +67,15 @@ namespace PowerGrid.Persistence.UnitTests
                     {
                         Thread.Sleep(250);
                         writeLog.Add(nameof(stockPriceGridLockKey1));
-                        completeSignal.Set();
                     });
                 });
                 Thread thread2 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () => { writeLog.Add(nameof(stockPriceGridLockKey2)); });
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () => 
+                    { 
+                        writeLog.Add(nameof(stockPriceGridLockKey2));
+                        completeSignal.Set();
+                    });
                 });
                 Thread thread3 = new(() =>
                 {
@@ -84,14 +87,12 @@ namespace PowerGrid.Persistence.UnitTests
                 });
 
                 thread1.Start();
+                Thread.Sleep(50);
                 thread2.Start();
+                Thread.Sleep(50);
                 thread3.Start();
+                Thread.Sleep(50);
                 thread4.Start();
-
-
-                Console.WriteLine(stockPriceGridLockKey1.GetHashCode());
-                Console.WriteLine(stockPriceGridLockKey2.GetHashCode());
-
 
                 completeSignal.WaitOne();
                 Assert.That(writeLog.Count == 4);
@@ -103,9 +104,64 @@ namespace PowerGrid.Persistence.UnitTests
         }
 
         [Test]
-        public void AcquireLockAndInvokeAction_LockObjectAlreadyExists()
+        public void AcquireLockAndInvokeAction_LockObjectsAlreadyExists()
         {
-            throw new NotImplementedException();
+            StockPrice stockPrice1 = new(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440);
+            StockPrice stockPrice2 = new(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732);
+            StockPrice stockPrice3 = new(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
+            StockPrice stockPrice4 = new(refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
+            StockPriceGridLockKey stockPriceGridLockKey1 = new(stockPrice1);
+            StockPriceGridLockKey stockPriceGridLockKey2 = new(stockPrice2);
+            StockPriceGridLockKey stockPriceGridLockKey3 = new(stockPrice3);
+            StockPriceGridLockKey stockPriceGridLockKey4 = new(stockPrice4);
+            // Call AcquireLockAndInvokeAction() with each GridLockKey once to create the lock objects
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey1, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey3, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey4, () => { });
+            List<String> writeLog = new();
+            using (AutoResetEvent completeSignal = new(false))
+            {
+                Thread thread1 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey1, () =>
+                    {
+                        Thread.Sleep(250);
+                        writeLog.Add(nameof(stockPriceGridLockKey1));
+                    });
+                });
+                Thread thread2 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () =>
+                    {
+                        writeLog.Add(nameof(stockPriceGridLockKey2));
+                        completeSignal.Set();
+                    });
+                });
+                Thread thread3 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey3, () => { writeLog.Add(nameof(stockPriceGridLockKey3)); });
+                });
+                Thread thread4 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey4, () => { writeLog.Add(nameof(stockPriceGridLockKey4)); });
+                });
+
+                thread1.Start();
+                Thread.Sleep(50);
+                thread2.Start();
+                Thread.Sleep(50);
+                thread3.Start();
+                Thread.Sleep(50);
+                thread4.Start();
+
+                completeSignal.WaitOne();
+                Assert.That(writeLog.Count == 4);
+                Assert.That(writeLog[0] == nameof(stockPriceGridLockKey3));
+                Assert.That(writeLog[1] == nameof(stockPriceGridLockKey4));
+                Assert.That(writeLog[2] == nameof(stockPriceGridLockKey1));
+                Assert.That(writeLog[3] == nameof(stockPriceGridLockKey2));
+            }
         }
     }
 }

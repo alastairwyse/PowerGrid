@@ -26,7 +26,7 @@ namespace PowerGrid.Grids
     /// <param name="Date">The date the price was quoted for.</param>
     /// <param name="Company">The company the price was quoted for.</param>
     /// <param name="Price">The price.</param>
-    public record StockPrice(String DataSource, DateOnly Date, String Company, Decimal Price) : IKeyPropertyComparable<StockPrice>, IValuePropertyEquatable<StockPrice>
+    public record StockPrice(String DataSource, DateOnly Date, String Company, Decimal Price) : IGridItem<StockPrice>
     {
         /// <inheritdoc/>
         public Int32 KeyCompareTo(StockPrice other)

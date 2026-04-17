@@ -86,7 +86,7 @@ namespace PowerGrid.Core.UnitTests
         }
 
         [Test]
-        public void GetHashCode()
+        public new void GetHashCode()
         {
             StockPrice otherStockPrice = new(bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-14"), canonCompany, 4431);
             StockPriceGridLockKey otherStockPriceGridLockKey = new StockPriceGridLockKey(otherStockPrice);

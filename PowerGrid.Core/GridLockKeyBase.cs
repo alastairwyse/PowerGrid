@@ -22,7 +22,7 @@ namespace PowerGrid.Core
     /// Base for classes which implement <see cref="IGridLockKey"/>.
     /// </summary>
     /// <typeparam name="T">The type of grid item the class creates a key for.</typeparam>
-    public abstract class GridLockKeyBase<T> : IGridLockKey where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public abstract class GridLockKeyBase<T> : IGridLockKey where T : IGridItem<T>
     {
         /// <summary>The grid item object to generate key for.</summary>
         protected T underlyingGridItem;
@@ -79,7 +79,13 @@ namespace PowerGrid.Core
         /// <inheritdoc/>
         public override Int32 GetHashCode()
         {
-            return HashCode.Combine(KeyPropertyValues);
+            HashCode hashCode = new();
+            foreach (Object currentKeyPropertyValue in KeyPropertyValues)
+            {
+                hashCode.Add(currentKeyPropertyValue);
+            }
+
+            return hashCode.ToHashCode();
         }
      }
 }

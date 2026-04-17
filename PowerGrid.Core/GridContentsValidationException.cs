@@ -22,7 +22,7 @@ namespace PowerGrid.Core
     /// The exception that is thrown when an item in a grid fails validation.
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridContentsValidationException<T> : Exception where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public class GridContentsValidationException<T> : Exception where T : IGridItem<T>
     {
         /// <summary>The item in the grid which failed to validate.</summary>
         protected T gridItem;

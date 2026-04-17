@@ -23,7 +23,7 @@ namespace PowerGrid.Core
     /// Validates items in a grid. 
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridContentsValidator<T> where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public class GridContentsValidator<T> where T : IGridItem<T>
     {
         /// <summary>
         /// Validates each of the items in a grid.

@@ -22,7 +22,7 @@ namespace PowerGrid.Core
     /// The exception that is thrown when a grid contains duplicate items.
     /// </summary>
     /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridContentsDuplicateItemsException<T> : Exception where T : IKeyPropertyComparable<T>, IValuePropertyEquatable<T>
+    public class GridContentsDuplicateItemsException<T> : Exception where T : IGridItem<T>
     {
         /// <summary>The item in the grid which was duplicated (based on <see cref="IKeyPropertyComparable{T}">key properties</see>).</summary>
         protected T gridItem;

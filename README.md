@@ -9,9 +9,6 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
-* GridLockKeyBase.GetHashCode() ISN'T WORKING
-* Add tests for GridLockKeyBase (likely via StockPriceGridLockKey)
-* Implement GridLockManager
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+
 * Should we introduce an IGridItem&lt;T&gt; interface which implements both IKeyPropertyComparable&lt;T&gt; and IValuePropertyEquatable&lt;T&gt;?
 * Review StockPriceGridLockKey... abstract, protected properties, and private members... could these be done better?
