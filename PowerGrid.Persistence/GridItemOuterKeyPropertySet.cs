@@ -21,5 +21,7 @@ namespace PowerGrid.Persistence
 {
     public record GridItemOuterKeyPropertySet(Type GridItemType) : IEquatable<GridItemOuterKeyPropertySet>
     {
+        // TODO... might need this when a grid contains extra key/classification properties which are separate from the grid items... but need to think about more
+        //   This should possibly be an interface, not a class
     }
 }

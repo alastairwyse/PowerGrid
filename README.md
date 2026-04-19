@@ -15,7 +15,21 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Review XML comments on IGridLockKey.  Could these be made better after 2nd read?
 * Should 'StockPriceGrids' table in database just be 'Grids' and have a column which denotes the grid type (e.g. 'StockPrice')?
 * Should PersistenceConcurrencyManager accept a Func rather than Action?
+* Interface for GridPersistence (i.e. in addition to current IGridItemPersister)...
+  * Get grid by outer key properties (how to have these an an interface since they'll differ for each grid implementation)
+  * Get list of grids by some combination of those key properties
+  * Have to somehow have the outer key properties defined as a T type?
 
 #### Longer Term TODO
 * Add another type of grid item (other than StockPrice), and use to push common functionality into 'Core' project, generic classes and methods, etc...
 * With above other type of grid item mentioned above, have a 'key', 'tag' or 'set id' property which is part of the IKeyPropertyComparable implementation (but not a natural/real-world property of the class).  This additional property should exist only in a derived class (e.g. if the property mentioned applied to StockPrice, the derived class could be called something like GridStockPrice), and the IKeyPropertyComparable and IValuePropertyEquatable implementations on that derived class should call the base class implementations (and extend them).
+* StockPricePersister (and any other persister classes) should have logging and metrics.
+* Add a 'connectionRetryAction' Action to any persister classes which support transient error retries.
+* Include validation filters which reject datasources etc which don't match a known whitelist... alternative to lookup tables and foreign key constraints
+
+#### Terminology
+* Grid - 
+* Grid Item - 
+* Key Property
+* Value Property
+* Outer Key Property - (might change this terminology)
