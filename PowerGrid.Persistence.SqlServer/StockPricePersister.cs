@@ -29,6 +29,7 @@ namespace PowerGrid.Persistence.SqlServer
     public class StockPricePersister : IGridPersister<StockPrice>
     {
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
+        protected const String transactionSql23DateStyle = "yyyy-MM-dd";
         protected const String transactionSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
 
         /// <summary>The string to use to connect to the SQL Server database.</summary>
@@ -41,6 +42,8 @@ namespace PowerGrid.Persistence.SqlServer
         protected List<Int32> sqlServerTransientErrorNumbers;
         /// <summary>The retry logic to use when connecting to and executing against the SQL Server database.</summary>
         protected SqlRetryLogicOption sqlRetryLogicOption;
+        /// <summary>Maps <see cref="SessionDeadlockPriority"/> values to their equivalent SQL Server string value.</summary>
+        protected Dictionary<SessionDeadlockPriority, String> deadlockPriorityToStringValueMap;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
@@ -76,6 +79,12 @@ namespace PowerGrid.Persistence.SqlServer
             sqlRetryLogicOption.MaxTimeInterval = TimeSpan.FromSeconds(120);
             sqlRetryLogicOption.DeltaTime = TimeSpan.FromSeconds(retryInterval);
             sqlRetryLogicOption.TransientErrors = sqlServerTransientErrorNumbers;
+            deadlockPriorityToStringValueMap = new Dictionary<SessionDeadlockPriority, String>()
+            {
+                { SessionDeadlockPriority.Low, "LOW"},
+                { SessionDeadlockPriority.Normal, "NORMAL"},
+                { SessionDeadlockPriority.High, "HIGH"},
+            };
         }
 
         /// <inheritdoc/>
@@ -93,7 +102,7 @@ namespace PowerGrid.Persistence.SqlServer
              */
 
             if (gridItems.Count == 0)
-                throw new ArgumentException($"Parameter '{gridItems}' contained no items.", nameof(gridItems));
+                throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
 
             try
             {
@@ -135,6 +144,9 @@ namespace PowerGrid.Persistence.SqlServer
                     );
             ";
 
+            if (String.IsNullOrWhiteSpace(dataSource) == true)
+                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
+
             using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand(query))
             {
@@ -149,7 +161,7 @@ namespace PowerGrid.Persistence.SqlServer
                     {
                         if (alreadyReadResult == true)
                         {
-                            throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for data source '{dataSource}' and date '{date.ToString("yyyy-MM-dd")}'.");
+                            throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for data source '{dataSource}' and date '{date.ToString(transactionSql23DateStyle)}'.");
                         }
                         latestGridVersionNumber = (Int32)dataReader["Version"];
                         latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
@@ -163,9 +175,49 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected IEnumerable<StockPrice> ReadExistingGrid(SqlConnection readConnection)
+        /// <summary>
+        /// Gets the contents of a stock price grid.
+        /// </summary>
+        /// <param name="dataSource">The datasource of the stock prices.</param>
+        /// <param name="date">The quotes date of the stock prices.</param>
+        /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
+        /// <returns>The items in the grid.</returns>
+        protected IEnumerable<StockPrice> GetExistingGrid(String dataSource, DateOnly date, DateTime transactionTimestamp)
         {
+            String query = @$"
+            SELECT DataSource, 
+                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                   Company, 
+                   Price
+            FROM   StockPrices 
+            WHERE  DataSource = 'xx'
+              AND  [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 126) 
+              AND  CONVERT(datetime2, '{date.ToString(transactionSql126DateStyle)}', 126) BETWEEN TransactionFrom AND TransactionTo;
+            ";
 
+            if (String.IsNullOrWhiteSpace(dataSource) == true)
+                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
+
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand(query))
+            {
+                PrepareConnectionAndCommand(connection, command);
+                using (SqlDataReader dataReader = command.ExecuteReader())
+                {
+                    while (dataReader.Read())
+                    {
+                        // See SqlServerPersisterUtilities.ExecuteQueryAndConvertColumnWithDeadlockRetry<T>
+                        //   Need retry ability but with ability to yield results
+
+                        String firstDataItemAsString = (String)dataReader[columnToConvert1];
+                        String secondDataItemAsString = (String)dataReader[columnToConvert2];
+                        TReturn1 firstDataItemConverted = returnType1ConversionFromStringFunction.Invoke(firstDataItemAsString);
+                        TReturn2 secondDataItemConverted = returnType2ConversionFromStringFunction.Invoke(secondDataItemAsString);
+                        yield return new Tuple<TReturn1, TReturn2>(firstDataItemConverted, secondDataItemConverted);
+                    }
+                }
+                TeardownConnectionAndCommand(connection, command);
+            }
         }
 
         /// <summary>
@@ -179,6 +231,24 @@ namespace PowerGrid.Persistence.SqlServer
             connection.Open();
             command.Connection = connection;
             command.CommandTimeout = operationTimeout;
+        }
+
+        /// <summary>
+        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a query against them, and sets the session deadlock priority.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="command">The command which runs the query.</param>
+        /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
+        protected virtual void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command, SessionDeadlockPriority deadlockPriority)
+        {
+            PrepareConnectionAndCommand(connection, command);
+            String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
+            using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
+            {
+                setDeadlockPriorityCommand.Connection = connection;
+                setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
+                setDeadlockPriorityCommand.ExecuteNonQuery();
+            }
         }
 
         /// <summary>
