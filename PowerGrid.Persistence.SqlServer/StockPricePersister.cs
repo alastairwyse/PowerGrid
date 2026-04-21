@@ -14,12 +14,13 @@
 * limitations under the License.
 */
 
-using Microsoft.Data.SqlClient;
-using PowerGrid.Core;
-using PowerGrid.Grids;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Microsoft.Data.SqlClient;
+using PowerGrid.Core;
+using PowerGrid.Grids;
+using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 
 namespace PowerGrid.Persistence.SqlServer
 {
@@ -104,6 +105,8 @@ namespace PowerGrid.Persistence.SqlServer
             if (gridItems.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
 
+            // TODO: Next setup the comparer and methods to insert, update, delete
+
             try
             {
 
@@ -178,17 +181,21 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Gets the contents of a stock price grid.
         /// </summary>
+        /// <param name="connection">The connection to use to retrieve the grid.</param>
         /// <param name="dataSource">The datasource of the stock prices.</param>
         /// <param name="date">The quotes date of the stock prices.</param>
         /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
         /// <returns>The items in the grid.</returns>
-        protected IEnumerable<StockPrice> GetExistingGrid(String dataSource, DateOnly date, DateTime transactionTimestamp)
+        protected IEnumerable<StockPricePTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
         {
             String query = @$"
-            SELECT DataSource, 
+            SELECT Id, 
+                   DataSource, 
                    CONVERT(nvarchar(30), [Date], 23) AS [Date], 
                    Company, 
-                   Price
+                   Price, 
+                   TransactionFrom, 
+                   TransactionTo 
             FROM   StockPrices 
             WHERE  DataSource = 'xx'
               AND  [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 126) 
@@ -198,7 +205,6 @@ namespace PowerGrid.Persistence.SqlServer
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
-            using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand(query))
             {
                 PrepareConnectionAndCommand(connection, command);
@@ -206,14 +212,17 @@ namespace PowerGrid.Persistence.SqlServer
                 {
                     while (dataReader.Read())
                     {
-                        // See SqlServerPersisterUtilities.ExecuteQueryAndConvertColumnWithDeadlockRetry<T>
-                        //   Need retry ability but with ability to yield results
+                        Int64 currentId = (Int64)dataReader["Id"];
+                        String currentDataSource = (String)dataReader["DataSource"];
+                        DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        String currentCompany = (String)dataReader["Company"];
+                        Decimal currentPrice = Decimal.Parse((String)dataReader["Price"]);
+                        DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
+                        DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        currentTransactionTo = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
 
-                        String firstDataItemAsString = (String)dataReader[columnToConvert1];
-                        String secondDataItemAsString = (String)dataReader[columnToConvert2];
-                        TReturn1 firstDataItemConverted = returnType1ConversionFromStringFunction.Invoke(firstDataItemAsString);
-                        TReturn2 secondDataItemConverted = returnType2ConversionFromStringFunction.Invoke(secondDataItemAsString);
-                        yield return new Tuple<TReturn1, TReturn2>(firstDataItemConverted, secondDataItemConverted);
+                        yield return new StockPricePTO(currentId, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
                     }
                 }
                 TeardownConnectionAndCommand(connection, command);

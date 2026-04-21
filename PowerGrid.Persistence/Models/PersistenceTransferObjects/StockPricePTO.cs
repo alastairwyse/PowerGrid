@@ -1,0 +1,44 @@
+﻿/*
+* Copyright 2026 Alastair Wyse (https://github.com/alastairwyse/PowerGrid/)
+* 
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+* 
+*     http://www.apache.org/licenses/LICENSE-2.0
+* 
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
+using System;
+using PowerGrid.Grids;
+
+namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
+{
+    /// <summary>
+    /// Persistence transfer class holding a stock price.
+    /// </summary>
+    /// <param name="Id">Unique persistence platform id for the stock price.</param>
+    /// <param name="DataSource">The source/entity which provided the price.</param>
+    /// <param name="Date">The date the price was quoted for.</param>
+    /// <param name="Company">The company the price was quoted for.</param>
+    /// <param name="Price">The price.</param>
+    /// <param name="TransactionFrom">The date and time that the stock price became active.</param>
+    /// <param name="TransactionTo">The date and time that the stock price was superseded or deleted.</param>
+    public record StockPricePTO
+    (
+        Int64 Id,
+        String DataSource,
+        DateOnly Date,
+        String Company,
+        Decimal Price,
+        DateTime TransactionFrom,
+        DateTime TransactionTo
+    ) : StockPrice(DataSource, Date, Company, Price)
+    {
+    }
+}

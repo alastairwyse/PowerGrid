@@ -19,6 +19,8 @@ A prototype for a system persisting grids of data to a database, with advanced s
   * Get grid by outer key properties (how to have these an an interface since they'll differ for each grid implementation)
   * Get list of grids by some combination of those key properties
   * Have to somehow have the outer key properties defined as a T type?
+* GridComparer&lt;T&gt; may need to specify 2 generic types... one for the new data source and one for the existing (since existing will have DB specific PTO properties like Id and temporal dates)... and there should be a constraint so that the existing derives from the new.  OR, another alternative could be to put the query results (new/PTO version) into a Dictionary, and the emitted rows for update/insert (emitted from the GridComparer) could be retrieved from the Dictionary based on key equality.  Second option probably keeps the GridComparer more sinple and generic.
+* IGridPersister probably needs 2x T types... one for the base grid item class and the other for the PTO equiv.  Same as what I was suggesting for GridComparer above.
 
 #### Longer Term TODO
 * Add another type of grid item (other than StockPrice), and use to push common functionality into 'Core' project, generic classes and methods, etc...
@@ -28,8 +30,8 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Include validation filters which reject datasources etc which don't match a known whitelist... alternative to lookup tables and foreign key constraints
 
 #### Terminology
-* Grid - 
-* Grid Item - 
-* Key Property
+* Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/
+* Grid Item - I single data point within a grid.  Equivalent to a single row in a relational database.
+* Key Property - 
 * Value Property
 * Outer Key Property - (might change this terminology)
