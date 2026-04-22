@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
@@ -37,6 +38,8 @@ namespace PowerGrid.Persistence.SqlServer
         protected String connectionString;
         /// <summary>The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</summary>
         protected Int32 operationTimeout;
+        /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</summary>
+        protected ISqlCommandShim sqlCommandShim;
         /// <summary>A set of SQL Server database engine error numbers which denote a transient fault.</summary>
         /// <see href="https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16"/>
         /// <see href="https://docs.microsoft.com/en-us/azure/azure-sql/database/troubleshoot-common-errors-issues?view=azuresql"/>
@@ -49,6 +52,10 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
         /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
         public StockPricePersister
         (
             String connectionString,
@@ -72,6 +79,7 @@ namespace PowerGrid.Persistence.SqlServer
 
             this.connectionString = connectionString;
             this.operationTimeout = operationTimeout;
+            sqlCommandShim = new DefaultSqlCommandShim();
             // Setup retry logic
             sqlServerTransientErrorNumbers = GenerateSqlServerTransientErrorNumbers();
             sqlRetryLogicOption = new SqlRetryLogicOption();
@@ -86,6 +94,27 @@ namespace PowerGrid.Persistence.SqlServer
                 { SessionDeadlockPriority.Normal, "NORMAL"},
                 { SessionDeadlockPriority.High, "HIGH"},
             };
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
+        /// <remarks>This constructor is included to facilitate unit testing.</remarks>
+        public StockPricePersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            ISqlCommandShim sqlCommandShim
+        ) : this(connectionString, retryCount, retryInterval, operationTimeout)
+        {
+            this.sqlCommandShim = sqlCommandShim;
         }
 
         /// <inheritdoc/>
@@ -157,7 +186,7 @@ namespace PowerGrid.Persistence.SqlServer
                 DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
                 PrepareConnectionAndCommand(connection, command);
-                using (SqlDataReader dataReader = command.ExecuteReader())
+                using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     Boolean alreadyReadResult = false;
                     while (dataReader.Read())
@@ -208,7 +237,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var command = new SqlCommand(query))
             {
                 PrepareConnectionAndCommand(connection, command);
-                using (SqlDataReader dataReader = command.ExecuteReader())
+                using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
                     {
@@ -227,6 +256,39 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 TeardownConnectionAndCommand(connection, command);
             }
+        }
+
+        // REFACTORING: 
+        //   All below methods could go to base class, once PTO type is included in generic signature
+
+        /// <summary>
+        /// Adds an item to the current/latest grid.
+        /// </summary>
+        /// <param name="item">The item to add.</param>
+        /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
+        protected void InsertGridItem(StockPricePTO item, DateTime insertDateTime)
+        {
+
+        }
+
+        /// <summary>
+        /// Updates an existing item in the current/latest grid.
+        /// </summary>
+        /// <param name="item">The item to update.</param>
+        /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
+        protected void UpdateGridItem(StockPricePTO item, DateTime udpateDateTime)
+        {
+
+        }
+
+        /// <summary>
+        /// Deletes an existing item from the current/latest grid.
+        /// </summary>
+        /// <param name="item">The item to delete.</param>
+        /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
+        protected void DeleteGridItem(StockPricePTO item, DateTime deleteDateTime)
+        {
+
         }
 
         /// <summary>

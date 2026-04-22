@@ -28,6 +28,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * StockPricePersister (and any other persister classes) should have logging and metrics.
 * Add a 'connectionRetryAction' Action to any persister classes which support transient error retries.
 * Include validation filters which reject datasources etc which don't match a known whitelist... alternative to lookup tables and foreign key constraints
+* Figure out what to do with deadlock handling in read of existing data for grid upload.  I.e. expect if deadlock is retried it will reset enumeration (and ultimately return duplicate grid items).  Need to figure out if 1. concurrent read and update on same connection actually works (Google 'AI' keeps giving vastly different 'random' responses after earlier confidently telling me it would work... let's see)... 2. if it works are deadlocks actually a problem, or doesn't the sengle connection prevent it?
 
 #### Terminology
 * Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/
