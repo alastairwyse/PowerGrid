@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Frozen;
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
@@ -30,8 +31,9 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class StockPricePersister : IGridPersister<StockPrice>
     {
-        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactionSql23DateStyle = "yyyy-MM-dd";
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
         protected const String transactionSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
 
         /// <summary>The string to use to connect to the SQL Server database.</summary>
@@ -47,7 +49,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>The retry logic to use when connecting to and executing against the SQL Server database.</summary>
         protected SqlRetryLogicOption sqlRetryLogicOption;
         /// <summary>Maps <see cref="SessionDeadlockPriority"/> values to their equivalent SQL Server string value.</summary>
-        protected Dictionary<SessionDeadlockPriority, String> deadlockPriorityToStringValueMap;
+        protected IDictionary<SessionDeadlockPriority, String> deadlockPriorityToStringValueMap;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
@@ -94,6 +96,7 @@ namespace PowerGrid.Persistence.SqlServer
                 { SessionDeadlockPriority.Normal, "NORMAL"},
                 { SessionDeadlockPriority.High, "HIGH"},
             };
+            deadlockPriorityToStringValueMap = deadlockPriorityToStringValueMap.ToFrozenDictionary();
         }
 
         /// <summary>
@@ -135,6 +138,10 @@ namespace PowerGrid.Persistence.SqlServer
                 throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
 
             // TODO: Next setup the comparer and methods to insert, update, delete
+            //   Need emitter implementations that call Insert/Update/Delete
+            //   Plus Dict that maps StockPrices to StockPricePTOs (for updates and deletes)
+            //   Plus protected method to insert the StockPriceGrids row
+            //     DO THIS FIRST... and then tie everything together
 
             try
             {
@@ -264,31 +271,143 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Adds an item to the current/latest grid.
         /// </summary>
+        /// <param name="connection">The connection to use to insert.</param>
         /// <param name="item">The item to add.</param>
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
-        protected void InsertGridItem(StockPricePTO item, DateTime insertDateTime)
+        protected void InsertGridItem(SqlConnection connection, StockPrice item, DateTime insertDateTime)
         {
+            String query = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        '{item.DataSource}', 
+                        CONVERT(date, '{item.Date.ToString(transactionSql23DateStyle)}', 23), 
+                        '{item.Company}', 
+                        {item.Price}, 
+                        CONVERT(date, '{insertDateTime.ToString(transactionSql126DateStyle)}', 126) , 
+                        dbo.GetTemporalMaxDate()
+                    );
+            ";
 
+            try
+            {
+                ExecuteNonQueryWithDeadlockRetry(connection, query);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to insert stock price with datasource '{item.DataSource}', date '{item.Date.ToString(transactionSql23DateStyle)}', 23)', and company '{item.Company}' into SQL Server.", e);
+            }
         }
 
         /// <summary>
         /// Updates an existing item in the current/latest grid.
         /// </summary>
+        /// <param name="connection">The connection to use to update.</param>
         /// <param name="item">The item to update.</param>
         /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
-        protected void UpdateGridItem(StockPricePTO item, DateTime udpateDateTime)
+        protected void UpdateGridItem(SqlConnection connection, StockPricePTO item, DateTime udpateDateTime)
         {
-
+            try
+            {
+                DeleteGridItem(connection, item, udpateDateTime);
+                InsertGridItem(connection, item, udpateDateTime);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to update stock price with id '{item.Id}' in SQL Server.", e);
+            }
         }
 
         /// <summary>
         /// Deletes an existing item from the current/latest grid.
         /// </summary>
+        /// <param name="connection">The connection to use to delete.</param>
         /// <param name="item">The item to delete.</param>
         /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
-        protected void DeleteGridItem(StockPricePTO item, DateTime deleteDateTime)
+        protected void DeleteGridItem(SqlConnection connection, StockPricePTO item, DateTime deleteDateTime)
         {
+            String query = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, '{deleteDateTime.ToString(transactionSql126DateStyle)}', 126))
+            WHERE   Id = {item.Id};
+            ";
 
+            try
+            {
+                ExecuteNonQueryWithDeadlockRetry(connection, query);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to delete stock price with id '{item.Id}' in SQL Server.", e);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to execute a non-query SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
+        /// </summary>
+        /// <param name="connection">The connection to use to execute the command.</param>
+        /// <param name="commandText">The SQL command as a string.</param>
+        protected void ExecuteNonQueryWithDeadlockRetry(SqlConnection connection, String commandText)
+        {
+            const Int32 deadlockErrorNumber = 1205;
+
+            Int32 retryCount = sqlRetryLogicOption.NumberOfTries - 1;
+            var exceptions = new List<Exception>();
+            while (true)
+            {
+                try
+                {
+                    using (var command = new SqlCommand(commandText))
+                    {
+                        connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
+                        //connection.RetryLogicProvider.Retrying += connectionRetryAction;
+                        connection.Open();
+                        command.Connection = connection;
+                        command.CommandTimeout = operationTimeout;
+                        /* REFACTORING: Commenting, as not sure SQL Server will like if you change deadlock priority whilst it's in the middle of the read
+                        String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.Low]};";
+                        using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
+                        {
+                            setDeadlockPriorityCommand.Connection = connection;
+                            setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
+                            setDeadlockPriorityCommand.ExecuteNonQuery();
+                        }
+                        */
+                        command.ExecuteNonQuery();
+                        break;
+                     }
+                }
+                catch (SqlException sqlException)
+                {
+                    if (sqlException.Errors.Count > 0 && sqlException.Errors[0].Number == deadlockErrorNumber)
+                    {
+                        exceptions.Add(sqlException);
+                        if (retryCount > 0)
+                        {
+                            var retryEventArgs = new SqlRetryingEventArgs(sqlRetryLogicOption.NumberOfTries - retryCount, new TimeSpan(0), exceptions);
+                            //connectionRetryAction.Invoke(this, retryEventArgs);
+                            retryCount--;
+                        }
+                        else
+                        {
+                            String exceptionMessage = $"The number of deadlock retries has exceeded the maximum of {sqlRetryLogicOption.NumberOfTries} attempt(s).";
+                            throw new AggregateException(exceptionMessage, exceptions);
+                        }
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -346,13 +465,12 @@ namespace PowerGrid.Persistence.SqlServer
             return returnList;
         }
 
-
         /// <summary>
         /// Throws an <see cref="ArgumentException"/> is the specified 'connectionString' parameter is null or whitespace.
         /// </summary>
         /// <param name="connectionStringParameterName">The name of the parameter.</param>
         /// <param name="connectionString">The value of the parameter.</param>
-        public void ThrowExceptionIfConnectionStringParameterNullOrWhitespace(String connectionStringParameterName, String connectionString)
+        protected void ThrowExceptionIfConnectionStringParameterNullOrWhitespace(String connectionStringParameterName, String connectionString)
         {
             if (String.IsNullOrWhiteSpace(connectionString) == true)
                 throw new ArgumentException($"Parameter '{connectionStringParameterName}' must contain a value.", nameof(connectionString));
@@ -363,7 +481,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// </summary>
         /// <param name="operationTimeoutParameterName">The name of the parameter.</param>
         /// <param name="operationTimeout">The value of the parameter.</param>
-        public void ThrowExceptionIfOperationTimeoutParameterLessThanZero(String operationTimeoutParameterName, Int32 operationTimeout)
+        protected void ThrowExceptionIfOperationTimeoutParameterLessThanZero(String operationTimeoutParameterName, Int32 operationTimeout)
         {
             if (operationTimeout < 0)
                 throw new ArgumentOutOfRangeException(nameof(operationTimeout), $"Parameter '{operationTimeoutParameterName}' with value {operationTimeout} cannot be less than 0.");
