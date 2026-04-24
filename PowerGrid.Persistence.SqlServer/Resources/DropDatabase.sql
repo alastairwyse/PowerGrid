@@ -15,6 +15,7 @@ GO
 DROP FUNCTION dbo.GetTemporalMaxDate;
 DROP FUNCTION dbo.SubtractTemporalMinimumTimeUnit;
 
+
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- Drop Tables

@@ -15,8 +15,8 @@
 */
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Frozen;
+using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
@@ -165,7 +165,7 @@ namespace PowerGrid.Persistence.SqlServer
         {
             // REFACTORING: 
             //   General steps here in base case
-            //   Query can be abstract (or tablename and parameters... other parts of the query should be common)
+            //   Query can be abstract (or tablename and parameters... other parts of the insertStatement should be common)
             //   Use AppAccess SqlServerPersisterUtilities and ReadQueryGeneratorBase classes for influence in how to split platform-agnostic SQL into base classes
 
             String query = @$"
@@ -266,7 +266,7 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         // REFACTORING: 
-        //   All below methods could go to base class, once PTO type is included in generic signature
+        //   All below methods could go to base class, once PTO type is included in generic signature.  Just queries would defined in derived class.
 
         /// <summary>
         /// Adds an item to the current/latest grid.
@@ -276,7 +276,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
         protected void InsertGridItem(SqlConnection connection, StockPrice item, DateTime insertDateTime)
         {
-            String query = @$"
+            String insertStatement = @$"
             INSERT 
             INTO    StockPrices 
                     (
@@ -299,11 +299,11 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                ExecuteNonQueryWithDeadlockRetry(connection, query);
+                ExecuteNonQueryWithDeadlockRetry(connection, insertStatement);
             }
             catch (Exception e)
             {
-                throw new Exception($"Failed to insert stock price with datasource '{item.DataSource}', date '{item.Date.ToString(transactionSql23DateStyle)}', 23)', and company '{item.Company}' into SQL Server.", e);
+                throw new Exception($"Failed to insert stock price with datasource '{item.DataSource}', date '{item.Date.ToString(transactionSql23DateStyle)}', and company '{item.Company}' into SQL Server.", e);
             }
         }
 
@@ -334,7 +334,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
         protected void DeleteGridItem(SqlConnection connection, StockPricePTO item, DateTime deleteDateTime)
         {
-            String query = @$"
+            String deleteStatement = @$"
             UPDATE  StockPrices 
             SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, '{deleteDateTime.ToString(transactionSql126DateStyle)}', 126))
             WHERE   Id = {item.Id};
@@ -342,7 +342,7 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                ExecuteNonQueryWithDeadlockRetry(connection, query);
+                ExecuteNonQueryWithDeadlockRetry(connection, deleteStatement);
             }
             catch (Exception e)
             {
@@ -350,8 +350,63 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
+        protected Int32 CreateGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime createDateTime)
+        {
+            String maxIdQuery = @$"
+            SELECT  MAX(Id) AS MaxId
+            FROM    StockPriceGrids 
+            WHERE   DataSource = '{dataSource}'
+              AND   [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23);
+            ";
+
+            Int32 gridVersionNumber = 1;
+            using (var command = new SqlCommand(maxIdQuery))
+            {
+                PrepareConnectionAndCommand(connection, command);
+                using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                {
+                    while (dataReader.Read())
+                    {
+                        if (dataReader["MaxId"] != DBNull.Value)
+                        {
+                            gridVersionNumber = (Int32)dataReader["MaxId"] + 1;
+                        }
+                    }
+                }
+                TeardownConnectionAndCommand(connection, command);
+            }
+
+            String insertStatement = $@"
+            INSERT 
+            INTO    StockPriceGrids 
+                    (
+                        DataSource, 
+                        [Date], 
+                        [Version], 
+                        TransactionTimestamp
+                    )
+            VALUES  (
+                        '{dataSource}', 
+                        CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23), 
+                        {gridVersionNumber}, 
+                        CONVERT(datetime2, '{createDateTime.ToString(transactionSql126DateStyle)}', 126)
+                    );
+            ";
+
+            try
+            {
+                ExecuteNonQueryWithDeadlockRetry(connection, insertStatement);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to insert stock price grid for datasource '{dataSource}', date '{date.ToString(transactionSql23DateStyle)}', and version {gridVersionNumber} into SQL Server.", e);
+            }
+
+            return gridVersionNumber;
+        }
+
         /// <summary>
-        /// Attempts to execute a non-query SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
+        /// Attempts to execute a non-insertStatement SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
         /// </summary>
         /// <param name="connection">The connection to use to execute the command.</param>
         /// <param name="commandText">The SQL command as a string.</param>
@@ -411,10 +466,10 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a query against them.
+        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a insertStatement against them.
         /// </summary>
         /// <param name="connection">The connection.</param>
-        /// <param name="command">The command which runs the query.</param>
+        /// <param name="command">The command which runs the insertStatement.</param>
         protected void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command)
         {
             connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
@@ -424,10 +479,10 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a query against them, and sets the session deadlock priority.
+        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a insertStatement against them, and sets the session deadlock priority.
         /// </summary>
         /// <param name="connection">The connection.</param>
-        /// <param name="command">The command which runs the query.</param>
+        /// <param name="command">The command which runs the insertStatement.</param>
         /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
         protected virtual void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command, SessionDeadlockPriority deadlockPriority)
         {
