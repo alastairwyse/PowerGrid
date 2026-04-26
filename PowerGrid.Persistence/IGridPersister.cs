@@ -23,18 +23,20 @@ namespace PowerGrid.Persistence
     /// <summary>
     /// Defines methods to read and write grids from and to persistent storage.
     /// </summary>
-    /// <typeparam name="T">The type of items stored in the grid.</typeparam>
-    public interface IGridPersister<T> where T : IGridItem<T>
+    /// <typeparam name="TGridItemPTO">The type of items stored in grids in persistent storage.</typeparam>
+    /// <typeparam name="TGridItem">The type of items in the new grids to be written to persistent storage.</typeparam>
+    public interface IGridPersister<TGridItemPTO, TGridItem> where TGridItemPTO : TGridItem, IGridItem<TGridItem> where TGridItem : IGridItem<TGridItem>
     {
         // TODO: Previously had granular CRUD methods here to deal with individual grid items, but realized that the whole comparison and all resulting updates need to be done in a transaction.
         //   In the future might want to add more granular methods... e.g. just to upsert a collection of grid items, or to delete a collection of grid items.
         //   How to get a grid?  Parameters could be different depending on grid item.
         //   Also need methods to get grid details... should that be a aeparate iterface?
+        // TODO: Get methods will return PTO type (if/shen defined)
 
         /// <summary>
         /// Writes the specified grid to persistent storage.
         /// </summary>
         /// <param name="gridItems">The items in the grid.</param>
-        GridComparisonStatistics PersistGrid(IList<T> gridItems);
+        GridComparisonStatistics PersistGrid(IList<TGridItem> gridItems);
     }
 }

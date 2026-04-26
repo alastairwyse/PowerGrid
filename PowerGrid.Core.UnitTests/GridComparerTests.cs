@@ -39,18 +39,18 @@ namespace PowerGrid.Core.UnitTests
         private List<StockPrice> existingGridContents;
         private List<StockPrice> newGridContents;
         private List<StockPrice> addedItems;
-        private List<StockPrice> updatedItems;
+        private List<Tuple<StockPrice, StockPrice>> updatedItems;
         private List<StockPrice> deletedItems;
-        private GridComparer<StockPrice> testGridComparer;
+        private GridComparer<StockPrice, StockPrice> testGridComparer;
 
         [SetUp]
         protected void SetUp()
         {
             utils = new TestUtilities();
             addedItems = new List<StockPrice>();
-            updatedItems = new List<StockPrice>();
+            updatedItems = new List<Tuple<StockPrice, StockPrice>>();
             deletedItems = new List<StockPrice>();
-            testGridComparer = new GridComparer<StockPrice>(new ListEmitter<StockPrice>(addedItems), new ListEmitter<StockPrice>(updatedItems), new ListEmitter<StockPrice>(deletedItems));
+            testGridComparer = new GridComparer<StockPrice, StockPrice>(new ListEmitter<StockPrice>(addedItems), new ListEmitter<Tuple<StockPrice, StockPrice>>(updatedItems), new ListEmitter<StockPrice>(deletedItems));
         }
 
         [Test]
@@ -74,7 +74,8 @@ namespace PowerGrid.Core.UnitTests
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 1);
             Assert.That(deletedItems.Count == 0);
-            Assert.That(updatedItems[0] == newGridContents[0]);
+            Assert.That(updatedItems[0].Item1 == existingGridContents[0]);
+            Assert.That(updatedItems[0].Item2 == newGridContents[0]);
             Assert.That(statistics.ItemsAddedCount == 0);
             Assert.That(statistics.ItemsUpdatedCount == 1);
             Assert.That(statistics.ItemsDeletedCount == 0);
@@ -101,7 +102,8 @@ namespace PowerGrid.Core.UnitTests
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 1);
             Assert.That(deletedItems.Count == 0);
-            Assert.That(updatedItems[0] == newGridContents[1]);
+            Assert.That(updatedItems[0].Item1 == existingGridContents[1]);
+            Assert.That(updatedItems[0].Item2 == newGridContents[1]);
             Assert.That(statistics.ItemsAddedCount == 0);
             Assert.That(statistics.ItemsUpdatedCount == 1);
             Assert.That(statistics.ItemsDeletedCount == 0);
@@ -128,7 +130,8 @@ namespace PowerGrid.Core.UnitTests
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 1);
             Assert.That(deletedItems.Count == 0);
-            Assert.That(updatedItems[0] == newGridContents[2]);
+            Assert.That(updatedItems[0].Item1 == existingGridContents[2]);
+            Assert.That(updatedItems[0].Item2 == newGridContents[2]);
             Assert.That(statistics.ItemsAddedCount == 0);
             Assert.That(statistics.ItemsUpdatedCount == 1);
             Assert.That(statistics.ItemsDeletedCount == 0);
@@ -367,10 +370,14 @@ namespace PowerGrid.Core.UnitTests
             Assert.That(addedItems.Count == 0);
             Assert.That(updatedItems.Count == 4);
             Assert.That(deletedItems.Count == 0);
-            Assert.That(updatedItems[0] == newGridContents[0]);
-            Assert.That(updatedItems[1] == newGridContents[1]);
-            Assert.That(updatedItems[2] == newGridContents[2]);
-            Assert.That(updatedItems[3] == newGridContents[3]);
+            Assert.That(updatedItems[0].Item1 == existingGridContents[0]);
+            Assert.That(updatedItems[1].Item1 == existingGridContents[1]);
+            Assert.That(updatedItems[2].Item1 == existingGridContents[2]);
+            Assert.That(updatedItems[3].Item1 == existingGridContents[3]);
+            Assert.That(updatedItems[0].Item2 == newGridContents[0]);
+            Assert.That(updatedItems[1].Item2 == newGridContents[1]);
+            Assert.That(updatedItems[2].Item2 == newGridContents[2]);
+            Assert.That(updatedItems[3].Item2 == newGridContents[3]);
             Assert.That(statistics.ItemsAddedCount == 0);
             Assert.That(statistics.ItemsUpdatedCount == 4);
             Assert.That(statistics.ItemsDeletedCount == 0);

@@ -29,7 +29,7 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Reads and writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPricePersister : IGridPersister<StockPrice>
+    public class StockPricePersister : IGridPersister<StockPricePTO, StockPrice>
     {
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactionSql23DateStyle = "yyyy-MM-dd";
@@ -137,6 +137,10 @@ namespace PowerGrid.Persistence.SqlServer
             if (gridItems.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
 
+            // TODO: Need to create the SQlConnection (in using) and the change datatime... SO NEED A datetime provider
+
+            DataBaseOperationEmitter<StockPrice> addedItemEmitter = new()
+
             // TODO: Next setup the comparer and methods to insert, update, delete
             //   Need emitter implementations that call Insert/Update/Delete
             //   Plus Dict that maps StockPrices to StockPricePTOs (for updates and deletes)
@@ -235,7 +239,10 @@ namespace PowerGrid.Persistence.SqlServer
             FROM   StockPrices 
             WHERE  DataSource = 'xx'
               AND  [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 126) 
-              AND  CONVERT(datetime2, '{date.ToString(transactionSql126DateStyle)}', 126) BETWEEN TransactionFrom AND TransactionTo;
+              AND  CONVERT(datetime2, '{date.ToString(transactionSql126DateStyle)}', 126) BETWEEN TransactionFrom AND TransactionTo
+            ORDER  BY DataSource, 
+                      [Date], 
+                      Company;
             ";
 
             if (String.IsNullOrWhiteSpace(dataSource) == true)
@@ -311,18 +318,19 @@ namespace PowerGrid.Persistence.SqlServer
         /// Updates an existing item in the current/latest grid.
         /// </summary>
         /// <param name="connection">The connection to use to update.</param>
-        /// <param name="item">The item to update.</param>
+        /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
+        /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
         /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
-        protected void UpdateGridItem(SqlConnection connection, StockPricePTO item, DateTime udpateDateTime)
+        protected void UpdateGridItem(SqlConnection connection, StockPricePTO supersededItem, StockPrice newItem, DateTime udpateDateTime)
         {
             try
             {
-                DeleteGridItem(connection, item, udpateDateTime);
-                InsertGridItem(connection, item, udpateDateTime);
+                DeleteGridItem(connection, supersededItem, udpateDateTime);
+                InsertGridItem(connection, newItem, udpateDateTime);
             }
             catch (Exception e)
             {
-                throw new Exception($"Failed to update stock price with id '{item.Id}' in SQL Server.", e);
+                throw new Exception($"Failed to update stock price with id '{supersededItem.Id}' in SQL Server.", e);
             }
         }
 
@@ -540,6 +548,43 @@ namespace PowerGrid.Persistence.SqlServer
         {
             if (operationTimeout < 0)
                 throw new ArgumentOutOfRangeException(nameof(operationTimeout), $"Parameter '{operationTimeoutParameterName}' with value {operationTimeout} cannot be less than 0.");
+        }
+
+        #endregion
+
+        #region Nested Classes
+
+        /// <summary>
+        /// An implementation of <see cref="IEmitter{T}"/> which performs an action against a SQL Server database.
+        /// </summary>
+        /// <typeparam name="T">The type of object emitted and used in the database operation.</typeparam>
+        protected class DataBaseOperationEmitter<T> : IEmitter<T>
+        {
+            // REFACTORING: Can we put this into a base class?  SqlConnection would have to become a generic type.
+
+            /// <summary>The connection to use to perform the operation.</summary>
+            protected SqlConnection connection;
+            /// <summary>The date and time that the operation occurred.</summary>
+            protected DateTime operationDateTime;
+            /// <summary>An action which performs the database operation.  Accepts 3 parameters: the connection to use to perform the operation, the object used in the database operation, and the date and time that the operation occurred.</summary>
+            protected Action<SqlConnection, T, DateTime> operationAction;
+
+            /// <summary>
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister+DataBaseOperationEmitter class.
+            /// </summary>
+            /// <param name="connection">The connection to use to perform the operation.</param>
+            /// <param name="operationDateTime">The date and time that the operation occurred.</param>
+            public DataBaseOperationEmitter(SqlConnection connection, DateTime operationDateTime)
+            {
+                this.connection = connection;
+                this.operationDateTime = operationDateTime;
+            }
+
+            /// <inheritdoc/>
+            public void Emit(T instance)
+            {
+                operationAction(connection, instance, operationDateTime);
+            }
         }
 
         #endregion

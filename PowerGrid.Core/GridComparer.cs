@@ -20,25 +20,27 @@ using System.Collections.Generic;
 namespace PowerGrid.Core
 {
     /// <summary>
-    /// Analyzes and outputs the differences between the sorted contents of two grids.
+    /// Analyzes and outputs the differences between the sorted contents of two grids (one containing existing data, and one containing new data).
     /// </summary>
-    /// <typeparam name="T">The type of data stored in the grid.</typeparam>
-    public class GridComparer<T> where T : IGridItem<T>
+    /// <typeparam name="TExisting">The type of data stored in the existing grid.</typeparam>
+    /// <typeparam name="TNew">The type of data stored in the new grid.</typeparam>
+    /// <remarks>The reason for the distinction between <typeparamref name="TExisting"/> and <typeparamref name="TNew"/> is to allow <typeparamref name="TExisting"/> to contain additional properties (e.g. properties specific to persistence like database unique ids), and still be emitted as their original type during the comparison process.</remarks>
+    public class GridComparer<TExisting, TNew> where TExisting : TNew, IGridItem<TNew> where TNew : IGridItem<TNew>
     {
         /// <summary>An <see cref="IEmitter{T}"/> instance to which items added to the existing grid are outputted during the comparison process.</summary>
-        protected IEmitter<T> addedItemsEmitter;
-        /// <summary>An <see cref="IEmitter{T}"/> instance to which items updated in the existing grid are outputted during the comparison process.</summary>
-        protected IEmitter<T> updatedItemsEmitter;
+        protected IEmitter<TNew> addedItemsEmitter;
+        /// <summary>An <see cref="IEmitter{T}"/> instance to which items updated in the existing grid are outputted during the comparison process (the existing/superseded item, and the item which replaces it).</summary>
+        protected IEmitter<Tuple<TExisting, TNew>> updatedItemsEmitter;
         /// <summary>An <see cref="IEmitter{T}"/> instance to which items deleted from the existing grid are outputted during the comparison process.</summary>
-        protected IEmitter<T> deletedItemsEmitter;
+        protected IEmitter<TExisting> deletedItemsEmitter;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Core.GridComparer class.
         /// </summary>
         /// <param name="addedItemsEmitter">An <see cref="IEmitter{T}"/> instance to which items added to the existing grid are outputted during the comparison process.</param>
-        /// <param name="updatedItemsEmitter">An <see cref="IEmitter{T}"/> instance to which items updated in the existing grid are outputted during the comparison process.</param>
+        /// <param name="updatedItemsEmitter">An <see cref="IEmitter{T}"/> instance to which items updated in the existing grid are outputted during the comparison process (the existing/superseded item, and the item which replaces it).</param>
         /// <param name="deletedItemsEmitter">An <see cref="IEmitter{T}"/> instance to which items deleted from the existing grid are outputted during the comparison process.</param>
-        public GridComparer(IEmitter<T> addedItemsEmitter, IEmitter<T> updatedItemsEmitter, IEmitter<T> deletedItemsEmitter)
+        public GridComparer(IEmitter<TNew> addedItemsEmitter, IEmitter<Tuple<TExisting, TNew>> updatedItemsEmitter, IEmitter<TExisting> deletedItemsEmitter)
         {
             this.addedItemsEmitter = addedItemsEmitter;
             this.updatedItemsEmitter = updatedItemsEmitter;
@@ -51,11 +53,11 @@ namespace PowerGrid.Core
         /// <param name="existingGridContents">The items in the existing grid.</param>
         /// <param name="newGridContents">The items in the new grid.</param>
         /// <returns>Statistics containing counts of the items emitted.</returns>
-        public GridComparisonStatistics Compare(IEnumerable<T> existingGridContents, IEnumerable<T> newGridContents)
+        public GridComparisonStatistics Compare(IEnumerable<TExisting> existingGridContents, IEnumerable<TNew> newGridContents)
         {
             Int32 itemsAddedCount = 0, itemsUpdatedCount = 0, itemsDeletedCount = 0;
-            IEnumerator<T> existingEnumerator = existingGridContents.GetEnumerator();
-            IEnumerator<T> newEnumerator = newGridContents.GetEnumerator();
+            IEnumerator<TExisting> existingEnumerator = existingGridContents.GetEnumerator();
+            IEnumerator<TNew> newEnumerator = newGridContents.GetEnumerator();
             existingEnumerator.Reset();
             newEnumerator.Reset();
             Boolean existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
@@ -63,8 +65,8 @@ namespace PowerGrid.Core
 
             while (existingEnumeratorMoveNextResult == true || newEnumeratorMoveNextResult == true)
             {
-                T existingItem = existingEnumerator.Current;
-                T newItem = newEnumerator.Current;
+                TExisting existingItem = existingEnumerator.Current;
+                TNew newItem = newEnumerator.Current;
 
                 if (existingEnumeratorMoveNextResult == true && newEnumeratorMoveNextResult == true)
                 {
@@ -78,7 +80,7 @@ namespace PowerGrid.Core
                         }
                         else
                         {
-                            updatedItemsEmitter.Emit(newItem);
+                            updatedItemsEmitter.Emit(Tuple.Create(existingItem, newItem));
                             itemsUpdatedCount++;
                         }
                         existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
