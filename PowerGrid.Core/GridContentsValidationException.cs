@@ -43,6 +43,17 @@ namespace PowerGrid.Core
         /// </summary>
         /// <param name="message">The message that describes the error.</param>
         /// <param name="gridItem">The item in the grid which failed to validate.</param>
+        public GridContentsValidationException(String message, T gridItem)
+            : base(message)
+        {
+            this.gridItem = gridItem;
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Core.GridContentsValidationException class.
+        /// </summary>
+        /// <param name="message">The message that describes the error.</param>
+        /// <param name="gridItem">The item in the grid which failed to validate.</param>
         /// <param name="innerException">The exception that is the cause of the current exception.</param>
         public GridContentsValidationException(String message, T gridItem, Exception innerException)
             : base(message, innerException)

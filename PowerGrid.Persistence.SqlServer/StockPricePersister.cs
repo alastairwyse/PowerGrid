@@ -15,10 +15,12 @@
 */
 
 using System;
+using System.Collections;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
+using System.Linq;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
@@ -40,6 +42,8 @@ namespace PowerGrid.Persistence.SqlServer
         protected String connectionString;
         /// <summary>The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</summary>
         protected Int32 operationTimeout;
+        /// <summary>Provider for the current date and time.</summary>
+        protected IDateTimeProvider dateTimeProvider;
         /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</summary>
         protected ISqlCommandShim sqlCommandShim;
         /// <summary>A set of SQL Server database engine error numbers which denote a transient fault.</summary>
@@ -81,6 +85,7 @@ namespace PowerGrid.Persistence.SqlServer
 
             this.connectionString = connectionString;
             this.operationTimeout = operationTimeout;
+            dateTimeProvider = new DefaultDateTimeProvider();
             sqlCommandShim = new DefaultSqlCommandShim();
             // Setup retry logic
             sqlServerTransientErrorNumbers = GenerateSqlServerTransientErrorNumbers();
@@ -106,6 +111,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="mockDateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
         /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
         /// <remarks>This constructor is included to facilitate unit testing.</remarks>
         public StockPricePersister
@@ -114,46 +120,97 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
+            IDateTimeProvider dateTimeProvider, 
             ISqlCommandShim sqlCommandShim
         ) : this(connectionString, retryCount, retryInterval, operationTimeout)
         {
+            this.dateTimeProvider = dateTimeProvider;
             this.sqlCommandShim = sqlCommandShim;
         }
 
         /// <inheritdoc/>
         public GridComparisonStatistics PersistGrid(IList<StockPrice> gridItems)
         {
-            /*
-             DONT wrap in a lock... have that outside
-             Create a transaction
-             read the current latest grid data
-             do a comparison (stream results of read)
-               include validator and consistency check 'plugins' in the reading
-             write delete etc individual items as they come out
-             rollback in case of exception
-             commit
-             */
-
             if (gridItems.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
 
-            // TODO: Need to create the SQlConnection (in using) and the change datatime... SO NEED A datetime provider
-
-            DataBaseOperationEmitter<StockPrice> addedItemEmitter = new()
-
-            // TODO: Next setup the comparer and methods to insert, update, delete
-            //   Need emitter implementations that call Insert/Update/Delete
-            //   Plus Dict that maps StockPrices to StockPricePTOs (for updates and deletes)
-            //   Plus protected method to insert the StockPriceGrids row
-            //     DO THIS FIRST... and then tie everything together
-
-            try
+            using (var connection = new SqlConnection(connectionString))
             {
+                DateTime transactionTimestamp = dateTimeProvider.UtcNow();
 
-            }
-            catch (Exception e)
-            {
-                throw new Exception("Failed to persist grid to SQL Server.", e);
+                // Create IEmitter implementations for comparer
+                Action<SqlConnection, StockPrice, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, StockPrice addedStockPrice, DateTime transactionDateTime) =>
+                {
+                    InsertGridItem(connection, addedStockPrice, transactionDateTime);
+                };
+                DataBaseOperationEmitter<StockPrice> addedItemEmitter = new(connection, transactionTimestamp, addedItemEmitterOperationAction);
+                Action<SqlConnection, Tuple<StockPricePTO, StockPrice>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, Tuple<StockPricePTO, StockPrice> updatedStockPrices, DateTime transactionDateTime) =>
+                {
+                    UpdateGridItem(connection, updatedStockPrices.Item1, updatedStockPrices.Item2, transactionDateTime);
+                };
+                DataBaseOperationEmitter<Tuple<StockPricePTO, StockPrice>> updatedItemsEmitter = new(connection, transactionTimestamp, updatedItemsEmitterOperationAction);
+                Action<SqlConnection, StockPricePTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, StockPricePTO deletedStockPrice, DateTime transactionDateTime) =>
+                {
+                    DeleteGridItem(connection, deletedStockPrice, transactionDateTime);
+                };
+                DataBaseOperationEmitter<StockPricePTO> deletedItemEmitter = new(connection, transactionTimestamp, deletedItemEmitterOperationAction);
+                GridComparer<StockPricePTO, StockPrice> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+
+                // Setup IEnumerable 'chains' 
+                //   Create a GridContentsValidator to check that all elements of 'gridItems' have the same data source and date
+                GridContentsValidator<StockPrice> newGridContentsValidator = new();
+                String expectedDataSource = gridItems[0].DataSource;
+                DateOnly expectedDate = gridItems[0].Date;
+                Action<StockPrice> newGridContentsValidationAction = (StockPrice stockPrice) =>
+                {
+                    if (stockPrice.DataSource != expectedDataSource)
+                        throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}' found in grid which which was expected to contain {nameof(StockPrice.DataSource)} '{expectedDataSource}'.", stockPrice);
+                    if (stockPrice.Date != expectedDate)
+                        throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}' found in grid which which was expected to contain {nameof(StockPrice.Date)} '{expectedDate.ToString(transactionSql23DateStyle)}'.", stockPrice);
+                };
+                GridContentsDuplicateChecker<StockPrice> newGridDuplicateChecker = new();
+                // Order of below chain is 1 validate, 2 order, 3 dup check
+                IEnumerable<StockPrice> newGridContents = newGridDuplicateChecker.CheckForDuplicates
+                (
+                    newGridContentsValidator.ValidateItems
+                    (
+                        gridItems, 
+                        newGridContentsValidationAction
+                    ).Order()
+                );
+
+                GridComparisonStatistics comparisonStatistics;
+                try
+                {
+                    IEnumerable<StockPricePTO> existingGridContents;
+                    try
+                    {
+                        existingGridContents = GetExistingGrid(connection, expectedDataSource, expectedDate, transactionTimestamp);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception($"Failed to read existing stock price grid from SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                    }
+                    using (SqlTransaction transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            comparisonStatistics = gridComparer.Compare(existingGridContents, newGridContents);
+                            transaction.Commit();
+                        }
+                        catch (Exception e)
+                        {
+                            transaction.Rollback();
+                            throw new Exception($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new Exception("Failed to persist grid to SQL Server.", e);
+                }
+
+                return comparisonStatistics;
             }
         }
 
@@ -162,10 +219,11 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Gets the latest stock price grid version for the specified parameters.
         /// </summary>
+        /// <param name="connection">The connection to use to retrieve the grid.</param>
         /// <param name="dataSource">The datasource of the stock prices.</param>
         /// <param name="date">The quotes date of the stock prices.</param>
         /// <returns>A tuple containing: The version number of the latest grid (or 0 if no grids exist for the specified parameters), and the transaction timestamp of the grid (or <see cref="DateTime.MinValue"/> if no grids exist for the specified parameters).</returns>
-        protected (Int32, DateTime) GetLatestGridVersion(String dataSource, DateOnly date)
+        protected (Int32, DateTime) GetLatestGridVersion(SqlConnection connection, String dataSource, DateOnly date)
         {
             // REFACTORING: 
             //   General steps here in base case
@@ -190,7 +248,6 @@ namespace PowerGrid.Persistence.SqlServer
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
-            using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand(query))
             {
                 Int32 latestGridVersionNumber = 0;
@@ -574,10 +631,12 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             /// <param name="connection">The connection to use to perform the operation.</param>
             /// <param name="operationDateTime">The date and time that the operation occurred.</param>
-            public DataBaseOperationEmitter(SqlConnection connection, DateTime operationDateTime)
+            /// <param name="operationAction">An action which performs the database operation.  Accepts 3 parameters: the connection to use to perform the operation, the object used in the database operation, and the date and time that the operation occurred.</param>
+            public DataBaseOperationEmitter(SqlConnection connection, DateTime operationDateTime, Action<SqlConnection, T, DateTime> operationAction)
             {
                 this.connection = connection;
                 this.operationDateTime = operationDateTime;
+                this.operationAction = operationAction;
             }
 
             /// <inheritdoc/>

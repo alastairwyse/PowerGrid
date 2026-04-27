@@ -9,6 +9,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
+* In tests for StockPricePersister, need test of both exceptions in contents validator
 * Ordering and any validation filters etc... should be handled outside of the persistence layer.
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+
 * Should we introduce an IGridItem&lt;T&gt; interface which implements both IKeyPropertyComparable&lt;T&gt; and IValuePropertyEquatable&lt;T&gt;?
@@ -24,6 +25,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * IGridPersister probably needs 2x T types... one for the base grid item class and the other for the PTO equiv.  Same as what I was suggesting for GridComparer above.
 
 #### Longer Term TODO
+* For StockPrice we don't have any 'outer key' columns in the DB data which aren't in the base StockPrice (like 'business unit' or 'tag'), but what if we do?  The IGridPersister.PersistGrid() method will not have enough info in the 'gridItems' param to persist (i.e. will be missing 'outer key' values).  How to handle?  Need to someone make the 'outer key' values a generic property of the class... have a model class which is a T property?.. and then would likely need some type of Func/Action which 'applies' that model to an instance of the class (i.e. to get/set the values)??  Need to think about this.
 * Add another type of grid item (other than StockPrice), and use to push common functionality into 'Core' project, generic classes and methods, etc...
 * With above other type of grid item mentioned above, have a 'key', 'tag' or 'set id' property which is part of the IKeyPropertyComparable implementation (but not a natural/real-world property of the class).  This additional property should exist only in a derived class (e.g. if the property mentioned applied to StockPrice, the derived class could be called something like GridStockPrice), and the IKeyPropertyComparable and IValuePropertyEquatable implementations on that derived class should call the base class implementations (and extend them).
 * StockPricePersister (and any other persister classes) should have logging and metrics.
