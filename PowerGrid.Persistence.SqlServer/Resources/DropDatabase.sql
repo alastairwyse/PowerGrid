@@ -24,3 +24,7 @@ DROP FUNCTION dbo.SubtractTemporalMinimumTimeUnit;
 
 DROP TABLE $(DatabaseName).dbo.StockPriceGrids;
 DROP TABLE $(DatabaseName).dbo.StockPrices;
+
+
+-- Temporary for connection/command reuse testing
+DROp TABLE $(DatabaseName).dbo.Test;

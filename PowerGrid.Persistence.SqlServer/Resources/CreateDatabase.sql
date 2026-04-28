@@ -79,3 +79,15 @@ CREATE TABLE $(DatabaseName).dbo.StockPriceGrids
 );
 
 CREATE INDEX StockPriceGridsOuterKeysIndex ON $(DatabaseName).dbo.StockPriceGrids (DataSource, [Date], [Version]);
+
+
+-- Temporary for connection/command reuse testing
+CREATE TABLE $(DatabaseName).dbo.Test
+(
+    Id              bigint        IDENTITY(1,1) PRIMARY KEY  NOT NULL, 
+    DataSource      nvarchar(50)  NOT NULL, 
+    Company         nvarchar(50)  NOT NULL, 
+    AuditTimestamp  datetime2     NOT NULL
+);
+
+CREATE INDEX StockPriceGridsOuterKeysIndex ON $(DatabaseName).dbo.Test (DataSource);

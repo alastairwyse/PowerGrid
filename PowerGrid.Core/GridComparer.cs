@@ -58,8 +58,6 @@ namespace PowerGrid.Core
             Int32 itemsAddedCount = 0, itemsUpdatedCount = 0, itemsDeletedCount = 0;
             IEnumerator<TExisting> existingEnumerator = existingGridContents.GetEnumerator();
             IEnumerator<TNew> newEnumerator = newGridContents.GetEnumerator();
-            existingEnumerator.Reset();
-            newEnumerator.Reset();
             Boolean existingEnumeratorMoveNextResult = existingEnumerator.MoveNext();
             Boolean newEnumeratorMoveNextResult = newEnumerator.MoveNext();
 
