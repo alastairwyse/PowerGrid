@@ -131,7 +131,7 @@ namespace PowerGrid.Persistence.SqlServer
         public void TestGetUpdateMars(String dataSource)
         {
             Random randgen = new();
-            String connString = "Server=192.168.1.133;Database=PowerGrid;User Id=sa;Password=fake;Encrypt=false;Authentication=SqlPassword;MultipleActiveResultSets=true";
+            String connString = "";
             using (SqlConnection connection = new(connString))
             {
                 connection.Open();
@@ -181,7 +181,7 @@ namespace PowerGrid.Persistence.SqlServer
         public void TestGetUpdate2Connections(String dataSource)
         {
             Random randgen = new();
-            String connString = "Server=192.168.1.133;Database=PowerGrid;User Id=sa;Password=fake;Encrypt=false;Authentication=SqlPassword";
+            String connString = "";
             using (SqlConnection readConnection = new(connString))
             using (SqlConnection writeConnection = new(connString))
             {
@@ -249,86 +249,92 @@ namespace PowerGrid.Persistence.SqlServer
             if (gridItems.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
 
-            using (var connection = new SqlConnection(connectionString))
+            using (var readConnection = new SqlConnection(connectionString))
+            using (var writeConnection = new SqlConnection(connectionString))
+            
             {
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
+                writeConnection.Open();
+                using (SqlTransaction transaction = writeConnection.BeginTransaction())
+                {
+                    Action<SqlConnection, SqlTransaction, StockPrice, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPrice addedStockPrice, DateTime transactionDateTime) =>
+                    {
+                        InsertGridItem(connection, transaction, addedStockPrice, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<StockPrice> addedItemEmitter = new(writeConnection, transaction, transactionTimestamp, addedItemEmitterOperationAction);
+                    Action<SqlConnection, SqlTransaction, Tuple<StockPricePTO, StockPrice>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<StockPricePTO, StockPrice> updatedStockPrices, DateTime transactionDateTime) =>
+                    {
+                        UpdateGridItem(connection, transaction, updatedStockPrices.Item1, updatedStockPrices.Item2, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<Tuple<StockPricePTO, StockPrice>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
+                    Action<SqlConnection, SqlTransaction, StockPricePTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPricePTO deletedStockPrice, DateTime transactionDateTime) =>
+                    {
+                        DeleteGridItem(connection, transaction, deletedStockPrice, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<StockPricePTO> deletedItemEmitter = new(writeConnection, transaction, transactionTimestamp, deletedItemEmitterOperationAction);
+                    GridComparer<StockPricePTO, StockPrice> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
 
-                // Create IEmitter implementations for comparer
-                Action<SqlConnection, StockPrice, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, StockPrice addedStockPrice, DateTime transactionDateTime) =>
-                {
-                    InsertGridItem(connection, addedStockPrice, transactionDateTime);
-                };
-                DataBaseOperationEmitter<StockPrice> addedItemEmitter = new(connection, transactionTimestamp, addedItemEmitterOperationAction);
-                Action<SqlConnection, Tuple<StockPricePTO, StockPrice>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, Tuple<StockPricePTO, StockPrice> updatedStockPrices, DateTime transactionDateTime) =>
-                {
-                    UpdateGridItem(connection, updatedStockPrices.Item1, updatedStockPrices.Item2, transactionDateTime);
-                };
-                DataBaseOperationEmitter<Tuple<StockPricePTO, StockPrice>> updatedItemsEmitter = new(connection, transactionTimestamp, updatedItemsEmitterOperationAction);
-                Action<SqlConnection, StockPricePTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, StockPricePTO deletedStockPrice, DateTime transactionDateTime) =>
-                {
-                    DeleteGridItem(connection, deletedStockPrice, transactionDateTime);
-                };
-                DataBaseOperationEmitter<StockPricePTO> deletedItemEmitter = new(connection, transactionTimestamp, deletedItemEmitterOperationAction);
-                GridComparer<StockPricePTO, StockPrice> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
-
-                // Setup IEnumerable 'chains' 
-                //   Create a GridContentsValidator to check that all elements of 'gridItems' have the same data source and date
-                GridContentsValidator<StockPrice> newGridContentsValidator = new();
-                String expectedDataSource = gridItems[0].DataSource;
-                DateOnly expectedDate = gridItems[0].Date;
-                Action<StockPrice> newGridContentsValidationAction = (StockPrice stockPrice) =>
-                {
-                    if (stockPrice.DataSource != expectedDataSource)
-                        throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}' found in grid which which was expected to contain {nameof(StockPrice.DataSource)} '{expectedDataSource}'.", stockPrice);
-                    if (stockPrice.Date != expectedDate)
-                        throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}' found in grid which which was expected to contain {nameof(StockPrice.Date)} '{expectedDate.ToString(transactionSql23DateStyle)}'.", stockPrice);
-                };
-                GridContentsDuplicateChecker<StockPrice> newGridDuplicateChecker = new();
-                // Order of below chain is 1 validate, 2 order, 3 dup check
-                IEnumerable<StockPrice> newGridContents = newGridDuplicateChecker.CheckForDuplicates
-                (
-                    newGridContentsValidator.ValidateItems
+                    // Setup IEnumerable 'chains' 
+                    //   Create a GridContentsValidator to check that all elements of 'gridItems' have the same data source and date
+                    GridContentsValidator<StockPrice> newGridContentsValidator = new();
+                    String expectedDataSource = gridItems[0].DataSource;
+                    DateOnly expectedDate = gridItems[0].Date;
+                    Action<StockPrice> newGridContentsValidationAction = (StockPrice stockPrice) =>
+                    {
+                        if (stockPrice.DataSource != expectedDataSource)
+                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}' found in grid which which was expected to contain {nameof(StockPrice.DataSource)} '{expectedDataSource}'.", stockPrice);
+                        if (stockPrice.Date != expectedDate)
+                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}' found in grid which which was expected to contain {nameof(StockPrice.Date)} '{expectedDate.ToString(transactionSql23DateStyle)}'.", stockPrice);
+                    };
+                    GridContentsDuplicateChecker<StockPrice> newGridDuplicateChecker = new();
+                    // Order of below chain is 1 validate, 2 order, 3 dup check
+                    IEnumerable<StockPrice> newGridContents = newGridDuplicateChecker.CheckForDuplicates
                     (
-                        gridItems, 
-                        newGridContentsValidationAction
-                    ).Order()
-                );
+                        newGridContentsValidator.ValidateItems
+                        (
+                            gridItems,
+                            newGridContentsValidationAction
+                        ).Order(Comparer<StockPrice>.Create
+                        (
+                            (StockPrice first, StockPrice second) => { return first.KeyCompareTo(second); }
+                        ))
+                    );
 
-                GridComparisonStatistics comparisonStatistics;
-                try
-                {
-                    IEnumerable<StockPricePTO> existingGridContents;
+                    GridComparisonStatistics comparisonStatistics;
                     try
                     {
-                        existingGridContents = GetExistingGrid(connection, expectedDataSource, expectedDate, transactionTimestamp);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new Exception($"Failed to read existing stock price grid from SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
-                    }
-                    connection.Open();
-                    using (SqlTransaction transaction = connection.BeginTransaction())
-                    {
+                        readConnection.Open();
+                        IEnumerable<StockPricePTO> existingGridContents;
                         try
                         {
-                            comparisonStatistics = gridComparer.Compare(existingGridContents, newGridContents);
-                            transaction.Commit();
+                            existingGridContents = GetExistingGrid(readConnection, expectedDataSource, expectedDate, transactionTimestamp);
                         }
                         catch (Exception e)
                         {
-                            transaction.Rollback();
-                            throw new Exception($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                            throw new Exception($"Failed to read existing stock price grid from SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
                         }
+                        {
+                            try
+                            {
+                                comparisonStatistics = gridComparer.Compare(existingGridContents, newGridContents);
+                                transaction.Commit();
+                            }
+                            catch (Exception e)
+                            {
+                                transaction.Rollback();
+                                throw new Exception($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                            }
+                        }
+                        writeConnection.Close();
+                        readConnection.Close();
                     }
-                    connection.Close();
-                }
-                catch (Exception e)
-                {
-                    throw new Exception("Failed to persist grid to SQL Server.", e);
-                }
-                connection.Close();
+                    catch (Exception e)
+                    {
+                        throw new Exception("Failed to persist grid to SQL Server.", e);
+                    }
 
-                return comparisonStatistics;
+                    return comparisonStatistics;
+                }
             }
         }
 
@@ -371,7 +377,6 @@ namespace PowerGrid.Persistence.SqlServer
                 Int32 latestGridVersionNumber = 0;
                 DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
-                PrepareConnectionAndCommand(connection, command);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     Boolean alreadyReadResult = false;
@@ -387,7 +392,6 @@ namespace PowerGrid.Persistence.SqlServer
                         alreadyReadResult = true;
                     }
                 }
-                TeardownConnectionAndCommand(connection, command);
 
                 return (latestGridVersionNumber, latestGridTransactionTimestamp);
             }
@@ -414,7 +418,7 @@ namespace PowerGrid.Persistence.SqlServer
             FROM   StockPrices 
             WHERE  DataSource = '{dataSource}'
               AND  [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23) 
-              AND  CONVERT(datetime2, '{transactionTimestamp.ToString(transactionSql23DateStyle)}', 126) BETWEEN TransactionFrom AND TransactionTo
+              AND  CONVERT(datetime2, '{transactionTimestamp.ToString(transactionSql126DateStyle)}', 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY DataSource, 
                       [Date], 
                       Company;
@@ -423,9 +427,8 @@ namespace PowerGrid.Persistence.SqlServer
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
-            using (var command = new SqlCommand(query))
+            using (var command = new SqlCommand(query, connection))
             {
-                PrepareConnectionAndCommand(connection, command);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -434,16 +437,17 @@ namespace PowerGrid.Persistence.SqlServer
                         String currentDataSource = (String)dataReader["DataSource"];
                         DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
                         String currentCompany = (String)dataReader["Company"];
-                        Decimal currentPrice = Decimal.Parse((String)dataReader["Price"]);
-                        DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        Decimal currentPrice = (Decimal)dataReader["Price"];
+                        //DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        DateTime currentTransactionFrom = (DateTime)dataReader["TransactionFrom"];
                         currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
-                        DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        //DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                        DateTime currentTransactionTo = (DateTime)dataReader["TransactionTo"];
                         currentTransactionTo = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
 
                         yield return new StockPricePTO(currentId, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
                     }
                 }
-                TeardownConnectionAndCommand(connection, command);
             }
         }
 
@@ -454,9 +458,10 @@ namespace PowerGrid.Persistence.SqlServer
         /// Adds an item to the current/latest grid.
         /// </summary>
         /// <param name="connection">The readConnection to use to insert.</param>
+        /// <param name="transaction">The transaction to execute the add operation in.</param>
         /// <param name="item">The item to add.</param>
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
-        protected void InsertGridItem(SqlConnection connection, StockPrice item, DateTime insertDateTime)
+        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPrice item, DateTime insertDateTime)
         {
             String insertStatement = @$"
             INSERT 
@@ -474,14 +479,20 @@ namespace PowerGrid.Persistence.SqlServer
                         CONVERT(date, '{item.Date.ToString(transactionSql23DateStyle)}', 23), 
                         '{item.Company}', 
                         {item.Price}, 
-                        CONVERT(date, '{insertDateTime.ToString(transactionSql126DateStyle)}', 126) , 
+                        CONVERT(datetime2, '{insertDateTime.ToString(transactionSql126DateStyle)}', 126) , 
                         dbo.GetTemporalMaxDate()
                     );
             ";
 
             try
             {
-                ExecuteNonQueryWithDeadlockRetry(connection, insertStatement);
+                using (var command = new SqlCommand(insertStatement, connection))
+                {
+                    command.Connection = connection;
+                    command.Transaction = transaction;
+                    command.CommandTimeout = operationTimeout;
+                    command.ExecuteNonQuery();
+                }
             }
             catch (Exception e)
             {
@@ -493,15 +504,16 @@ namespace PowerGrid.Persistence.SqlServer
         /// Updates an existing item in the current/latest grid.
         /// </summary>
         /// <param name="connection">The readConnection to use to update.</param>
+        /// <param name="transaction">The transaction to execute the update operation in.</param>
         /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
         /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
         /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
-        protected void UpdateGridItem(SqlConnection connection, StockPricePTO supersededItem, StockPrice newItem, DateTime udpateDateTime)
+        protected void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO supersededItem, StockPrice newItem, DateTime udpateDateTime)
         {
             try
             {
-                DeleteGridItem(connection, supersededItem, udpateDateTime);
-                InsertGridItem(connection, newItem, udpateDateTime);
+                DeleteGridItem(connection, transaction, supersededItem, udpateDateTime);
+                InsertGridItem(connection, transaction, newItem, udpateDateTime);
             }
             catch (Exception e)
             {
@@ -513,9 +525,10 @@ namespace PowerGrid.Persistence.SqlServer
         /// Deletes an existing item from the current/latest grid.
         /// </summary>
         /// <param name="connection">The readConnection to use to delete.</param>
+        /// <param name="transaction">The transaction to execute the delete operation in.</param>
         /// <param name="item">The item to delete.</param>
         /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
-        protected void DeleteGridItem(SqlConnection connection, StockPricePTO item, DateTime deleteDateTime)
+        protected void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO item, DateTime deleteDateTime)
         {
             String deleteStatement = @$"
             UPDATE  StockPrices 
@@ -525,7 +538,13 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                ExecuteNonQueryWithDeadlockRetry(connection, deleteStatement);
+                using (var command = new SqlCommand(deleteStatement, connection))
+                {
+                    command.Connection = connection;
+                    command.Transaction = transaction;
+                    command.CommandTimeout = operationTimeout;
+                    command.ExecuteNonQuery();
+                }
             }
             catch (Exception e)
             {
@@ -533,7 +552,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected Int32 CreateGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime createDateTime)
+        protected Int32 CreateGrid(SqlConnection connection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
         {
             String maxIdQuery = @$"
             SELECT  MAX(Id) AS MaxId
@@ -578,7 +597,13 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                ExecuteNonQueryWithDeadlockRetry(connection, insertStatement);
+                using (var command = new SqlCommand(insertStatement, connection))
+                {
+                    command.Connection = connection;
+                    command.Transaction = transaction;
+                    command.CommandTimeout = operationTimeout;
+                    command.ExecuteNonQuery();
+                }
             }
             catch (Exception e)
             {
@@ -605,9 +630,9 @@ namespace PowerGrid.Persistence.SqlServer
                 {
                     using (var command = new SqlCommand(commandText))
                     {
-                        connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
+                        //connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
                         //readConnection.RetryLogicProvider.Retrying += connectionRetryAction;
-                        connection.Open();
+                        //connection.Open();
                         command.Connection = connection;
                         command.CommandTimeout = operationTimeout;
                         /* REFACTORING: Commenting, as not sure SQL Server will like if you change deadlock priority whilst it's in the middle of the read
@@ -740,20 +765,24 @@ namespace PowerGrid.Persistence.SqlServer
 
             /// <summary>The readConnection to use to perform the operation.</summary>
             protected SqlConnection connection;
+            /// <summary>The transaction to perform the operation under.</summary>
+            protected SqlTransaction transaction;
             /// <summary>The date and time that the operation occurred.</summary>
             protected DateTime operationDateTime;
-            /// <summary>An action which performs the database operation.  Accepts 3 parameters: the readConnection to use to perform the operation, the object used in the database operation, and the date and time that the operation occurred.</summary>
-            protected Action<SqlConnection, T, DateTime> operationAction;
+            /// <summary>An action which performs the database operation.  Accepts 3 parameters: the connection to use to perform the operation, the transaction to perform the operation under, the object used in the database operation, and the date and time that the operation occurred.</summary>
+            protected Action<SqlConnection, SqlTransaction, T, DateTime> operationAction;
 
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister+DataBaseOperationEmitter class.
             /// </summary>
-            /// <param name="connection">The readConnection to use to perform the operation.</param>
+            /// <param name="connection">The connection to use to perform the operation.</param>
+            /// <param name="transaction">The transaction to perform the operation under.</param>
             /// <param name="operationDateTime">The date and time that the operation occurred.</param>
-            /// <param name="operationAction">An action which performs the database operation.  Accepts 3 parameters: the readConnection to use to perform the operation, the object used in the database operation, and the date and time that the operation occurred.</param>
-            public DataBaseOperationEmitter(SqlConnection connection, DateTime operationDateTime, Action<SqlConnection, T, DateTime> operationAction)
+            /// <param name="operationAction">An action which performs the database operation.  Accepts 3 parameters: the connection to use to perform the operation, the transaction to perform the operation under, the object used in the database operation, and the date and time that the operation occurred.</param>
+            public DataBaseOperationEmitter(SqlConnection connection, SqlTransaction transaction, DateTime operationDateTime, Action<SqlConnection, SqlTransaction, T, DateTime> operationAction)
             {
                 this.connection = connection;
+                this.transaction = transaction;
                 this.operationDateTime = operationDateTime;
                 this.operationAction = operationAction;
             }
@@ -761,7 +790,7 @@ namespace PowerGrid.Persistence.SqlServer
             /// <inheritdoc/>
             public void Emit(T instance)
             {
-                operationAction(connection, instance, operationDateTime);
+                operationAction(connection, transaction, instance, operationDateTime);
             }
         }
 

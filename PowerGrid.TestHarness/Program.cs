@@ -26,13 +26,14 @@ namespace PowerGrid.TestHarness
             {
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3211),
                 new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
             };
-            String connectionString = "abc";
+            String connectionString = File.ReadAllText(@"..\..\..\..\Documentation\TempConnectionString.txt");
+
             StockPricePersister persister = new StockPricePersister(connectionString, 5, 5, 0);
-            //persister.PersistGrid(testGridItems);
-            persister.TestGetUpdate2Connections("Reuters");
+            persister.PersistGrid(testGridItems);
+            //persister.TestGetUpdate2Connections("Reuters");
         }
     }
 }
