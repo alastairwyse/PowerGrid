@@ -128,121 +128,6 @@ namespace PowerGrid.Persistence.SqlServer
             this.sqlCommandShim = sqlCommandShim;
         }
 
-        public void TestGetUpdateMars(String dataSource)
-        {
-            Random randgen = new();
-            String connString = "";
-            using (SqlConnection connection = new(connString))
-            {
-                connection.Open();
-                String selectQuery = $@"
-                SELECT  * 
-                FROM    dbo.TEST 
-                WHERE   DataSource = '{dataSource}';
-                ";
-
-                using (SqlCommand queryCommand = new(selectQuery, connection))
-                using (SqlDataReader reader = queryCommand.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        Int64 id = (Int64)reader["Id"];
-                        String company = (String)reader["Company"];
-                        Console.WriteLine($"Read row with id {id} for company '{company}'.");
-
-                        // Update the row with the current id
-                        String updatetQuery = $@"
-                        UPDATE  dbo.TEST 
-                        SET     AuditTimestamp = GETDATE() 
-                        WHERE   Id = {id};
-                        ";
-                        using (SqlCommand updateCommand = new(updatetQuery, connection))
-                        {
-                            updateCommand.ExecuteNonQuery();
-                        }
-
-                        // Randomly add a row
-                        Int32 shouldAdd = randgen.Next(2);
-                        if (shouldAdd == 0)
-                        {
-                            String insertQuery = $@"INSERT INTO dbo.TEST (DataSource, Company, AuditTimestamp) VALUES ('{dataSource}', '{Guid.NewGuid().ToString()}', GETDATE());";
-                            using (SqlCommand insertCommand = new(insertQuery, connection))
-                            {
-                                insertCommand.ExecuteNonQuery();
-                            }
-                        }
-                    }
-                }
-
-                connection.Close();
-            }
-        }
-
-        public void TestGetUpdate2Connections(String dataSource)
-        {
-            Random randgen = new();
-            String connString = "";
-            using (SqlConnection readConnection = new(connString))
-            using (SqlConnection writeConnection = new(connString))
-            {
-                readConnection.Open();
-                writeConnection.Open();
-                using (SqlTransaction writeTransaction = writeConnection.BeginTransaction())
-                {
-                    String selectQuery = $@"
-                    SELECT  * 
-                    FROM    dbo.TEST 
-                    WHERE   DataSource = '{dataSource}';
-                    ";
-
-                    try
-                    {
-                        using (SqlCommand queryCommand = new(selectQuery, readConnection))
-                        using (SqlDataReader reader = queryCommand.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                Int64 id = (Int64)reader["Id"];
-                                String company = (String)reader["Company"];
-                                Console.WriteLine($"Read row with id {id} for company '{company}'.");
-
-                                // Update the row with the current id
-                                String updatetQuery = $@"
-                                UPDATE  dbo.TEST 
-                                SET     AuditTimestamp = GETDATE() 
-                                WHERE   Id = {id};
-                                ";
-                                using (SqlCommand updateCommand = new(updatetQuery, writeConnection, writeTransaction))
-                                {
-                                    updateCommand.ExecuteNonQuery();
-                                }
-
-                                // Randomly add a row
-                                Int32 shouldAdd = randgen.Next(2);
-                                if (shouldAdd == 0)
-                                {
-                                    String insertQuery = $@"INSERT INTO dbo.TEST (DataSource, Company, AuditTimestamp) VALUES ('{dataSource}', '{Guid.NewGuid().ToString()}', GETDATE());";
-                                    using (SqlCommand insertCommand = new(insertQuery, writeConnection, writeTransaction))
-                                    {
-                                        insertCommand.ExecuteNonQuery();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        writeTransaction.Rollback();
-                        throw;
-                    }
-                    
-                    writeTransaction.Commit();
-                }
-                writeConnection.Close();
-                readConnection.Close();
-            }
-        }
-
         /// <inheritdoc/>
         public GridComparisonStatistics PersistGrid(IList<StockPrice> gridItems)
         {
@@ -251,8 +136,10 @@ namespace PowerGrid.Persistence.SqlServer
 
             using (var readConnection = new SqlConnection(connectionString))
             using (var writeConnection = new SqlConnection(connectionString))
-            
             {
+                PrepareConnection(readConnection);
+                PrepareConnection(writeConnection);
+
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
                 writeConnection.Open();
                 using (SqlTransaction transaction = writeConnection.BeginTransaction())
@@ -303,7 +190,8 @@ namespace PowerGrid.Persistence.SqlServer
                     GridComparisonStatistics comparisonStatistics;
                     try
                     {
-                        readConnection.Open();
+                        readConnection.Open(); 
+//HJERE
                         IEnumerable<StockPricePTO> existingGridContents;
                         try
                         {
@@ -374,6 +262,7 @@ namespace PowerGrid.Persistence.SqlServer
 
             using (var command = new SqlCommand(query))
             {
+                PrepareCommand(connection, command);
                 Int32 latestGridVersionNumber = 0;
                 DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
@@ -429,6 +318,7 @@ namespace PowerGrid.Persistence.SqlServer
 
             using (var command = new SqlCommand(query, connection))
             {
+                PrepareCommand(connection, command);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -488,9 +378,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(insertStatement, connection))
                 {
-                    command.Connection = connection;
-                    command.Transaction = transaction;
-                    command.CommandTimeout = operationTimeout;
+                    PrepareCommand(connection, transaction, command);
                     command.ExecuteNonQuery();
                 }
             }
@@ -540,9 +428,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(deleteStatement, connection))
                 {
-                    command.Connection = connection;
-                    command.Transaction = transaction;
-                    command.CommandTimeout = operationTimeout;
+                    PrepareCommand(connection, transaction, command);
                     command.ExecuteNonQuery();
                 }
             }
@@ -564,7 +450,8 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 gridVersionNumber = 1;
             using (var command = new SqlCommand(maxIdQuery))
             {
-                PrepareConnectionAndCommand(connection, command);
+                // TODO: Maybe this has to be done under readConnection without transaction?  Need to test.
+                PrepareCommand(connection, transaction, command);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -575,7 +462,6 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
                 }
-                TeardownConnectionAndCommand(connection, command);
             }
 
             String insertStatement = $@"
@@ -599,9 +485,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(insertStatement, connection))
                 {
-                    command.Connection = connection;
-                    command.Transaction = transaction;
-                    command.CommandTimeout = operationTimeout;
+                    PrepareCommand(connection, transaction, command);
                     command.ExecuteNonQuery();
                 }
             }
@@ -674,17 +558,35 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a insertStatement against them.
+        /// Prepares the specified <see cref="SqlConnection"/>.
         /// </summary>
-        /// <param name="connection">The readConnection.</param>
-        /// <param name="command">The command which runs the insertStatement.</param>
-        protected void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command)
+        /// <param name="connection">The connection.</param>
+        protected void PrepareConnection(SqlConnection connection)
         {
             connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
-            // TODO: Figure out what to do with below...
-            // readConnection.Open();
+        }
+
+        /// <summary>
+        /// Prepares the specified <see cref="SqlCommand"/>.
+        /// </summary>
+        /// <param name="connection">The connection to SQL Server.</param>
+        /// <param name="command">The command.</param>
+        protected void PrepareCommand(SqlConnection connection, SqlCommand command)
+        {
             command.Connection = connection;
             command.CommandTimeout = operationTimeout;
+        }
+
+        /// <summary>
+        /// Prepares the specified <see cref="SqlCommand"/>.
+        /// </summary>
+        /// <param name="connection">The connection to SQL Server.</param>
+        /// <param name="transaction">The transaction to execute the command under.</param>
+        /// <param name="command">The command.</param>
+        protected void PrepareCommand(SqlConnection connection, SqlTransaction transaction, SqlCommand command)
+        {
+            PrepareCommand(connection, command);
+            command.Transaction = transaction;
         }
 
         /// <summary>
@@ -695,7 +597,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
         protected virtual void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command, SessionDeadlockPriority deadlockPriority)
         {
-            PrepareConnectionAndCommand(connection, command);
+            //PrepareConnectionAndCommand(connection, command);
             String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
             using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
             {
@@ -706,12 +608,13 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Performs teardown/deconstruct operations on the the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> after utilizing them.
+        /// Performs teardown/deconstruct operations on the the specified <see cref="SqlConnection"/> after utilizing it.
         /// </summary>
-        /// <param name="connection">The readConnection.</param>
-        /// <param name="command">The command.</param>
-        protected void TeardownConnectionAndCommand(SqlConnection connection, SqlCommand command)
+        /// <param name="connection">The connection to SQL Server.</param>
+        protected void TeardownConnection(SqlConnection connection)
         {
+            // TODO: Only required once a connectionRetryAction is implemented
+            //connection.RetryLogicProvider.Retrying -= connectionRetryAction;
         }
 
         /// <summary>
