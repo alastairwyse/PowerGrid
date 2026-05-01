@@ -231,7 +231,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Gets the latest stock price grid version for the specified parameters.
         /// </summary>
-        /// <param name="connection">The readConnection to use to retrieve the grid.</param>
+        /// <param name="connection">The connection to use to retrieve the grid.</param>
         /// <param name="dataSource">The datasource of the stock prices.</param>
         /// <param name="date">The quotes date of the stock prices.</param>
         /// <returns>A tuple containing: The version number of the latest grid (or 0 if no grids exist for the specified parameters), and the transaction timestamp of the grid (or <see cref="DateTime.MinValue"/> if no grids exist for the specified parameters).</returns>
@@ -289,7 +289,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Gets the contents of a stock price grid.
         /// </summary>
-        /// <param name="connection">The readConnection to use to retrieve the grid.</param>
+        /// <param name="connection">The connection to use to retrieve the grid.</param>
         /// <param name="dataSource">The datasource of the stock prices.</param>
         /// <param name="date">The quotes date of the stock prices.</param>
         /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
@@ -347,7 +347,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Adds an item to the current/latest grid.
         /// </summary>
-        /// <param name="connection">The readConnection to use to insert.</param>
+        /// <param name="connection">The connection to use to insert.</param>
         /// <param name="transaction">The transaction to execute the add operation in.</param>
         /// <param name="item">The item to add.</param>
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
@@ -379,7 +379,8 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand(insertStatement, connection))
                 {
                     PrepareCommand(connection, transaction, command);
-                    command.ExecuteNonQuery();
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                    //command.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -391,7 +392,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Updates an existing item in the current/latest grid.
         /// </summary>
-        /// <param name="connection">The readConnection to use to update.</param>
+        /// <param name="connection">The connection to use to update.</param>
         /// <param name="transaction">The transaction to execute the update operation in.</param>
         /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
         /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
@@ -412,7 +413,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Deletes an existing item from the current/latest grid.
         /// </summary>
-        /// <param name="connection">The readConnection to use to delete.</param>
+        /// <param name="connection">The connection to use to delete.</param>
         /// <param name="transaction">The transaction to execute the delete operation in.</param>
         /// <param name="item">The item to delete.</param>
         /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
@@ -429,7 +430,8 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand(deleteStatement, connection))
                 {
                     PrepareCommand(connection, transaction, command);
-                    command.ExecuteNonQuery();
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                    //command.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -450,7 +452,7 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 gridVersionNumber = 1;
             using (var command = new SqlCommand(maxIdQuery))
             {
-                // TODO: Maybe this has to be done under readConnection without transaction?  Need to test.
+                // TODO: Maybe this has to be done under connection without transaction?  Need to test.
                 PrepareCommand(connection, transaction, command);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
@@ -486,7 +488,8 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand(insertStatement, connection))
                 {
                     PrepareCommand(connection, transaction, command);
-                    command.ExecuteNonQuery();
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                    //command.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -498,11 +501,12 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Attempts to execute a non-insertStatement SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
+        /// Attempts to execute a non-query SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
         /// </summary>
-        /// <param name="connection">The readConnection to use to execute the command.</param>
-        /// <param name="commandText">The SQL command as a string.</param>
-        protected void ExecuteNonQueryWithDeadlockRetry(SqlConnection connection, String commandText)
+        /// <param name="connection">The connection to use to execute the command.</param>
+        /// <param name="transaction">The transaction to execute the command under.</param>
+        /// <param name="command">The SQL command to executeg.</param>
+        protected void ExecuteNonQueryWithDeadlockRetry(SqlConnection connection, SqlTransaction transaction, SqlCommand command)
         {
             const Int32 deadlockErrorNumber = 1205;
 
@@ -512,25 +516,17 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
-                    using (var command = new SqlCommand(commandText))
+                    //readConnection.RetryLogicProvider.Retrying += connectionRetryAction;
+                    String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.Low]};";
+                    using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
                     {
-                        //connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
-                        //readConnection.RetryLogicProvider.Retrying += connectionRetryAction;
-                        //connection.Open();
-                        command.Connection = connection;
-                        command.CommandTimeout = operationTimeout;
-                        /* REFACTORING: Commenting, as not sure SQL Server will like if you change deadlock priority whilst it's in the middle of the read
-                        String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.Low]};";
-                        using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
-                        {
-                            setDeadlockPriorityCommand.Connection = readConnection;
-                            setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
-                            setDeadlockPriorityCommand.ExecuteNonQuery();
-                        }
-                        */
-                        command.ExecuteNonQuery();
-                        break;
-                     }
+                        setDeadlockPriorityCommand.Connection = connection;
+                        setDeadlockPriorityCommand.Transaction = transaction;
+                        setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
+                        setDeadlockPriorityCommand.ExecuteNonQuery();
+                    }
+                    command.ExecuteNonQuery();
+                    break;
                 }
                 catch (SqlException sqlException)
                 {
@@ -592,7 +588,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a insertStatement against them, and sets the session deadlock priority.
         /// </summary>
-        /// <param name="connection">The readConnection.</param>
+        /// <param name="connection">The connection.</param>
         /// <param name="command">The command which runs the insertStatement.</param>
         /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
         protected virtual void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command, SessionDeadlockPriority deadlockPriority)
@@ -666,7 +662,7 @@ namespace PowerGrid.Persistence.SqlServer
         {
             // REFACTORING: Can we put this into a base class?  SqlConnection would have to become a generic type.
 
-            /// <summary>The readConnection to use to perform the operation.</summary>
+            /// <summary>The connection to use to perform the operation.</summary>
             protected SqlConnection connection;
             /// <summary>The transaction to perform the operation under.</summary>
             protected SqlTransaction transaction;
