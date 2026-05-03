@@ -213,6 +213,8 @@ namespace PowerGrid.Persistence.SqlServer
                                 throw new Exception($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
                             }
                         }
+                        CreateGrid(readConnection, writeConnection, transaction, expectedDataSource, expectedDate, transactionTimestamp);
+
                         writeConnection.Close();
                         readConnection.Close();
                     }
@@ -440,7 +442,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected Int32 CreateGrid(SqlConnection connection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
+        protected Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
         {
             String maxIdQuery = @$"
             SELECT  MAX(Id) AS MaxId
@@ -449,18 +451,17 @@ namespace PowerGrid.Persistence.SqlServer
               AND   [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23);
             ";
 
-            Int32 gridVersionNumber = 1;
+            Int64 gridVersionNumber = 1;
             using (var command = new SqlCommand(maxIdQuery))
             {
-                // TODO: Maybe this has to be done under connection without transaction?  Need to test.
-                PrepareCommand(connection, transaction, command);
+                PrepareCommand(readConnection, transaction, command);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
                     {
                         if (dataReader["MaxId"] != DBNull.Value)
                         {
-                            gridVersionNumber = (Int32)dataReader["MaxId"] + 1;
+                            gridVersionNumber = (Int64)dataReader["MaxId"] + 1;
                         }
                     }
                 }
@@ -485,11 +486,10 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                using (var command = new SqlCommand(insertStatement, connection))
+                using (var command = new SqlCommand(insertStatement, writeConnection))
                 {
-                    PrepareCommand(connection, transaction, command);
-                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
-                    //command.ExecuteNonQuery();
+                    PrepareCommand(writeConnection, transaction, command);
+                    ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
                 }
             }
             catch (Exception e)
@@ -593,12 +593,10 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
         protected virtual void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command, SessionDeadlockPriority deadlockPriority)
         {
-            //PrepareConnectionAndCommand(connection, command);
             String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
             using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
             {
-                setDeadlockPriorityCommand.Connection = connection;
-                setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
+                PrepareCommand(connection, setDeadlockPriorityCommand);
                 setDeadlockPriorityCommand.ExecuteNonQuery();
             }
         }
