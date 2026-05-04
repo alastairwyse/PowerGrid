@@ -137,11 +137,12 @@ namespace PowerGrid.Persistence.SqlServer
             using (var readConnection = new SqlConnection(connectionString))
             using (var writeConnection = new SqlConnection(connectionString))
             {
+                GridComparisonStatistics comparisonStatistics;
                 PrepareConnection(readConnection);
-                PrepareConnection(writeConnection);
+                writeConnection.Open();
+                PrepareConnection(writeConnection, SessionDeadlockPriority.High);
 
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
-                writeConnection.Open();
                 using (SqlTransaction transaction = writeConnection.BeginTransaction())
                 {
                     Action<SqlConnection, SqlTransaction, StockPrice, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPrice addedStockPrice, DateTime transactionDateTime) =>
@@ -187,7 +188,6 @@ namespace PowerGrid.Persistence.SqlServer
                         ))
                     );
 
-                    GridComparisonStatistics comparisonStatistics;
                     try
                     {
                         readConnection.Open(); 
@@ -222,9 +222,11 @@ namespace PowerGrid.Persistence.SqlServer
                     {
                         throw new Exception("Failed to persist grid to SQL Server.", e);
                     }
-
-                    return comparisonStatistics;
                 }
+                TeardownConnection(readConnection);
+                TeardownConnection(writeConnection);
+
+                return comparisonStatistics;
             }
         }
 
@@ -244,27 +246,33 @@ namespace PowerGrid.Persistence.SqlServer
             //   Query can be abstract (or tablename and parameters... other parts of the insertStatement should be common)
             //   Use AppAccess SqlServerPersisterUtilities and ReadQueryGeneratorBase classes for influence in how to split platform-agnostic SQL into base classes
 
+            const String dataSourceParameterName = "@DataSource";
+            const String dateParameterName = "@Date";
             String query = @$"
             SELECT  [Version] AS Version, 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
-            WHERE   DataSource = '{dataSource}' 
-              AND   [Date] = CONVERT(date, '{date.ToString(transactionSql126DateStyle)}', 126) 
+            WHERE   DataSource = {dataSourceParameterName} 
+              AND   [Date] = CONVERT(date, {dateParameterName}, 126) 
               AND   [Version] = 
                     (
                       SELECT  MAX([Version])
                       FROM    StockPriceGrids 
-                      WHERE   DataSource = '{dataSource}' 
-                        AND   [Date] = CONVERT(date, '{date.ToString(transactionSql126DateStyle)}', 126) 
+                      WHERE   DataSource = {dataSourceParameterName}
+                        AND   [Date] = CONVERT(date, {dateParameterName}, 126) 
                     );
             ";
-
+            
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
             using (var command = new SqlCommand(query))
             {
                 PrepareCommand(connection, command);
+                command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
+                command.Parameters[dataSourceParameterName].Value = dataSource;
+                command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
+                command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
                 Int32 latestGridVersionNumber = 0;
                 DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
@@ -298,6 +306,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// <returns>The items in the grid.</returns>
         protected IEnumerable<StockPricePTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
         {
+            const String dataSourceParameterName = "@DataSource";
+            const String dateParameterName = "@Date";
+            const String transactionTimestampParameterName = "@TransactionTimestamp";
             String query = @$"
             SELECT Id, 
                    DataSource, 
@@ -307,9 +318,9 @@ namespace PowerGrid.Persistence.SqlServer
                    TransactionFrom, 
                    TransactionTo 
             FROM   StockPrices 
-            WHERE  DataSource = '{dataSource}'
-              AND  [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23) 
-              AND  CONVERT(datetime2, '{transactionTimestamp.ToString(transactionSql126DateStyle)}', 126) BETWEEN TransactionFrom AND TransactionTo
+            WHERE  DataSource = {dataSourceParameterName}
+              AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
+              AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY DataSource, 
                       [Date], 
                       Company;
@@ -321,6 +332,12 @@ namespace PowerGrid.Persistence.SqlServer
             using (var command = new SqlCommand(query, connection))
             {
                 PrepareCommand(connection, command);
+                command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
+                command.Parameters[dataSourceParameterName].Value = dataSource;
+                command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
+                command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
+                command.Parameters.Add(transactionTimestampParameterName, SqlDbType.NVarChar);
+                command.Parameters[transactionTimestampParameterName].Value = transactionTimestamp.ToString(transactionSql126DateStyle);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -355,6 +372,11 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
         protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPrice item, DateTime insertDateTime)
         {
+            const String dataSourceParameterName = "@DataSource";
+            const String dateParameterName = "@Date";
+            const String companyParameterName = "@Company";
+            const String priceParameterName = "@Price";
+            const String insertDateTimeParameterName = "@InsertDateTime";
             String insertStatement = @$"
             INSERT 
             INTO    StockPrices 
@@ -367,11 +389,11 @@ namespace PowerGrid.Persistence.SqlServer
                         TransactionTo 
                     )
             VALUES  (
-                        '{item.DataSource}', 
-                        CONVERT(date, '{item.Date.ToString(transactionSql23DateStyle)}', 23), 
-                        '{item.Company}', 
-                        {item.Price}, 
-                        CONVERT(datetime2, '{insertDateTime.ToString(transactionSql126DateStyle)}', 126) , 
+                        {dataSourceParameterName}, 
+                        CONVERT(date, {dateParameterName}, 23), 
+                        {companyParameterName}, 
+                        {priceParameterName}, 
+                        CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
                         dbo.GetTemporalMaxDate()
                     );
             ";
@@ -381,8 +403,17 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand(insertStatement, connection))
                 {
                     PrepareCommand(connection, transaction, command);
+                    command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
+                    command.Parameters[dataSourceParameterName].Value = item.DataSource;
+                    command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
+                    command.Parameters[dateParameterName].Value = item.Date.ToString(transactionSql23DateStyle);
+                    command.Parameters.Add(companyParameterName, SqlDbType.NVarChar);
+                    command.Parameters[companyParameterName].Value = item.Company;
+                    command.Parameters.Add(priceParameterName, SqlDbType.Money);
+                    command.Parameters[priceParameterName].Value = item.Price;
+                    command.Parameters.Add(insertDateTimeParameterName, SqlDbType.NVarChar);
+                    command.Parameters[insertDateTimeParameterName].Value = insertDateTime.ToString(transactionSql126DateStyle);
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
-                    //command.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -421,9 +452,11 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
         protected void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO item, DateTime deleteDateTime)
         {
+            const String idParameterName = "@Id";
+            const String deleteDateTimeParameterName = "@DeleteDateTime";
             String deleteStatement = @$"
             UPDATE  StockPrices 
-            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, '{deleteDateTime.ToString(transactionSql126DateStyle)}', 126))
+            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, {deleteDateTimeParameterName}, 126))
             WHERE   Id = {item.Id};
             ";
 
@@ -431,9 +464,12 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(deleteStatement, connection))
                 {
+                    command.Parameters.Add(idParameterName, SqlDbType.BigInt);
+                    command.Parameters[idParameterName].Value = item.Id;
+                    command.Parameters.Add(deleteDateTimeParameterName, SqlDbType.NVarChar);
+                    command.Parameters[deleteDateTimeParameterName].Value = deleteDateTime.ToString(transactionSql126DateStyle);
                     PrepareCommand(connection, transaction, command);
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
-                    //command.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -444,17 +480,23 @@ namespace PowerGrid.Persistence.SqlServer
 
         protected Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
         {
+            const String dataSourceParameterName = "@DataSource";
+            const String dateParameterName = "@Date";
             String maxIdQuery = @$"
             SELECT  MAX(Id) AS MaxId
             FROM    StockPriceGrids 
-            WHERE   DataSource = '{dataSource}'
-              AND   [Date] = CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23);
+            WHERE   DataSource = {dataSourceParameterName}
+              AND   [Date] = CONVERT(date, {dateParameterName}, 23);
             ";
 
             Int64 gridVersionNumber = 1;
             using (var command = new SqlCommand(maxIdQuery))
             {
                 PrepareCommand(readConnection, transaction, command);
+                command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
+                command.Parameters[dataSourceParameterName].Value = dataSource;
+                command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
+                command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -467,6 +509,8 @@ namespace PowerGrid.Persistence.SqlServer
                 }
             }
 
+            const String versionParameterName = "@Version";
+            const String createDateTimeParameterName = "@CreateDateTime";
             String insertStatement = $@"
             INSERT 
             INTO    StockPriceGrids 
@@ -477,10 +521,10 @@ namespace PowerGrid.Persistence.SqlServer
                         TransactionTimestamp
                     )
             VALUES  (
-                        '{dataSource}', 
-                        CONVERT(date, '{date.ToString(transactionSql23DateStyle)}', 23), 
-                        {gridVersionNumber}, 
-                        CONVERT(datetime2, '{createDateTime.ToString(transactionSql126DateStyle)}', 126)
+                        {dataSourceParameterName}, 
+                        CONVERT(date, {dateParameterName}, 23), 
+                        {versionParameterName}, 
+                        CONVERT(datetime2, {createDateTimeParameterName}, 126)
                     );
             ";
 
@@ -488,6 +532,14 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(insertStatement, writeConnection))
                 {
+                    command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
+                    command.Parameters[dataSourceParameterName].Value = dataSource;
+                    command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
+                    command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
+                    command.Parameters.Add(versionParameterName, SqlDbType.Int);
+                    command.Parameters[versionParameterName].Value = gridVersionNumber;
+                    command.Parameters.Add(createDateTimeParameterName, SqlDbType.NVarChar);
+                    command.Parameters[createDateTimeParameterName].Value = createDateTime.ToString(transactionSql126DateStyle);
                     PrepareCommand(writeConnection, transaction, command);
                     ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
                 }
@@ -563,6 +615,22 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
+        /// Prepares the specified <see cref="SqlConnection"/> and sets the session deadlock priority.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
+        protected virtual void PrepareConnection(SqlConnection connection, SessionDeadlockPriority deadlockPriority)
+        {
+            PrepareConnection(connection);
+            String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
+            using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
+            {
+                PrepareCommand(connection, setDeadlockPriorityCommand);
+                setDeadlockPriorityCommand.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
         /// Prepares the specified <see cref="SqlCommand"/>.
         /// </summary>
         /// <param name="connection">The connection to SQL Server.</param>
@@ -583,22 +651,6 @@ namespace PowerGrid.Persistence.SqlServer
         {
             PrepareCommand(connection, command);
             command.Transaction = transaction;
-        }
-
-        /// <summary>
-        /// Prepare the specified <see cref="SqlConnection"/> and <see cref="SqlCommand"/> to execute a insertStatement against them, and sets the session deadlock priority.
-        /// </summary>
-        /// <param name="connection">The connection.</param>
-        /// <param name="command">The command which runs the insertStatement.</param>
-        /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
-        protected virtual void PrepareConnectionAndCommand(SqlConnection connection, SqlCommand command, SessionDeadlockPriority deadlockPriority)
-        {
-            String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
-            using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
-            {
-                PrepareCommand(connection, setDeadlockPriorityCommand);
-                setDeadlockPriorityCommand.ExecuteNonQuery();
-            }
         }
 
         /// <summary>
