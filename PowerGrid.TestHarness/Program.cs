@@ -24,10 +24,11 @@ namespace PowerGrid.TestHarness
 
             List<StockPrice> testGridItems = new()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4442),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4737),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3215),
-                //new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3259)
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4446),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4738),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3217),
+                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3259),
+                //new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), "Kamispring", 10000000000)
             };
             String connectionString = File.ReadAllText(@"..\..\..\..\Documentation\TempConnectionString.txt");
 

@@ -54,6 +54,8 @@ namespace PowerGrid.Persistence.SqlServer
         protected SqlRetryLogicOption sqlRetryLogicOption;
         /// <summary>Maps <see cref="SessionDeadlockPriority"/> values to their equivalent SQL Server string value.</summary>
         protected IDictionary<SessionDeadlockPriority, String> deadlockPriorityToStringValueMap;
+        /// <summary>The action to invoke if an action is retried due to a transient error.</summary>
+        protected EventHandler<SqlRetryingEventArgs> connectionRetryAction;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
@@ -102,6 +104,23 @@ namespace PowerGrid.Persistence.SqlServer
                 { SessionDeadlockPriority.High, "HIGH"},
             };
             deadlockPriorityToStringValueMap = deadlockPriorityToStringValueMap.ToFrozenDictionary();
+            connectionRetryAction = (Object sender, SqlRetryingEventArgs eventArgs) =>
+            {
+                Exception lastException = eventArgs.Exceptions[eventArgs.Exceptions.Count - 1];
+                Int32 retryDelayInSeconds = eventArgs.Delay.Seconds;
+                if (typeof(SqlException).IsAssignableFrom(lastException.GetType()) == true)
+                {
+                    // TODO: Uncomment lines when logging and metrics is implemented
+
+                    var se = (SqlException)lastException;
+                    //logger.Log(this, LogLevel.Warning, $"SQL Server error with number {se.Number} occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", se);
+                }
+                else
+                {
+                    //logger.Log(this, LogLevel.Warning, $"Exception occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", lastException);
+                }
+                //metricLogger.Increment(new SqlCommandExecutionRetried());
+            };
         }
 
         /// <summary>
@@ -191,7 +210,6 @@ namespace PowerGrid.Persistence.SqlServer
                     try
                     {
                         readConnection.Open(); 
-//HJERE
                         IEnumerable<StockPricePTO> existingGridContents;
                         try
                         {
@@ -269,10 +287,8 @@ namespace PowerGrid.Persistence.SqlServer
             using (var command = new SqlCommand(query))
             {
                 PrepareCommand(connection, command);
-                command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
-                command.Parameters[dataSourceParameterName].Value = dataSource;
-                command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
-                command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
+                sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
                 Int32 latestGridVersionNumber = 0;
                 DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
@@ -332,12 +348,9 @@ namespace PowerGrid.Persistence.SqlServer
             using (var command = new SqlCommand(query, connection))
             {
                 PrepareCommand(connection, command);
-                command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
-                command.Parameters[dataSourceParameterName].Value = dataSource;
-                command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
-                command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
-                command.Parameters.Add(transactionTimestampParameterName, SqlDbType.NVarChar);
-                command.Parameters[transactionTimestampParameterName].Value = transactionTimestamp.ToString(transactionSql126DateStyle);
+                sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
+                sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactionSql126DateStyle));
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -347,10 +360,8 @@ namespace PowerGrid.Persistence.SqlServer
                         DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
                         String currentCompany = (String)dataReader["Company"];
                         Decimal currentPrice = (Decimal)dataReader["Price"];
-                        //DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                         DateTime currentTransactionFrom = (DateTime)dataReader["TransactionFrom"];
                         currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
-                        //DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                         DateTime currentTransactionTo = (DateTime)dataReader["TransactionTo"];
                         currentTransactionTo = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
 
@@ -403,16 +414,11 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand(insertStatement, connection))
                 {
                     PrepareCommand(connection, transaction, command);
-                    command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
-                    command.Parameters[dataSourceParameterName].Value = item.DataSource;
-                    command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
-                    command.Parameters[dateParameterName].Value = item.Date.ToString(transactionSql23DateStyle);
-                    command.Parameters.Add(companyParameterName, SqlDbType.NVarChar);
-                    command.Parameters[companyParameterName].Value = item.Company;
-                    command.Parameters.Add(priceParameterName, SqlDbType.Money);
-                    command.Parameters[priceParameterName].Value = item.Price;
-                    command.Parameters.Add(insertDateTimeParameterName, SqlDbType.NVarChar);
-                    command.Parameters[insertDateTimeParameterName].Value = insertDateTime.ToString(transactionSql126DateStyle);
+                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, item.DataSource);
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, item.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, item.Company);
+                    sqlCommandShim.AddParameter(command, priceParameterName, SqlDbType.Money, item.Price);
+                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactionSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                 }
             }
@@ -464,11 +470,9 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(deleteStatement, connection))
                 {
-                    command.Parameters.Add(idParameterName, SqlDbType.BigInt);
-                    command.Parameters[idParameterName].Value = item.Id;
-                    command.Parameters.Add(deleteDateTimeParameterName, SqlDbType.NVarChar);
-                    command.Parameters[deleteDateTimeParameterName].Value = deleteDateTime.ToString(transactionSql126DateStyle);
                     PrepareCommand(connection, transaction, command);
+                    sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
+                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.ToString(transactionSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                 }
             }
@@ -493,10 +497,8 @@ namespace PowerGrid.Persistence.SqlServer
             using (var command = new SqlCommand(maxIdQuery))
             {
                 PrepareCommand(readConnection, transaction, command);
-                command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
-                command.Parameters[dataSourceParameterName].Value = dataSource;
-                command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
-                command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
+                sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
                 using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                 {
                     while (dataReader.Read())
@@ -532,15 +534,11 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 using (var command = new SqlCommand(insertStatement, writeConnection))
                 {
-                    command.Parameters.Add(dataSourceParameterName, SqlDbType.NVarChar);
-                    command.Parameters[dataSourceParameterName].Value = dataSource;
-                    command.Parameters.Add(dateParameterName, SqlDbType.NVarChar);
-                    command.Parameters[dateParameterName].Value = date.ToString(transactionSql23DateStyle);
-                    command.Parameters.Add(versionParameterName, SqlDbType.Int);
-                    command.Parameters[versionParameterName].Value = gridVersionNumber;
-                    command.Parameters.Add(createDateTimeParameterName, SqlDbType.NVarChar);
-                    command.Parameters[createDateTimeParameterName].Value = createDateTime.ToString(transactionSql126DateStyle);
                     PrepareCommand(writeConnection, transaction, command);
+                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, gridVersionNumber);
+                    sqlCommandShim.AddParameter(command, createDateTimeParameterName, SqlDbType.NVarChar, createDateTime.ToString(transactionSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
                 }
             }
@@ -568,16 +566,15 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
-                    //readConnection.RetryLogicProvider.Retrying += connectionRetryAction;
                     String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.Low]};";
                     using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
                     {
                         setDeadlockPriorityCommand.Connection = connection;
                         setDeadlockPriorityCommand.Transaction = transaction;
                         setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
-                        setDeadlockPriorityCommand.ExecuteNonQuery();
+                        sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
                     }
-                    command.ExecuteNonQuery();
+                    sqlCommandShim.ExecuteNonQuery(command);
                     break;
                 }
                 catch (SqlException sqlException)
@@ -588,7 +585,7 @@ namespace PowerGrid.Persistence.SqlServer
                         if (retryCount > 0)
                         {
                             var retryEventArgs = new SqlRetryingEventArgs(sqlRetryLogicOption.NumberOfTries - retryCount, new TimeSpan(0), exceptions);
-                            //connectionRetryAction.Invoke(this, retryEventArgs);
+                            connectionRetryAction.Invoke(this, retryEventArgs);
                             retryCount--;
                         }
                         else
@@ -612,6 +609,7 @@ namespace PowerGrid.Persistence.SqlServer
         protected void PrepareConnection(SqlConnection connection)
         {
             connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
+            connection.RetryLogicProvider.Retrying += connectionRetryAction;
         }
 
         /// <summary>
@@ -626,7 +624,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
             {
                 PrepareCommand(connection, setDeadlockPriorityCommand);
-                setDeadlockPriorityCommand.ExecuteNonQuery();
+                sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
             }
         }
 
@@ -659,8 +657,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="connection">The connection to SQL Server.</param>
         protected void TeardownConnection(SqlConnection connection)
         {
-            // TODO: Only required once a connectionRetryAction is implemented
-            //connection.RetryLogicProvider.Retrying -= connectionRetryAction;
+            connection.RetryLogicProvider.Retrying -= connectionRetryAction;
         }
 
         /// <summary>

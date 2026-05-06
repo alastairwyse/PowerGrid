@@ -30,5 +30,18 @@ namespace PowerGrid.Persistence.SqlServer
         {
             return sqlCommand.ExecuteReader();
         }
+
+        /// <inheritdoc/>
+        public Int32 ExecuteNonQuery(SqlCommand sqlCommand)
+        {
+            return sqlCommand.ExecuteNonQuery();
+        }
+
+        /// <inheritdoc/>
+        public void AddParameter(SqlCommand sqlCommand, String parameterName, SqlDbType sqlDbType, Object value)
+        {
+            sqlCommand.Parameters.Add(parameterName, sqlDbType);
+            sqlCommand.Parameters[parameterName].Value = value;
+        }
     }
 }

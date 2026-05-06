@@ -23,14 +23,30 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Defines methods which interface to a <see cref="SqlCommand"/> instance.
     /// </summary>
-    /// <remarks>Acts as a<see href = "https://en.wikipedia.org/wiki/Shim_(computing)"> shim</see> to the <see cref="SqlCommand"/> class for use in unit testing.</remarks>
+    /// <remarks>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class for use in unit testing.</remarks>
     public interface ISqlCommandShim
     {
         /// <summary>
         /// Returns an <see cref="IDataReader"/> implementation from the specified <see cref="SqlCommand"/>.
         /// </summary>
-        /// <param name="sqlCommand">The <see cref="SqlCommand"/>.</param>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to retrieve the <see cref="IDataReader"/> from.</param>
         /// <returns>An <see cref="IDataReader"/> implementation.</returns>
         public IDataReader ExecuteReader(SqlCommand sqlCommand);
+
+        /// <summary>
+        /// Executes a Transact-SQL statement against the connection and returns the number of rows affected.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to execute against.</param>
+        /// <returns>The number of rows affected.</returns>
+        public Int32 ExecuteNonQuery(SqlCommand sqlCommand);
+
+        /// <summary>
+        /// Adds a parameter to the specified <see cref="SqlCommand"/>.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to add the parameter to.</param>
+        /// <param name="parameterName">The name of the parameter.</param>
+        /// <param name="sqlDbType">The data type of the parameter.</param>
+        /// <param name="value">The value of the parameter.</param>
+        public void AddParameter(SqlCommand sqlCommand, String parameterName, SqlDbType sqlDbType, Object value);
     }
 }
