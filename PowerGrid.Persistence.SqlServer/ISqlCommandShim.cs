@@ -27,6 +27,20 @@ namespace PowerGrid.Persistence.SqlServer
     public interface ISqlCommandShim
     {
         /// <summary>
+        /// Sets the Transact-SQL statement, table name or stored procedure to execute at the data source.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to set the text on.</param>
+        /// <param name="commandText">The command text.</param>
+        public void SetCommandText(SqlCommand sqlCommand, String commandText);
+
+        /// <summary>
+        /// Sets a value indicating how the command text is to be interpreted.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to set the type on.</param>
+        /// <param name="commandType">The command type.</param>
+        public void SetCommandType(SqlCommand sqlCommand, CommandType commandType);
+
+        /// <summary>
         /// Returns an <see cref="IDataReader"/> implementation from the specified <see cref="SqlCommand"/>.
         /// </summary>
         /// <param name="sqlCommand">The <see cref="SqlCommand"/> to retrieve the <see cref="IDataReader"/> from.</param>

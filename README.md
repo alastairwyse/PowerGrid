@@ -24,8 +24,10 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * GridComparer&lt;T&gt; may need to specify 2 generic types... one for the new data source and one for the existing (since existing will have DB specific PTO properties like Id and temporal dates)... and there should be a constraint so that the existing derives from the new.  OR, another alternative could be to put the query results (new/PTO version) into a Dictionary, and the emitted rows for update/insert (emitted from the GridComparer) could be retrieved from the Dictionary based on key equality.  Second option probably keeps the GridComparer more sinple and generic.
 * IGridPersister probably needs 2x T types... one for the base grid item class and the other for the PTO equiv.  Same as what I was suggesting for GridComparer above.
 * Parameterize queries to avoid any SQL injection potential
+* Validator and ordering 'chain' in StockPricePersister... would be easier to read if creating extension methods in LINQ style.  Find a way to do this, but limit the scope (don't let it be global)... maybe by adding a T type constraint to be be IGridItem, or limiting via defined namespace??
 
 #### Longer Term TODO
+* Create interface for GridComparer (to allow mocking in testing for StockPricePersister)
 * Use a model class as T type to define Get() parameters in Persister base class
 * Make the persister inner DataBaseOperationEmitter class into a buffer with configurable size (on persister constructor).  Can set to 1 to minimize memory usage and stream things through... OR set huge to effectively write once (or close to once) to DB.  If coupled with option to write in bulk via a temp table or TVP, you would then have the option of high performance/throughput at the cost of memory usage.
 * Have an option to 'delete' (via setting TransactionTo) all current rows, before doing the compare... then it basically will insert everything new every time, and performance becomes similar to a straight insert/overwrite with no compare (since comparer will retrieve 0 existing rows).
@@ -36,6 +38,10 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Add a 'connectionRetryAction' Action to any persister classes which support transient error retries.
 * Include validation filters which reject datasources etc which don't match a known whitelist... alternative to lookup tables and foreign key constraints
 * Figure out what to do with deadlock handling in read of existing data for grid upload.  I.e. expect if deadlock is retried it will reset enumeration (and ultimately return duplicate grid items).  Need to figure out if 1. concurrent read and update on same connection actually works (Google 'AI' keeps giving vastly different 'random' responses after earlier confidently telling me it would work... let's see)... 2. if it works are deadlocks actually a problem, or doesn't the sengle connection prevent it?
+* Add parameter to StockPricePersister.PersistGrid() method to specify comparison type i.e. likely...
+  * Full compare
+  * Add/update only
+  * Delete only (is this possible? since we delete the things that are not in the set?)
 
 #### Terminology
 * Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/

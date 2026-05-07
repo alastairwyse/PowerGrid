@@ -192,6 +192,8 @@ namespace PowerGrid.Persistence.SqlServer
                             throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}' found in grid which which was expected to contain {nameof(StockPrice.DataSource)} '{expectedDataSource}'.", stockPrice);
                         if (stockPrice.Date != expectedDate)
                             throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}' found in grid which which was expected to contain {nameof(StockPrice.Date)} '{expectedDate.ToString(transactionSql23DateStyle)}'.", stockPrice);
+                        if (stockPrice.Price < 0)
+                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}', {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}', and {nameof(StockPrice.Company)} '{stockPrice.Company}' has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
                     };
                     GridContentsDuplicateChecker<StockPrice> newGridDuplicateChecker = new();
                     // Order of below chain is 1 validate, 2 order, 3 dup check
@@ -284,8 +286,9 @@ namespace PowerGrid.Persistence.SqlServer
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
-            using (var command = new SqlCommand(query))
+            using (var command = new SqlCommand())
             {
+                sqlCommandShim.SetCommandText(command, query);
                 PrepareCommand(connection, command);
                 sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
                 sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
@@ -345,8 +348,9 @@ namespace PowerGrid.Persistence.SqlServer
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
-            using (var command = new SqlCommand(query, connection))
+            using (var command = new SqlCommand())
             {
+                sqlCommandShim.SetCommandText(command, query);
                 PrepareCommand(connection, command);
                 sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
                 sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
@@ -411,8 +415,9 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                using (var command = new SqlCommand(insertStatement, connection))
+                using (var command = new SqlCommand())
                 {
+                    sqlCommandShim.SetCommandText(command, insertStatement);
                     PrepareCommand(connection, transaction, command);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, item.DataSource);
                     sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, item.Date.ToString(transactionSql23DateStyle));
@@ -468,8 +473,9 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                using (var command = new SqlCommand(deleteStatement, connection))
+                using (var command = new SqlCommand())
                 {
+                    sqlCommandShim.SetCommandText(command, deleteStatement);
                     PrepareCommand(connection, transaction, command);
                     sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
                     sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.ToString(transactionSql126DateStyle));
@@ -494,8 +500,9 @@ namespace PowerGrid.Persistence.SqlServer
             ";
 
             Int64 gridVersionNumber = 1;
-            using (var command = new SqlCommand(maxIdQuery))
+            using (var command = new SqlCommand())
             {
+                sqlCommandShim.SetCommandText(command, maxIdQuery);
                 PrepareCommand(readConnection, transaction, command);
                 sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
                 sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
@@ -532,8 +539,9 @@ namespace PowerGrid.Persistence.SqlServer
 
             try
             {
-                using (var command = new SqlCommand(insertStatement, writeConnection))
+                using (var command = new SqlCommand())
                 {
+                    sqlCommandShim.SetCommandText(command, insertStatement);
                     PrepareCommand(writeConnection, transaction, command);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
                     sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
@@ -567,8 +575,9 @@ namespace PowerGrid.Persistence.SqlServer
                 try
                 {
                     String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.Low]};";
-                    using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
+                    using (var setDeadlockPriorityCommand = new SqlCommand())
                     {
+                        sqlCommandShim.SetCommandText(setDeadlockPriorityCommand, setDeadlockPriorityStatement);
                         setDeadlockPriorityCommand.Connection = connection;
                         setDeadlockPriorityCommand.Transaction = transaction;
                         setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
@@ -621,8 +630,9 @@ namespace PowerGrid.Persistence.SqlServer
         {
             PrepareConnection(connection);
             String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
-            using (var setDeadlockPriorityCommand = new SqlCommand(setDeadlockPriorityStatement))
+            using (var setDeadlockPriorityCommand = new SqlCommand())
             {
+                sqlCommandShim.SetCommandText(setDeadlockPriorityCommand, setDeadlockPriorityStatement);
                 PrepareCommand(connection, setDeadlockPriorityCommand);
                 sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
             }

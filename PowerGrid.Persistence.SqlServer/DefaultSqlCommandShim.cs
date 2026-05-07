@@ -26,6 +26,18 @@ namespace PowerGrid.Persistence.SqlServer
     public class DefaultSqlCommandShim : ISqlCommandShim
     {
         /// <inheritdoc/>
+        public void SetCommandText(SqlCommand sqlCommand, String commandText)
+        {
+            sqlCommand.CommandText = commandText;
+        }
+
+        /// <inheritdoc/>
+        public void SetCommandType(SqlCommand sqlCommand, CommandType commandType)
+        {
+            sqlCommand.CommandType = commandType;
+        }
+
+        /// <inheritdoc/>
         public IDataReader ExecuteReader(SqlCommand sqlCommand)
         {
             return sqlCommand.ExecuteReader();
