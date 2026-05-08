@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Persistence.UnitT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.TestHarness", "PowerGrid.TestHarness\PowerGrid.TestHarness.csproj", "{9DBBA009-518D-40AF-B5E9-A8ACF752D663}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Persistence.SqlServer.UnitTests", "PowerGrid.Persistence.SqlServer.UnitTests\PowerGrid.Persistence.SqlServer.UnitTests.csproj", "{23D2131A-91DB-4599-BF6E-6183F3C1AA76}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,10 @@ Global
 		{9DBBA009-518D-40AF-B5E9-A8ACF752D663}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9DBBA009-518D-40AF-B5E9-A8ACF752D663}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9DBBA009-518D-40AF-B5E9-A8ACF752D663}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -28,10 +28,22 @@ namespace PowerGrid.Core.UnitTests
         /// Creates a DateOnly from the specified yyyy-MM-dd format string.
         /// </summary>
         /// <param name="stringifiedDateOnly">The stringified date to convert.</param>
-        /// <returns></returns>
+        /// <returns>A DateOnly.</returns>
         public DateOnly CreateDateOnlyFromString(String stringifiedDateOnly)
         {
             return DateOnly.ParseExact(stringifiedDateOnly, "yyyy-MM-dd", DateTimeFormatInfo.InvariantInfo);
+        }
+
+        /// <summary>
+        /// Creates a DateTime from the specified yyyy-MM-dd HH:mm:ss format string.
+        /// </summary>
+        /// <param name="stringifiedDateTime">The stringified date/time to convert.</param>
+        /// <returns>A DateTime.</returns>
+        public DateTime CreateDataTimeFromString(String stringifiedDateTime)
+        {
+            DateTime returnDateTime = DateTime.ParseExact(stringifiedDateTime, "yyyy-MM-dd HH:mm:ss.fffffff", DateTimeFormatInfo.InvariantInfo);
+
+            return DateTime.SpecifyKind(returnDateTime, DateTimeKind.Utc);
         }
     }
 }
