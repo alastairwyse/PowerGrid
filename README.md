@@ -27,6 +27,11 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Validator and ordering 'chain' in StockPricePersister... would be easier to read if creating extension methods in LINQ style.  Find a way to do this, but limit the scope (don't let it be global)... maybe by adding a T type constraint to be be IGridItem, or limiting via defined namespace??
 
 #### Longer Term TODO
+* Might have to mock connection.open?
+* 2x grid params.. upsert only + full sync
+* Admin endpoint to hard delete by an outer key
+* For delete... can outer key be split into props that common for all grids and ones that are specific to this grid? Deletes may well just need to happen across the common properties
+* Can we have a shim for connection.open and close methods?.. and begintrans and retrylogicprovider
 * Create interface for GridComparer (to allow mocking in testing for StockPricePersister)
 * Use a model class as T type to define Get() parameters in Persister base class
 * Make the persister inner DataBaseOperationEmitter class into a buffer with configurable size (on persister constructor).  Can set to 1 to minimize memory usage and stream things through... OR set huge to effectively write once (or close to once) to DB.  If coupled with option to write in bulk via a temp table or TVP, you would then have the option of high performance/throughput at the cost of memory usage.

@@ -27,11 +27,32 @@ namespace PowerGrid.Persistence.SqlServer
     public interface ISqlCommandShim
     {
         /// <summary>
+        /// Sets the <see cref="SqlConnection"/> used by the specified command.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to set the connection on.</param>
+        /// <param name="connection">The connection.</param>
+        public void SetConnection(SqlCommand sqlCommand, SqlConnection connection);
+
+        /// <summary>
+        /// Sets the <see cref="SqlTransaction"/> within which the specified command executes.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to set the transaction on.</param>
+        /// <param name="connection">The connection.</param>
+        public void SetTransaction(SqlCommand sqlCommand, SqlTransaction transaction);
+
+        /// <summary>
         /// Sets the Transact-SQL statement, table name or stored procedure to execute at the data source.
         /// </summary>
         /// <param name="sqlCommand">The <see cref="SqlCommand"/> to set the text on.</param>
         /// <param name="commandText">The command text.</param>
         public void SetCommandText(SqlCommand sqlCommand, String commandText);
+
+        /// <summary>
+        /// Sets the wait time (in seconds) on the specified connection, before terminating the attempt to execute a command and generating an error.
+        /// </summary>
+        /// <param name="sqlCommand">The <see cref="SqlCommand"/> to set the command timeout on.</param>
+        /// <param name="connection">The connection.</param>
+        public void SetCommandTimeout(SqlCommand sqlCommand, Int32 commandTimeout);
 
         /// <summary>
         /// Sets a value indicating how the command text is to be interpreted.

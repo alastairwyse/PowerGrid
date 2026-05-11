@@ -26,9 +26,27 @@ namespace PowerGrid.Persistence.SqlServer
     public class DefaultSqlCommandShim : ISqlCommandShim
     {
         /// <inheritdoc/>
+        public void SetConnection(SqlCommand sqlCommand, SqlConnection connection)
+        {
+            sqlCommand.Connection = connection;
+        }
+
+        /// <inheritdoc/>
+        public void SetTransaction(SqlCommand sqlCommand, SqlTransaction transaction)
+        {
+            sqlCommand.Transaction = transaction;
+        }
+
+        /// <inheritdoc/>
         public void SetCommandText(SqlCommand sqlCommand, String commandText)
         {
             sqlCommand.CommandText = commandText;
+        }
+
+        /// <inheritdoc/>
+        public void SetCommandTimeout(SqlCommand sqlCommand, int commandTimeout)
+        {
+            sqlCommand.CommandTimeout = commandTimeout;
         }
 
         /// <inheritdoc/>
