@@ -19,8 +19,10 @@ using System.Collections;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Linq;
+using System.Transactions;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
@@ -44,6 +46,10 @@ namespace PowerGrid.Persistence.SqlServer
         protected Int32 operationTimeout;
         /// <summary>Provider for the current date and time.</summary>
         protected IDateTimeProvider dateTimeProvider;
+        /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</summary>
+        protected ISqlConnectionShim sqlConnectionShim;
+        /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlTransaction"/> class.</summary>
+        protected ISqlTransactionShim sqlTransactionShim;
         /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</summary>
         protected ISqlCommandShim sqlCommandShim;
         /// <summary>A set of SQL Server database engine error numbers which denote a transient fault.</summary>
@@ -88,6 +94,8 @@ namespace PowerGrid.Persistence.SqlServer
             this.connectionString = connectionString;
             this.operationTimeout = operationTimeout;
             dateTimeProvider = new DefaultDateTimeProvider();
+            sqlConnectionShim = new DefaultSqlConnectionShim();
+            sqlTransactionShim = new DefaultSqlTransactionShim();
             sqlCommandShim = new DefaultSqlCommandShim();
             // Setup retry logic
             sqlServerTransientErrorNumbers = GenerateSqlServerTransientErrorNumbers();
@@ -139,11 +147,15 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
-            IDateTimeProvider dateTimeProvider, 
+            IDateTimeProvider dateTimeProvider,
+            ISqlConnectionShim sqlConnectionShim, 
+            ISqlTransactionShim sqlTransactionShim, 
             ISqlCommandShim sqlCommandShim
         ) : this(connectionString, retryCount, retryInterval, operationTimeout)
         {
             this.dateTimeProvider = dateTimeProvider;
+            this.sqlConnectionShim = sqlConnectionShim;
+            this.sqlTransactionShim = sqlTransactionShim;
             this.sqlCommandShim = sqlCommandShim;
         }
 
@@ -158,11 +170,11 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 GridComparisonStatistics comparisonStatistics;
                 PrepareConnection(readConnection);
-                writeConnection.Open();
+                sqlConnectionShim.Open(writeConnection);
                 PrepareConnection(writeConnection, SessionDeadlockPriority.High);
 
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
-                using (SqlTransaction transaction = writeConnection.BeginTransaction())
+                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
                 {
                     Action<SqlConnection, SqlTransaction, StockPrice, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPrice addedStockPrice, DateTime transactionDateTime) =>
                     {
@@ -211,7 +223,7 @@ namespace PowerGrid.Persistence.SqlServer
 
                     try
                     {
-                        readConnection.Open(); 
+                        sqlConnectionShim.Open(readConnection);
                         IEnumerable<StockPricePTO> existingGridContents;
                         try
                         {
@@ -225,18 +237,27 @@ namespace PowerGrid.Persistence.SqlServer
                             try
                             {
                                 comparisonStatistics = gridComparer.Compare(existingGridContents, newGridContents);
-                                transaction.Commit();
+                                sqlTransactionShim.Commit(transaction);
                             }
                             catch (Exception e)
                             {
-                                transaction.Rollback();
-                                throw new Exception($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                                Exception compareException = new($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e); 
+                                try
+                                {
+                                    // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
+                                    sqlTransactionShim.Rollback(transaction);
+                                }
+                                catch (Exception rollbackException)
+                                {
+                                    throw new AggregateException("Failed to rollback transaction after exception comparing stock price grid to existing data.", rollbackException, compareException);
+                                }
+                                throw compareException;
                             }
                         }
                         CreateGrid(readConnection, writeConnection, transaction, expectedDataSource, expectedDate, transactionTimestamp);
 
-                        writeConnection.Close();
-                        readConnection.Close();
+                        sqlConnectionShim.Close(writeConnection);
+                        sqlConnectionShim.Close(readConnection);
                     }
                     catch (Exception e)
                     {
@@ -574,13 +595,13 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
-                    String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.Low]};";
+                    String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.High]};";
                     using (var setDeadlockPriorityCommand = new SqlCommand())
                     {
                         sqlCommandShim.SetCommandText(setDeadlockPriorityCommand, setDeadlockPriorityStatement);
-                        setDeadlockPriorityCommand.Connection = connection;
-                        setDeadlockPriorityCommand.Transaction = transaction;
-                        setDeadlockPriorityCommand.CommandTimeout = operationTimeout;
+                        sqlCommandShim.SetConnection(setDeadlockPriorityCommand, connection);
+                        sqlCommandShim.SetTransaction(setDeadlockPriorityCommand, transaction);
+                        sqlCommandShim.SetCommandTimeout(setDeadlockPriorityCommand, operationTimeout);
                         sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
                     }
                     sqlCommandShim.ExecuteNonQuery(command);
@@ -617,8 +638,8 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="connection">The connection.</param>
         protected void PrepareConnection(SqlConnection connection)
         {
-            connection.RetryLogicProvider = SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption);
-            connection.RetryLogicProvider.Retrying += connectionRetryAction;
+            sqlConnectionShim.SetRetryLogicProvider(connection, SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            sqlConnectionShim.GetRetryLogicProvider(connection).Retrying += connectionRetryAction;
         }
 
         /// <summary>
@@ -645,8 +666,8 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="command">The command.</param>
         protected void PrepareCommand(SqlConnection connection, SqlCommand command)
         {
-            command.Connection = connection;
-            command.CommandTimeout = operationTimeout;
+            sqlCommandShim.SetConnection(command, connection);
+            sqlCommandShim.SetCommandTimeout(command, operationTimeout);
         }
 
         /// <summary>
@@ -658,7 +679,7 @@ namespace PowerGrid.Persistence.SqlServer
         protected void PrepareCommand(SqlConnection connection, SqlTransaction transaction, SqlCommand command)
         {
             PrepareCommand(connection, command);
-            command.Transaction = transaction;
+            sqlCommandShim.SetTransaction(command, transaction);
         }
 
         /// <summary>
@@ -667,7 +688,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="connection">The connection to SQL Server.</param>
         protected void TeardownConnection(SqlConnection connection)
         {
-            connection.RetryLogicProvider.Retrying -= connectionRetryAction;
+            sqlConnectionShim.GetRetryLogicProvider(connection).Retrying -= connectionRetryAction;
         }
 
         /// <summary>

@@ -15,6 +15,7 @@
 */
 
 using System;
+using System.Data;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Core.UnitTests;
@@ -29,10 +30,16 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
     /// </summary>
     public class StockPricePersisterTests
     {
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
+        private const String transactionSql23DateStyle = "yyyy-MM-dd";
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
+        private const String transactionSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
         private const String testConnectionString = "Server=127.0.0.1;Database=PowerGrid;User Id=user;Password=pwd=%X9sjQb;Encrypt=false;Authentication=SqlPassword";
 
         private TestUtilities utils;
         private IDateTimeProvider mockDateTimeProvider;
+        private ISqlConnectionShim mockSqlConnectionShim;
+        private ISqlTransactionShim mockSqlTransactionShim;
         private ISqlCommandShim mockSqlCommandShim;
         private StockPricePersisterWithProtectedMembers testStockPricePersister;
 
@@ -42,7 +49,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDateTimeProvider = Substitute.For<IDateTimeProvider>();
             mockSqlCommandShim = Substitute.For<ISqlCommandShim>();
             utils = new TestUtilities();
-            testStockPricePersister = new StockPricePersisterWithProtectedMembers(testConnectionString, 5, 10, 0, mockDateTimeProvider, mockSqlCommandShim);
+            testStockPricePersister = new StockPricePersisterWithProtectedMembers(testConnectionString, 5, 10, 0, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
         }
 
         [Test]
@@ -58,29 +65,39 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             using (SqlTransaction transaction = connection.BeginTransaction())
             {
                 testStockPricePersister.InsertGridItem(connection, transaction, testItem, testInsertDateTime);
-            }
 
-            String expectedCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        dbo.GetTemporalMaxDate()
-                    );
-            ";
-            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                String expectedCommandText = @$"
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            dbo.GetTemporalMaxDate()
+                        );
+                ";
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), transaction);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.NVarChar, testItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH");
+                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            }
         }
 
         #region Nested Classes
@@ -99,8 +116,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 Int32 retryInterval,
                 Int32 operationTimeout,
                 IDateTimeProvider dateTimeProvider,
+                ISqlConnectionShim sqlConnectionShim,
+                ISqlTransactionShim sqlTransactionShim,
                 ISqlCommandShim sqlCommandShim
-            ) : base(connectionString, retryCount, retryInterval, operationTimeout, dateTimeProvider, sqlCommandShim)
+            ) : base(connectionString, retryCount, retryInterval, operationTimeout, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
             {
             }
 
