@@ -30,6 +30,15 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
     /// </summary>
     public class StockPricePersisterTests
     {
+        // Note:
+        //   Have found creative ways to mock SQL Server dependencies using 'shim' interfaces.
+        //   However, Microsoft.Data.SqlClient.SqlTransaction has been problematic, because it has no public constructor, and to instantiate one via a SqlConnection requires the connection to be open.
+        //   Hence the best I've been able to do so far is to pass the transaction as null, and check the corresponding ISqlTransactionShim methods receive null, e.g.
+        //     testStockPricePersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
+        //     mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+        //   Obviously this isn't perfect, as it won't catch if the code under test is passing null in error
+        //   But, IMO it's a small price to pay, as opposed to having no units tests at all.
+
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         private const String transactionSql23DateStyle = "yyyy-MM-dd";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
@@ -60,49 +69,54 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testCompany = "Hitachi";
             StockPrice testItem = new(testDataSource, testDate, testCompany, 4732);
             DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
+            String expectedCommandText = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        @DataSource, 
+                        CONVERT(date, @Date, 23), 
+                        @Company, 
+                        @Price, 
+                        CONVERT(datetime2, @InsertDateTime, 126), 
+                        dbo.GetTemporalMaxDate()
+                    );
+            ";
 
             using (var connection = new SqlConnection(testConnectionString))
-            using (SqlTransaction transaction = connection.BeginTransaction())
             {
-                testStockPricePersister.InsertGridItem(connection, transaction, testItem, testInsertDateTime);
+                testStockPricePersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
 
-                String expectedCommandText = @$"
-                INSERT 
-                INTO    StockPrices 
-                        (
-                            DataSource, 
-                            [Date], 
-                            Company, 
-                            Price, 
-                            TransactionFrom, 
-                            TransactionTo 
-                        )
-                VALUES  (
-                            @DataSource, 
-                            CONVERT(date, @Date, 23), 
-                            @Company, 
-                            @Price, 
-                            CONVERT(datetime2, @InsertDateTime, 126), 
-                            dbo.GetTemporalMaxDate()
-                        );
-                ";
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
                 mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), connection);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
-                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), transaction);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.NVarChar, testItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testItem.Price);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH");
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
 
+        [Test]
+        public void DeleteGridItem()
+        {
+            throw new NotImplementedException();
+        }
+
         #region Nested Classes
 
-        #pragma warning disable 1591
+#pragma warning disable 1591
 
         /// <summary>
         /// Version of the StockPricePersister class where private and protected methods are exposed as public so that they can be unit tested.
