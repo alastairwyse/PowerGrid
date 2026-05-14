@@ -489,7 +489,7 @@ namespace PowerGrid.Persistence.SqlServer
             String deleteStatement = @$"
             UPDATE  StockPrices 
             SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, {deleteDateTimeParameterName}, 126))
-            WHERE   Id = {item.Id};
+            WHERE   Id = {idParameterName};
             ";
 
             try

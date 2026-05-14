@@ -20,6 +20,7 @@ using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using NUnit.Framework;
 using NSubstitute;
 
@@ -34,7 +35,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         //   Have found creative ways to mock SQL Server dependencies using 'shim' interfaces.
         //   However, Microsoft.Data.SqlClient.SqlTransaction has been problematic, because it has no public constructor, and to instantiate one via a SqlConnection requires the connection to be open.
         //   Hence the best I've been able to do so far is to pass the transaction as null, and check the corresponding ISqlTransactionShim methods receive null, e.g.
-        //     testStockPricePersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
+        //     testStockPricePersister.InsertGridItem(connection, null, testItem, testDeleteDateTime);
         //     mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
         //   Obviously this isn't perfect, as it won't catch if the code under test is passing null in error
         //   But, IMO it's a small price to pay, as opposed to having no units tests at all.
@@ -109,14 +110,166 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void InsertGridItem_ExceptionInserting()
+        {
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-08");
+            const String testCompany = "Hitachi";
+            StockPrice testItem = new(testDataSource, testDate, testCompany, 4732);
+            DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
+            String expectedCommandText = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        @DataSource, 
+                        CONVERT(date, @Date, 23), 
+                        @Company, 
+                        @Price, 
+                        CONVERT(datetime2, @InsertDateTime, 126), 
+                        dbo.GetTemporalMaxDate()
+                    );
+            ";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPricePersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
+                });
+                
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price with datasource '{testDataSource}', date '{testDate.ToString(transactionSql23DateStyle)}', and company '{testCompany}' into SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void UpdateGridItem()
+        {
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
+            const String testCompany = "Toyota";
+            StockPrice testNewItem = new(testDataSource, testDate, testCompany, 3210);
+            StockPricePTO testSupersededItemItem = new(124, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
+            String expectedInsertCommandText = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        @DataSource, 
+                        CONVERT(date, @Date, 23), 
+                        @Company, 
+                        @Price, 
+                        CONVERT(datetime2, @InsertDateTime, 126), 
+                        dbo.GetTemporalMaxDate()
+                    );
+            ";
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, @DeleteDateTime, 126))
+            WHERE   Id = @Id;
+            ";
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPricePersister.UpdateGridItem(connection, null, testSupersededItemItem, testNewItem, testUpdateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                mockSqlCommandShim.Received(4).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(4).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(4).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItemItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testUpdateDateTime.AddTicks(-1).ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(2).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
+                mockSqlCommandShim.Received(4).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testNewItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testUpdateDateTime.ToString(transactionSql126DateStyle));
+            }
+        }
+
+        [Test]
         public void DeleteGridItem()
         {
-            throw new NotImplementedException();
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
+            const String testCompany = "Sony";
+            StockPricePTO testItem = new(123, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
+            String expectedCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, @DeleteDateTime, 126))
+            WHERE   Id = @Id;
+            ";
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPricePersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteDateTime.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
+                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            }
+        }
+
+        [Test]
+        public void DeleteGridItem_ExceptionDeleting()
+        {
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
+            const String testCompany = "Sony";
+            StockPricePTO testItem = new(123, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
+            String expectedCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, @DeleteDateTime, 126))
+            WHERE   Id = @Id;
+            ";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPricePersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to delete stock price with id '{testItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
         }
 
         #region Nested Classes
 
-#pragma warning disable 1591
+        #pragma warning disable 1591
 
         /// <summary>
         /// Version of the StockPricePersister class where private and protected methods are exposed as public so that they can be unit tested.
@@ -140,6 +293,16 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             public new void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPrice item, DateTime insertDateTime)
             {
                 base.InsertGridItem(connection, transaction, item, insertDateTime);
+            }
+
+            public new void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO supersededItem, StockPrice newItem, DateTime udpateDateTime)
+            {
+                base.UpdateGridItem(connection, transaction, supersededItem, newItem, udpateDateTime);
+            }
+
+            public new void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO item, DateTime deleteDateTime)
+            {
+                base.DeleteGridItem(connection, transaction, item, deleteDateTime);
             }
         }
 
