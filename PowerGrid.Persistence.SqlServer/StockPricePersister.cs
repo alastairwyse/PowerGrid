@@ -39,6 +39,8 @@ namespace PowerGrid.Persistence.SqlServer
         protected const String transactionSql23DateStyle = "yyyy-MM-dd";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
         protected const String transactionSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+        /// <summary>The maximum possible <see cref="DateTime"/> value to use as the upper bound for validity period in the persisted temporal model.</summary>
+        protected readonly DateTime temporalMaximumDateTime = DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
 
         /// <summary>The string to use to connect to the SQL Server database.</summary>
         protected String connectionString;
@@ -413,6 +415,7 @@ namespace PowerGrid.Persistence.SqlServer
             const String companyParameterName = "@Company";
             const String priceParameterName = "@Price";
             const String insertDateTimeParameterName = "@InsertDateTime";
+            const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
             String insertStatement = @$"
             INSERT 
             INTO    StockPrices 
@@ -430,7 +433,7 @@ namespace PowerGrid.Persistence.SqlServer
                         {companyParameterName}, 
                         {priceParameterName}, 
                         CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
-                        dbo.GetTemporalMaxDate()
+                        CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
                     );
             ";
 
@@ -445,6 +448,7 @@ namespace PowerGrid.Persistence.SqlServer
                     sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, item.Company);
                     sqlCommandShim.AddParameter(command, priceParameterName, SqlDbType.Money, item.Price);
                     sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactionSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactionSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                 }
             }
@@ -488,7 +492,7 @@ namespace PowerGrid.Persistence.SqlServer
             const String deleteDateTimeParameterName = "@DeleteDateTime";
             String deleteStatement = @$"
             UPDATE  StockPrices 
-            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, {deleteDateTimeParameterName}, 126))
+            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
             WHERE   Id = {idParameterName};
             ";
 
@@ -499,7 +503,7 @@ namespace PowerGrid.Persistence.SqlServer
                     sqlCommandShim.SetCommandText(command, deleteStatement);
                     PrepareCommand(connection, transaction, command);
                     sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
-                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.ToString(transactionSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactionSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                 }
             }

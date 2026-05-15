@@ -87,7 +87,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         @Company, 
                         @Price, 
                         CONVERT(datetime2, @InsertDateTime, 126), 
-                        dbo.GetTemporalMaxDate()
+                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
                     );
             ";
 
@@ -104,6 +104,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testItem.Price);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
@@ -134,7 +135,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         @Company, 
                         @Price, 
                         CONVERT(datetime2, @InsertDateTime, 126), 
-                        dbo.GetTemporalMaxDate()
+                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
                     );
             ";
             var mockException = new Exception("Mock exception");
@@ -179,12 +180,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         @Company, 
                         @Price, 
                         CONVERT(datetime2, @InsertDateTime, 126), 
-                        dbo.GetTemporalMaxDate()
+                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
                     );
             ";
             String expectedDeleteCommandText = @$"
             UPDATE  StockPrices 
-            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, @DeleteDateTime, 126))
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
             WHERE   Id = @Id;
             ";
 
@@ -197,7 +198,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(4).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(4).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItemItem.Id);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testUpdateDateTime.AddTicks(-1).ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000010").ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(2).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
                 mockSqlCommandShim.Received(4).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);
@@ -206,6 +207,58 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testNewItem.Price);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testUpdateDateTime.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
+            }
+        }
+
+        [Test]
+        public void UpdateGridItem_ExceptionUpdating()
+        {
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
+            const String testCompany = "Toyota";
+            StockPrice testNewItem = new(testDataSource, testDate, testCompany, 3210);
+            StockPricePTO testSupersededItem = new(124, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
+            String expectedInsertCommandText = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        @DataSource, 
+                        CONVERT(date, @Date, 23), 
+                        @Company, 
+                        @Price, 
+                        CONVERT(datetime2, @InsertDateTime, 126), 
+                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                    );
+            ";
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;
+            ";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPricePersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to update stock price with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Failed to delete stock price with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.InnerException == mockException);
             }
         }
 
@@ -219,7 +272,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
             String expectedCommandText = @$"
             UPDATE  StockPrices 
-            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, @DeleteDateTime, 126))
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
             WHERE   Id = @Id;
             ";
 
@@ -232,7 +285,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteDateTime.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
@@ -248,7 +301,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
             String expectedCommandText = @$"
             UPDATE  StockPrices 
-            SET     TransactionTo = dbo.SubtractTemporalMinimumTimeUnit(CONVERT(datetime2, @DeleteDateTime, 126))
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
             WHERE   Id = @Id;
             ";
             var mockException = new Exception("Mock exception");

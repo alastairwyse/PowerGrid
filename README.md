@@ -9,7 +9,6 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
-* Move SubtractTemporalMinimumTimeUnit and GetTemporalMaxDate functions from SQLServer into C# code
 * In tests for StockPricePersister, need test of both exceptions in contents validator
 * Ordering and any validation filters etc... should be handled outside of the persistence layer.
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+
