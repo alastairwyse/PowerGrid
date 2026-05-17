@@ -141,6 +141,8 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
         /// <param name="mockDateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
+        /// <param name="sqlConnectionShim">A mock <see cref="ISqlConnectionShim"/>.</param>
+        /// <param name="sqlTransactionShim">A mock <see cref="ISqlTransactionShim"/>.</param>
         /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
         /// <remarks>This constructor is included to facilitate unit testing.</remarks>
         public StockPricePersister
@@ -289,10 +291,13 @@ namespace PowerGrid.Persistence.SqlServer
             //   Query can be abstract (or tablename and parameters... other parts of the insertStatement should be common)
             //   Use AppAccess SqlServerPersisterUtilities and ReadQueryGeneratorBase classes for influence in how to split platform-agnostic SQL into base classes
 
+            if (String.IsNullOrWhiteSpace(dataSource) == true)
+                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
+
             const String dataSourceParameterName = "@DataSource";
             const String dateParameterName = "@Date";
             String query = @$"
-            SELECT  [Version] AS Version, 
+            SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
             WHERE   DataSource = {dataSourceParameterName} 
@@ -305,36 +310,40 @@ namespace PowerGrid.Persistence.SqlServer
                         AND   [Date] = CONVERT(date, {dateParameterName}, 126) 
                     );
             ";
-            
-            if (String.IsNullOrWhiteSpace(dataSource) == true)
-                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
 
             using (var command = new SqlCommand())
             {
-                sqlCommandShim.SetCommandText(command, query);
-                PrepareCommand(connection, command);
-                sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
-                sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
-                Int32 latestGridVersionNumber = 0;
-                DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
-
-                using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                try
                 {
-                    Boolean alreadyReadResult = false;
-                    while (dataReader.Read())
-                    {
-                        if (alreadyReadResult == true)
-                        {
-                            throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for data source '{dataSource}' and date '{date.ToString(transactionSql23DateStyle)}'.");
-                        }
-                        latestGridVersionNumber = (Int32)dataReader["Version"];
-                        latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
-                        latestGridTransactionTimestamp = DateTime.SpecifyKind(latestGridTransactionTimestamp, DateTimeKind.Utc);
-                        alreadyReadResult = true;
-                    }
-                }
+                    sqlCommandShim.SetCommandText(command, query);
+                    PrepareCommand(connection, command);
+                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
+                    Int32 latestGridVersionNumber = 0;
+                    DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
-                return (latestGridVersionNumber, latestGridTransactionTimestamp);
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        Boolean alreadyReadResult = false;
+                        while (dataReader.Read())
+                        {
+                            if (alreadyReadResult == true)
+                            {
+                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for data source '{dataSource}' and date '{date.ToString(transactionSql23DateStyle)}'.");
+                            }
+                            latestGridVersionNumber = (Int32)dataReader["Version"];
+                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            latestGridTransactionTimestamp = DateTime.SpecifyKind(latestGridTransactionTimestamp, DateTimeKind.Utc);
+                            alreadyReadResult = true;
+                        }
+                    }
+
+                    return (latestGridVersionNumber, latestGridTransactionTimestamp);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read latest stock price grid version for '{dataSource}', and date '{date.ToString(transactionSql23DateStyle)}' from SQL Server.", e);
+                }
             }
         }
 
@@ -348,6 +357,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// <returns>The items in the grid.</returns>
         protected IEnumerable<StockPricePTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
         {
+            if (String.IsNullOrWhiteSpace(dataSource) == true)
+                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
+
             const String dataSourceParameterName = "@DataSource";
             const String dateParameterName = "@Date";
             const String transactionTimestampParameterName = "@TransactionTimestamp";
@@ -357,8 +369,8 @@ namespace PowerGrid.Persistence.SqlServer
                    CONVERT(nvarchar(30), [Date], 23) AS [Date], 
                    Company, 
                    Price, 
-                   TransactionFrom, 
-                   TransactionTo 
+                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
             FROM   StockPrices 
             WHERE  DataSource = {dataSourceParameterName}
               AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
@@ -368,33 +380,41 @@ namespace PowerGrid.Persistence.SqlServer
                       Company;
             ";
 
-            if (String.IsNullOrWhiteSpace(dataSource) == true)
-                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
-
             using (var command = new SqlCommand())
             {
-                sqlCommandShim.SetCommandText(command, query);
-                PrepareCommand(connection, command);
-                sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
-                sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
-                sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactionSql126DateStyle));
-                using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                IDataReader dataReader = null;
+                try
                 {
-                    while (dataReader.Read())
-                    {
-                        Int64 currentId = (Int64)dataReader["Id"];
-                        String currentDataSource = (String)dataReader["DataSource"];
-                        DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
-                        String currentCompany = (String)dataReader["Company"];
-                        Decimal currentPrice = (Decimal)dataReader["Price"];
-                        DateTime currentTransactionFrom = (DateTime)dataReader["TransactionFrom"];
-                        currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
-                        DateTime currentTransactionTo = (DateTime)dataReader["TransactionTo"];
-                        currentTransactionTo = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
-
-                        yield return new StockPricePTO(currentId, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
-                    }
+                    sqlCommandShim.SetCommandText(command, query);
+                    PrepareCommand(connection, command);
+                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactionSql126DateStyle));
+                    dataReader = sqlCommandShim.ExecuteReader(command);
                 }
+                catch (Exception e)
+                {
+                    if (dataReader != null)
+                    {
+                        dataReader.Dispose();
+                    }
+                    throw new Exception($"Failed to read stock price grid for datasource '{dataSource}', date '{date.ToString(transactionSql23DateStyle)}', and transaction timestamp '{transactionTimestamp.ToString("yyyy-MM-dd HH:mm:ss.fffffff")}' from SQL Server.", e);
+                }
+                while (dataReader.Read())
+                {
+                    Int64 currentId = (Int64)dataReader["Id"];
+                    String currentDataSource = (String)dataReader["DataSource"];
+                    DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+                    String currentCompany = (String)dataReader["Company"];
+                    Decimal currentPrice = (Decimal)dataReader["Price"];
+                    DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                    currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
+                    DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                    currentTransactionTo = DateTime.SpecifyKind(currentTransactionTo, DateTimeKind.Utc);
+
+                    yield return new StockPricePTO(currentId, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
+                }
+                dataReader.Dispose();
             }
         }
 
@@ -513,8 +533,11 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
+        protected Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
         {
+            if (String.IsNullOrWhiteSpace(dataSource) == true)
+                throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
+
             const String dataSourceParameterName = "@DataSource";
             const String dateParameterName = "@Date";
             String maxIdQuery = @$"
@@ -523,23 +546,30 @@ namespace PowerGrid.Persistence.SqlServer
             WHERE   DataSource = {dataSourceParameterName}
               AND   [Date] = CONVERT(date, {dateParameterName}, 23);
             ";
-
-            Int64 gridVersionNumber = 1;
+            Int32 gridVersionNumber = 1;
             using (var command = new SqlCommand())
             {
-                sqlCommandShim.SetCommandText(command, maxIdQuery);
-                PrepareCommand(readConnection, transaction, command);
-                sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
-                sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
-                using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                try
                 {
-                    while (dataReader.Read())
+                    sqlCommandShim.SetCommandText(command, maxIdQuery);
+                    PrepareCommand(readConnection, transaction, command);
+                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                     {
-                        if (dataReader["MaxId"] != DBNull.Value)
+                        while (dataReader.Read())
                         {
-                            gridVersionNumber = (Int64)dataReader["MaxId"] + 1;
+                            if (dataReader["MaxId"] != DBNull.Value)
+                            {
+                                // TODO: Should have exception handler for if MaxId is already Int32.MavValue
+                                gridVersionNumber = (Int32)dataReader["MaxId"] + 1;
+                            }
                         }
                     }
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to retrieve latest grid version number while inserting stock price grid for datasource '{dataSource}', date '{date.ToString(transactionSql23DateStyle)}' into SQL Server.", e);
                 }
             }
 
@@ -561,7 +591,6 @@ namespace PowerGrid.Persistence.SqlServer
                         CONVERT(datetime2, {createDateTimeParameterName}, 126)
                     );
             ";
-
             try
             {
                 using (var command = new SqlCommand())
