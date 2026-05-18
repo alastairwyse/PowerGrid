@@ -561,7 +561,6 @@ namespace PowerGrid.Persistence.SqlServer
                         {
                             if (dataReader["MaxId"] != DBNull.Value)
                             {
-                                // TODO: Should have exception handler for if MaxId is already Int32.MavValue
                                 gridVersionNumber = (Int32)dataReader["MaxId"] + 1;
                             }
                         }
@@ -628,6 +627,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
+                    /*
                     String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.High]};";
                     using (var setDeadlockPriorityCommand = new SqlCommand())
                     {
@@ -637,6 +637,7 @@ namespace PowerGrid.Persistence.SqlServer
                         sqlCommandShim.SetCommandTimeout(setDeadlockPriorityCommand, operationTimeout);
                         sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
                     }
+                    */
                     sqlCommandShim.ExecuteNonQuery(command);
                     break;
                 }
