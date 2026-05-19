@@ -641,6 +641,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void GetExistingGrid_GridDoesntExist()
         {
+            // TODO: Implement when there's a public GetGrid() method
+
             throw new NotImplementedException();
         }
 
@@ -1065,18 +1067,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader.Read().Returns(true, false);
             mockDataReader["MaxId"].Returns<Object>(1);
             var mockException = new Exception("Mock exception");
-            Boolean executedOnce = false;
-            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => 
-            { 
-                if (executedOnce == true)
-                {
-                    throw mockException;
-                }
-                else
-                {
-                    executedOnce = true;
-                }
-            });
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
 
             using (var readConnection = new SqlConnection(testConnectionString))
             using (var writeConnection = new SqlConnection(testConnectionString))
@@ -1088,17 +1079,16 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
-                mockSqlCommandShim.Received(3).SetTransaction(Arg.Any<SqlCommand>(), null);
-                mockSqlCommandShim.Received(3).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
-                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
-                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for datasource 'Refinitiv', date '2026-05-16', and version 2 into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
@@ -1144,17 +1134,16 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
-                mockSqlCommandShim.Received(3).SetTransaction(Arg.Any<SqlCommand>(), null);
-                mockSqlCommandShim.Received(3).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
-                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
-                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 Assert.That(result == 2);
             }
         }
@@ -1198,16 +1187,15 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
-                mockSqlCommandShim.Received(3).SetTransaction(Arg.Any<SqlCommand>(), null);
-                mockSqlCommandShim.Received(3).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
-                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 1);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
-                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 Assert.That(result == 1);
             }
         }
@@ -1331,7 +1319,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 base.DeleteGridItem(connection, transaction, item, deleteDateTime);
             }
 
-            public new Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
+            public new Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
             {
                 return base.CreateGrid(readConnection, writeConnection, transaction, dataSource, date, createDateTime);
             }

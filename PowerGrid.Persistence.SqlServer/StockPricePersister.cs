@@ -241,7 +241,6 @@ namespace PowerGrid.Persistence.SqlServer
                             try
                             {
                                 comparisonStatistics = gridComparer.Compare(existingGridContents, newGridContents);
-                                sqlTransactionShim.Commit(transaction);
                             }
                             catch (Exception e)
                             {
@@ -259,6 +258,7 @@ namespace PowerGrid.Persistence.SqlServer
                             }
                         }
                         CreateGrid(readConnection, writeConnection, transaction, expectedDataSource, expectedDate, transactionTimestamp);
+                        sqlTransactionShim.Commit(transaction);
 
                         sqlConnectionShim.Close(writeConnection);
                         sqlConnectionShim.Close(readConnection);
@@ -533,7 +533,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
+        protected Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
         {
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
@@ -546,13 +546,13 @@ namespace PowerGrid.Persistence.SqlServer
             WHERE   DataSource = {dataSourceParameterName}
               AND   [Date] = CONVERT(date, {dateParameterName}, 23);
             ";
-            Int32 gridVersionNumber = 1;
+            Int64 gridVersionNumber = 1;
             using (var command = new SqlCommand())
             {
                 try
                 {
                     sqlCommandShim.SetCommandText(command, maxIdQuery);
-                    PrepareCommand(readConnection, transaction, command);
+                    PrepareCommand(readConnection, command);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, dataSource);
                     sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, date.ToString(transactionSql23DateStyle));
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
@@ -561,7 +561,7 @@ namespace PowerGrid.Persistence.SqlServer
                         {
                             if (dataReader["MaxId"] != DBNull.Value)
                             {
-                                gridVersionNumber = (Int32)dataReader["MaxId"] + 1;
+                                gridVersionNumber = (Int64)dataReader["MaxId"] + 1;
                             }
                         }
                     }
@@ -627,17 +627,6 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
-                    /*
-                    String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[SessionDeadlockPriority.High]};";
-                    using (var setDeadlockPriorityCommand = new SqlCommand())
-                    {
-                        sqlCommandShim.SetCommandText(setDeadlockPriorityCommand, setDeadlockPriorityStatement);
-                        sqlCommandShim.SetConnection(setDeadlockPriorityCommand, connection);
-                        sqlCommandShim.SetTransaction(setDeadlockPriorityCommand, transaction);
-                        sqlCommandShim.SetCommandTimeout(setDeadlockPriorityCommand, operationTimeout);
-                        sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
-                    }
-                    */
                     sqlCommandShim.ExecuteNonQuery(command);
                     break;
                 }
