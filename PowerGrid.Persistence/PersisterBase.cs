@@ -14,21 +14,39 @@
 * limitations under the License.
 */
 
+using System;
+using System.Collections.Generic;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
-using System;
-using System.Collections.Generic;
 
 namespace PowerGrid.Persistence
 {
+    /// <summary>
+    /// Base for classes which write and read grids to and from persistent storage.
+    /// </summary>
+    /// <typeparam name="TEntity">The type of data held in each item in the grid.</typeparam>
+    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
+    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
+    /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
     public abstract class PersisterBase<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
         where TOuterKeyProperties : IGridItemOuterKeyProperties
         where TGridItem : IGridItemOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
-        public abstract GridComparisonStatistics PersistGrid(TOuterKeyProperties outerKeyProperties, IList<StockPrice> gridItems);
+        /// <summary>
+        /// Writes the specified grid to persistent storage.
+        /// </summary>
+        /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
+        /// <param name="gridItems">The grid items to persist.</param>
+        /// <returns>Statistics containing counts of the items persisted.</returns>
+        public abstract GridComparisonStatistics PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> gridItems);
 
-        protected abstract IEnumerable<StockPricePTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
+        /// <summary>
+        /// Retrieve the grid with the specified properties.
+        /// </summary>
+        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <returns>The items in the grid.</returns>
+        public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties);
     }
 }
