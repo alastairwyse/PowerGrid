@@ -23,9 +23,14 @@ namespace PowerGrid.Persistence
     /// <summary>
     /// Defines methods to read and write grids from and to persistent storage.
     /// </summary>
-    /// <typeparam name="TGridItemPTO">The type of items stored in grids in persistent storage.</typeparam>
-    /// <typeparam name="TGridItem">The type of items in the new grids to be written to persistent storage.</typeparam>
-    public interface IGridPersister<TGridItemPTO, TGridItem> where TGridItemPTO : TGridItem, IGridItem<TGridItem> where TGridItem : IGridItem<TGridItem>
+    /// <typeparam name="TEntity">The type of data held in each item in the grid.</typeparam>
+    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
+    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
+    /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
+    public interface IGridPersister<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
+        where TOuterKeyProperties : IGridItemOuterKeyProperties
+        where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
+        where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         // TODO: Previously had granular CRUD methods here to deal with individual grid items, but realized that the whole comparison and all resulting updates need to be done in a transaction.
         //   In the future might want to add more granular methods... e.g. just to upsert a collection of grid items, or to delete a collection of grid items.
@@ -36,7 +41,17 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Writes the specified grid to persistent storage.
         /// </summary>
-        /// <param name="gridItems">The items in the grid.</param>
-        GridComparisonStatistics PersistGrid(IList<TGridItem> gridItems);
+        /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
+        /// <param name="gridItems">The grid items to persist.</param>
+        /// <returns>Statistics containing counts of the items persisted.</returns>
+        public GridComparisonStatistics PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> gridItems);
+
+        /// <summary>
+        /// Retrieve the grid with the specified properties.
+        /// </summary>
+        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <param name="version"
+        /// <returns>The items in the grid.</returns>
+        public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int64 version);
     }
 }

@@ -29,24 +29,15 @@ namespace PowerGrid.Persistence
     /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
     /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
     /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
-    public abstract class PersisterBase<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
+    public abstract class PersisterBase<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO> : IGridPersister<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
         where TOuterKeyProperties : IGridItemOuterKeyProperties
-        where TGridItem : IGridItemOuterKeyProperties, IGridItem<TGridItem>
+        where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
-        /// <summary>
-        /// Writes the specified grid to persistent storage.
-        /// </summary>
-        /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
-        /// <param name="gridItems">The grid items to persist.</param>
-        /// <returns>Statistics containing counts of the items persisted.</returns>
+        /// <inheritdoc/>
         public abstract GridComparisonStatistics PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> gridItems);
 
-        /// <summary>
-        /// Retrieve the grid with the specified properties.
-        /// </summary>
-        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
-        /// <returns>The items in the grid.</returns>
-        public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties);
+        /// <inheritdoc/>
+        public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int64 version);
     }
 }

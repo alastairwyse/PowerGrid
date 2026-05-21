@@ -33,7 +33,7 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Reads and writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPricePersister : IGridPersister<StockPricePTO, StockPrice>
+    public class StockPricePersister : IGridPersister<StockPrice,  StockPricePTO, StockPrice>
     {
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactionSql23DateStyle = "yyyy-MM-dd";
@@ -164,7 +164,7 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        public GridComparisonStatistics PersistGrid(IList<StockPrice> gridItems)
+        public (Int64, GridComparisonStatistics) PersistGrid(IList<StockPrice> gridItems)
         {
             if (gridItems.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
@@ -172,6 +172,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var readConnection = new SqlConnection(connectionString))
             using (var writeConnection = new SqlConnection(connectionString))
             {
+                Int64 gridVersion;
                 GridComparisonStatistics comparisonStatistics;
                 PrepareConnection(readConnection);
                 sqlConnectionShim.Open(writeConnection);
@@ -257,7 +258,7 @@ namespace PowerGrid.Persistence.SqlServer
                                 throw compareException;
                             }
                         }
-                        CreateGrid(readConnection, writeConnection, transaction, expectedDataSource, expectedDate, transactionTimestamp);
+                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, expectedDataSource, expectedDate, transactionTimestamp);
                         sqlTransactionShim.Commit(transaction);
 
                         sqlConnectionShim.Close(writeConnection);
@@ -271,7 +272,7 @@ namespace PowerGrid.Persistence.SqlServer
                 TeardownConnection(readConnection);
                 TeardownConnection(writeConnection);
 
-                return comparisonStatistics;
+                return (gridVersion, comparisonStatistics);
             }
         }
 
