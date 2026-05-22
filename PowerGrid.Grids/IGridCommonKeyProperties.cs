@@ -20,12 +20,9 @@ using PowerGrid.Core;
 namespace PowerGrid.Grids
 {
     /// <inheritdoc/>
-    public record IGridCommonKeyProperties(String Tag) : PowerGrid.Core.IGridCommonKeyProperties, IKeyPropertyComparable<IGridCommonKeyProperties>
+    public interface IGridCommonKeyProperties : PowerGrid.Core.IGridCommonKeyProperties
     {
-        /// <inheritdoc/>
-        public int KeyCompareTo(IGridCommonKeyProperties other)
-        {
-            return this.Tag.CompareTo(other.Tag);
-        }
+        /// <summary>A tag used to classify the grid.</summary>
+        public String Tag { get; }
     }
 }

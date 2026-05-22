@@ -29,6 +29,7 @@ namespace PowerGrid.Core.UnitTests
     [TestFixture]
     public class GridComparerTests
     {
+        private const String marketTag = "Market";
         private const String bloombergDataSource = "Bloomberg";
         private const String canonCompany = "Canon";
         private const String hitachiCompany = "Hitachi";
@@ -58,15 +59,15 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -86,15 +87,15 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -114,15 +115,15 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3208)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3208)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -142,14 +143,14 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -168,14 +169,14 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -194,14 +195,14 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -220,14 +221,14 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -246,14 +247,14 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -272,14 +273,14 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -298,15 +299,15 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -324,13 +325,13 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);
@@ -352,17 +353,17 @@ namespace PowerGrid.Core.UnitTests
         {
             existingGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209), 
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3209), 
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3255)
             };
             newGridContents = new List<StockPrice>()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
             };
 
             GridComparisonStatistics statistics = testGridComparer.Compare(existingGridContents, newGridContents);

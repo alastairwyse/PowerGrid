@@ -30,6 +30,7 @@ namespace PowerGrid.Persistence
     /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
     /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
     public abstract class PersisterBase<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO> : IGridPersister<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
+        where TEntity : IGridItem<TEntity>
         where TOuterKeyProperties : IGridItemOuterKeyProperties
         where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject

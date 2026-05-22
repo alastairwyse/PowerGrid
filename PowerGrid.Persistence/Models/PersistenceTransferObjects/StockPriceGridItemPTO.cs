@@ -14,31 +14,35 @@
 * limitations under the License.
 */
 
-using System;
+using PowerGrid.Core;
 using PowerGrid.Grids;
+using System;
 
 namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
 {
     /// <summary>
-    /// Persistence transfer class holding a stock price.
+    /// Model/container class holding a <see cref="StockPriceGridItem"/> augmented with properties allowing it to be transferred to and form persistent storage.
     /// </summary>
-    /// <param name="Id">Unique persistence platform id for the stock price.</param>
+    /// <param name="Id">A unique id for the object within persistent storage.</param>
+    /// <param name="Tag">A tag used to classify the grid.</param>
     /// <param name="DataSource">The source/entity which provided the price.</param>
     /// <param name="Date">The date the price was quoted for.</param>
     /// <param name="Company">The company the price was quoted for.</param>
     /// <param name="Price">The price.</param>
-    /// <param name="TransactionFrom">The date and time that the stock price became active.</param>
-    /// <param name="TransactionTo">The date and time that the stock price was superseded or deleted.</param>
-    public record StockPricePTO
+    /// <param name="TransactionFrom">The date and time that the object became active.</param>
+    /// <param name="TransactionTo">The date and time that the object was superseded or deleted.</param>
+    public record StockPriceGridItemPTO
     (
-        Int64 Id,
-        String DataSource,
-        DateOnly Date,
-        String Company,
-        Decimal Price,
-        DateTime TransactionFrom,
+        Int64 Id, 
+        String Tag, 
+        String DataSource, 
+        DateOnly Date, 
+        String Company, 
+        Decimal Price, 
+        DateTime TransactionFrom, 
         DateTime TransactionTo
-    ) : StockPrice(DataSource, Date, Company, Price)
+    )
+        : StockPriceGridItem(Tag, DataSource, Date, Company, Price), IStockPriceOuterKeyProperties, IGridItem<StockPriceGridItem>, IPTO
     {
     }
 }

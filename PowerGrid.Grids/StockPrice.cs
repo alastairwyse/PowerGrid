@@ -22,37 +22,14 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Model/container class holding a stock price.
     /// </summary>
-    /// <param name="DataSource">The source/entity which provided the price.</param>
-    /// <param name="Date">The date the price was quoted for.</param>
     /// <param name="Company">The company the price was quoted for.</param>
     /// <param name="Price">The price.</param>
-    public record StockPrice(String DataSource, DateOnly Date, String Company, Decimal Price) : IGridItem<StockPrice>
+    public record StockPrice(String Company, Decimal Price) : IGridItem<StockPrice>
     {
         /// <inheritdoc/>
         public Int32 KeyCompareTo(StockPrice other)
         {
-            if (this.DataSource.CompareTo(other.DataSource) == 0)
-            {
-                if (this.Date.CompareTo(other.Date) == 0)
-                {
-                    if (this.Company.CompareTo(other.Company) == 0)
-                    {
-                        return 0;
-                    }
-                    else
-                    {
-                        return this.Company.CompareTo(other.Company);
-                    }
-                }
-                else
-                {
-                    return this.Date.CompareTo(other.Date);
-                }
-            }
-            else
-            {
-                return this.DataSource.CompareTo(other.DataSource);
-            }
+            return this.Company.CompareTo(other.Company);
         }
 
         /// <inheritdoc/>

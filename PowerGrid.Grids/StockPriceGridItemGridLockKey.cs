@@ -20,25 +20,25 @@ using PowerGrid.Core;
 namespace PowerGrid.Grids
 {
     /// <summary>
-    /// An <see cref="IGridLockKey"/> implementation for <see cref="StockPrice"/> instances.
+    /// An <see cref="IGridLockKey"/> implementation for <see cref="StockPriceGridItem"/> instances.
     /// </summary>
-    public class StockPriceGridLockKey : GridLockKeyBase<StockPrice>
+    public class StockPriceGridItemGridLockKey : GridLockKeyBase<StockPriceGridItem>
     {
         /// <inheritdoc/>
         protected override Object[] UnderlyingGridItemKeyPropertyValues
         {
             get
             {
-                return new Object[2] { underlyingGridItem.DataSource, underlyingGridItem.Date };
+                return new Object[3] { underlyingGridItem.Tag, underlyingGridItem.DataSource, underlyingGridItem.Date };
             }
         }
 
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridLockKey class.
+        /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridItemGridLockKey class.
         /// </summary>
-        /// <param name="underlyingStockPrice">The stock price object to create a key for.</param>
-        public StockPriceGridLockKey(StockPrice underlyingStockPrice)
-            : base(underlyingStockPrice)
+        /// <param name="underlyingStockPrice">The stock price grid item object to create a key for.</param>
+        public StockPriceGridItemGridLockKey(StockPriceGridItem underlyingStockPriceGridItem)
+            : base(underlyingStockPriceGridItem)
         {
         }
     }

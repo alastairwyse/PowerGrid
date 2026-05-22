@@ -13,20 +13,21 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-using System;
-using PowerGrid.Core;
 
-namespace PowerGrid.Grids
+using System;
+
+namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
 {
     /// <summary>
-    /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
+    /// Defines properties of a persistence transfer object which allows transfer to persistent storage of a container/model class, which is persisted temporally.
     /// </summary>
-    public interface IStockPriceOuterKeyProperties : IGridCommonKeyProperties
+    public interface IPTO
     {
-        /// <summary>The source/entity which provided the price.</summary>
-        public String DataSource { get; }
-
-        /// <summary>The date the price was quoted for.</summary>
-        public DateOnly Date { get; }
+        /// <summary>A unique id for the object within persistent storage.</summary>
+        public Int64 Id { get; }
+        /// <summary>The date and time that the object became active.</summary>
+        public DateTime TransactionFrom { get; }
+        /// <summary>The date and time that the object was superseded or deleted.</summary>
+        public DateTime TransactionTo { get; }
     }
 }

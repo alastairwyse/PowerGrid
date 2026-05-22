@@ -28,6 +28,7 @@ namespace PowerGrid.Core.UnitTests
     [TestFixture]
     public class GridContentsDuplicateCheckerTests
     {
+        private const String marketTag = "Market";
         private const String bloombergDataSource = "Bloomberg";
         private const String canonCompany = "Canon";
         private const String hitachiCompany = "Hitachi";
@@ -49,10 +50,10 @@ namespace PowerGrid.Core.UnitTests
         {
             List<StockPrice> gridContents = new()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
             };
 
             List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
@@ -63,10 +64,10 @@ namespace PowerGrid.Core.UnitTests
         {
             List<StockPrice> gridContents = new()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4733),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4733),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), sonyCompany, 3210),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
             };
 
             var e = Assert.Throws<GridContentsDuplicateItemsException<StockPrice>>(delegate
@@ -80,10 +81,10 @@ namespace PowerGrid.Core.UnitTests
 
             gridContents = new()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 3210),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 3210),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
             };
 
             e = Assert.Throws<GridContentsDuplicateItemsException<StockPrice>>(delegate
@@ -97,10 +98,10 @@ namespace PowerGrid.Core.UnitTests
 
             gridContents = new()
             {
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3210),
-                new StockPrice(bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4441),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4733),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3210),
+                new StockPriceGridItem(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), toyotaCompany, 3256)
             };
 
             e = Assert.Throws<GridContentsDuplicateItemsException<StockPrice>>(delegate

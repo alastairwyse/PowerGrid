@@ -26,9 +26,6 @@ namespace PowerGrid.Core
     public interface IGridLockKey : IEquatable<IGridLockKey>
     {
         /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the grid item to apply locks for.</summary>
-        public abstract Object[] KeyPropertyValues
-        {
-            get;
-        }
+        public abstract Object[] KeyPropertyValues { get; }
     }
 }
