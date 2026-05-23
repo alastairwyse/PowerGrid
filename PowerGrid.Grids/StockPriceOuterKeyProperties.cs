@@ -15,19 +15,17 @@
  */
 
 using System;
+using PowerGrid.Core;
 
-namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
+namespace PowerGrid.Grids
 {
     /// <summary>
-    /// Defines properties of a persistence transfer object which allows transfer to persistent storage of a container/model class, which is persisted temporally.
+    /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
     /// </summary>
-    public interface IPTO
+    /// <param name="Tag">A tag used to classify the grid.</param>
+    /// <param name="DataSource">The source/entity which provided the price.</param>
+    /// <param name="Date">The date the price was quoted for.</param>
+    public record StockPriceOuterKeyProperties(String Tag, String DataSource, DateOnly Date) : IStockPriceOuterKeyProperties
     {
-        /// <summary>A unique id for the object within persistent storage.</summary>
-        public Int64 Id { get; }
-        /// <summary>The date and time that the object became active.</summary>
-        public DateTime TransactionFrom { get; }
-        /// <summary>The date and time that the object was superseded or deleted.</summary>
-        public DateTime TransactionTo { get; }
     }
 }

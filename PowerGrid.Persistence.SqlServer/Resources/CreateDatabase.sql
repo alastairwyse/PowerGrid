@@ -39,10 +39,11 @@ CREATE INDEX StockPricesTransactionIndex ON $(DatabaseName).dbo.StockPrices (Tra
 CREATE TABLE $(DatabaseName).dbo.StockPriceGrids
 (
     Id                    bigint        IDENTITY(1,1) PRIMARY KEY  NOT NULL, 
+    Tag                   nvarchar(50)  NOT NULL, 
     DataSource            nvarchar(50)  NOT NULL, 
     [Date]                date          NOT NULL, 
     [Version]             int           NOT NULL, 
     TransactionTimestamp  datetime2     NOT NULL
 );
 
-CREATE INDEX StockPriceGridsOuterKeysIndex ON $(DatabaseName).dbo.StockPriceGrids (DataSource, [Date], [Version]);
+CREATE INDEX StockPriceGridsOuterKeysIndex ON $(DatabaseName).dbo.StockPriceGrids (Tag, DataSource, [Date], [Version]);

@@ -22,7 +22,7 @@ namespace PowerGrid.Core
     /// Defines key properties of grids that are specific to a particular type of grid (i.e. not common across all grids), but not key properties of the grid item itself.
     /// </summary>
     /// <remarks><see cref="IKeyPropertyComparable{T}">Key properties</see> refer to properties of items in a grid which collectively must be unique within a single grid.  An example of an outer key property for a grid item class representing the price of a stock might be the date/time the price was valid at.  By contrast an 'inner' key property would be the company the price was quoted for.</remarks>
-    public interface IGridItemOuterKeyProperties
+    public interface IGridItemOuterKeyProperties : IGridCommonKeyProperties
     {
     }
 }

@@ -23,7 +23,7 @@ namespace PowerGrid.Persistence
     /// </summary>
     public interface IPersistenceTransferObject
     {
-        /// <summary>A numeric unique id for the object.</summary>
+        /// <summary>A numeric unique id for the object within persistent storage.</summary>
         public Int64 Id { get; }
 
         /// <summary>The date and time that the object became valid.</summary>

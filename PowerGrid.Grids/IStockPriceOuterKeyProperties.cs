@@ -22,7 +22,7 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
     /// </summary>
-    public interface IStockPriceOuterKeyProperties : IGridCommonKeyProperties
+    public interface IStockPriceOuterKeyProperties : IGridItemOuterKeyProperties, Grids.IGridCommonKeyProperties
     {
         /// <summary>The source/entity which provided the price.</summary>
         public String DataSource { get; }

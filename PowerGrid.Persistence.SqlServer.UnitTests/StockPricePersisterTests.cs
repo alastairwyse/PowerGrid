@@ -958,57 +958,19 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             }
         }
 
-
-        [Test]
-        public void CreateGrid_DataSourceParameterNull()
-        {
-            const String testDataSource = null;
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021"); 
-
-            using (var readConnection = new SqlConnection(testConnectionString))
-            using (var writeConnection = new SqlConnection(testConnectionString))
-            {
-                var e = Assert.Throws<ArgumentException>(delegate
-                {
-                    testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testDataSource, testDate, testCreateDateTime);
-                });
-
-                Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
-                Assert.That(e.ParamName == "dataSource");
-            }
-        }
-
-        [Test]
-        public void CreateGrid_DataSourceParameterWhitespace()
-        {
-            const String testDataSource = " ";
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
-
-            using (var readConnection = new SqlConnection(testConnectionString))
-            using (var writeConnection = new SqlConnection(testConnectionString))
-            {
-                var e = Assert.Throws<ArgumentException>(delegate
-                {
-                    testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testDataSource, testDate, testCreateDateTime);
-                });
-
-                Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
-                Assert.That(e.ParamName == "dataSource");
-            }
-        }
-
         [Test]
         public void CreateGrid_ExceptionRetrievingLatestGridVersion()
         {
+            const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX(Id) AS MaxId
             FROM    StockPriceGrids 
-            WHERE   DataSource = @DataSource
+            WHERE   Tag = @Tag
+              AND   DataSource = @DataSource
               AND   [Date] = CONVERT(date, @Date, 23);
             ";
             var mockException = new Exception("Mock exception");
@@ -1019,17 +981,18 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 var e = Assert.Throws<Exception>(delegate
                 {
-                    testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testDataSource, testDate, testCreateDateTime);
+                    testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
-                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for datasource 'Refinitiv', date '2026-05-16' into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for tag 'Market', datasource 'Refinitiv', date '2026-05-16' into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1037,25 +1000,30 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_ExceptionInserting()
         {
+            const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX(Id) AS MaxId
             FROM    StockPriceGrids 
-            WHERE   DataSource = @DataSource
+            WHERE   Tag = @Tag
+              AND   DataSource = @DataSource
               AND   [Date] = CONVERT(date, @Date, 23);
             ";
             String expectedInsertStatementText = @$"
             INSERT 
             INTO    StockPriceGrids 
                     (
+                        Tag, 
                         DataSource, 
                         [Date], 
                         [Version], 
                         TransactionTimestamp
                     )
             VALUES  (
+                        @Tag, 
                         @DataSource, 
                         CONVERT(date, @Date, 23), 
                         @Version, 
@@ -1074,13 +1042,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 var e = Assert.Throws<Exception>(delegate
                 {
-                    testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testDataSource, testDate, testCreateDateTime);
+                    testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
@@ -1089,7 +1058,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for datasource 'Refinitiv', date '2026-05-16', and version 2 into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for tag 'Market', datasource 'Refinitiv', date '2026-05-16', and version 2 into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1097,25 +1066,30 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_GridAlreadyExists()
         {
+            const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX(Id) AS MaxId
             FROM    StockPriceGrids 
-            WHERE   DataSource = @DataSource
+            WHERE   Tag = @Tag
+              AND   DataSource = @DataSource
               AND   [Date] = CONVERT(date, @Date, 23);
             ";
             String expectedInsertStatementText = @$"
             INSERT 
             INTO    StockPriceGrids 
                     (
+                        Tag, 
                         DataSource, 
                         [Date], 
                         [Version], 
                         TransactionTimestamp
                     )
             VALUES  (
+                        @Tag, 
                         @DataSource, 
                         CONVERT(date, @Date, 23), 
                         @Version, 
@@ -1130,12 +1104,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             using (var readConnection = new SqlConnection(testConnectionString))
             using (var writeConnection = new SqlConnection(testConnectionString))
             {
-                Int64 result = testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testDataSource, testDate, testCreateDateTime);
+                Int64 result = testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
@@ -1151,25 +1126,29 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_NoGridExists()
         {
+            const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             String expectedMaxIdQueryText = @$"
             SELECT  MAX(Id) AS MaxId
             FROM    StockPriceGrids 
-            WHERE   DataSource = @DataSource
+            WHERE   Tag = ""@Tag
+                    DataSource = @DataSource
               AND   [Date] = CONVERT(date, @Date, 23);
             ";
             String expectedInsertStatementText = @$"
             INSERT 
             INTO    StockPriceGrids 
                     (
+                        Tag, 
                         DataSource, 
                         [Date], 
                         [Version], 
                         TransactionTimestamp
                     )
             VALUES  (
+                        @Tag, 
                         @DataSource, 
                         CONVERT(date, @Date, 23), 
                         @Version, 
@@ -1183,12 +1162,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             using (var readConnection = new SqlConnection(testConnectionString))
             using (var writeConnection = new SqlConnection(testConnectionString))
             {
-                Int64 result = testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testDataSource, testDate, testCreateDateTime);
+                Int64 result = testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
@@ -1319,9 +1299,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 base.DeleteGridItem(connection, transaction, item, deleteDateTime);
             }
 
-            public new Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, String dataSource, DateOnly date, DateTime createDateTime)
+            public new Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, IStockPriceOuterKeyProperties outerKeyProperties, DateTime createDateTime)
             {
-                return base.CreateGrid(readConnection, writeConnection, transaction, dataSource, date, createDateTime);
+                return base.CreateGrid(readConnection, writeConnection, transaction, outerKeyProperties, createDateTime);
             }
 
             public new void ExecuteNonQueryWithDeadlockRetry(SqlConnection connection, SqlTransaction transaction, SqlCommand command)

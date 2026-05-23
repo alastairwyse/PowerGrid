@@ -36,7 +36,7 @@ namespace PowerGrid.Persistence
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         /// <inheritdoc/>
-        public abstract GridComparisonStatistics PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> gridItems);
+        public abstract (Int64, GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> gridItems);
 
         /// <inheritdoc/>
         public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int64 version);
