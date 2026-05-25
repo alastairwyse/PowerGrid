@@ -704,64 +704,19 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void InsertGridItem()
-        {
-            const String testDataSource = "Bloomberg";
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-08");
-            const String testCompany = "Hitachi";
-            StockPrice testItem = new(testDataSource, testDate, testCompany, 4732);
-            DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
-            String expectedCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
-                    );
-            ";
-
-            using (var connection = new SqlConnection(testConnectionString))
-            {
-                testStockPricePersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
-
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
-                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
-                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
-                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testItem.Price);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-            }
-        }
-
-        [Test]
         public void InsertGridItem_ExceptionInserting()
         {
+            const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-08");
             const String testCompany = "Hitachi";
-            StockPrice testItem = new(testDataSource, testDate, testCompany, 4732);
+            StockPriceGridItem testItem = new(testTag, testDataSource, testDate, testCompany, 4732);
             DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
             String expectedCommandText = @$"
             INSERT 
             INTO    StockPrices 
                     (
+                        Tag, 
                         DataSource, 
                         [Date], 
                         Company, 
@@ -770,6 +725,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         TransactionTo 
                     )
             VALUES  (
+                        @Tag, 
                         @DataSource, 
                         CONVERT(date, @Date, 23), 
                         @Company, 
@@ -789,8 +745,59 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
-                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price with datasource '{testDataSource}', date '{testDate.ToString(transactionSql23DateStyle)}', and company '{testCompany}' into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price with tag '{testTag}', datasource '{testDataSource}', date '{testDate.ToString(transactionSql23DateStyle)}', and company '{testCompany}' into SQL Server."));
                 Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void InsertGridItem()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-08");
+            const String testCompany = "Hitachi";
+            StockPriceGridItem testItem = new(testTag, testDataSource, testDate, testCompany, 4732);
+            DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
+            String expectedCommandText = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        Tag, 
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        @Tag, 
+                        @DataSource, 
+                        CONVERT(date, @Date, 23), 
+                        @Company, 
+                        @Price, 
+                        CONVERT(datetime2, @InsertDateTime, 126), 
+                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                    );
+            ";
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPricePersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
 

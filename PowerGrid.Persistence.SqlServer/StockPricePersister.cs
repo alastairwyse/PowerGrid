@@ -362,7 +362,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="date">The quotes date of the stock prices.</param>
         /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
         /// <returns>The items in the grid.</returns>
-        protected IEnumerable<StockPricePTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
+        protected IEnumerable<StockPriceGridItemPTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
         {
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
@@ -419,7 +419,7 @@ namespace PowerGrid.Persistence.SqlServer
                     DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                     currentTransactionTo = DateTime.SpecifyKind(currentTransactionTo, DateTimeKind.Utc);
 
-                    yield return new StockPricePTO(currentId, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
+                    yield return new StockPriceGridItemPTO(currentId, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
                 }
                 dataReader.Dispose();
             }
@@ -435,8 +435,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="transaction">The transaction to execute the add operation in.</param>
         /// <param name="item">The item to add.</param>
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
-        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPrice item, DateTime insertDateTime)
+        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItem item, DateTime insertDateTime)
         {
+            const String tagParameterName = "@Tag";
             const String dataSourceParameterName = "@DataSource";
             const String dateParameterName = "@Date";
             const String companyParameterName = "@Company";
@@ -447,6 +448,7 @@ namespace PowerGrid.Persistence.SqlServer
             INSERT 
             INTO    StockPrices 
                     (
+                        Tag, 
                         DataSource, 
                         [Date], 
                         Company, 
@@ -455,6 +457,7 @@ namespace PowerGrid.Persistence.SqlServer
                         TransactionTo 
                     )
             VALUES  (
+                        {tagParameterName}, 
                         {dataSourceParameterName}, 
                         CONVERT(date, {dateParameterName}, 23), 
                         {companyParameterName}, 
@@ -470,6 +473,7 @@ namespace PowerGrid.Persistence.SqlServer
                 {
                     sqlCommandShim.SetCommandText(command, insertStatement);
                     PrepareCommand(connection, transaction, command);
+                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, item.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, item.DataSource);
                     sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, item.Date.ToString(transactionSql23DateStyle));
                     sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, item.Company);
@@ -481,7 +485,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
-                throw new Exception($"Failed to insert stock price with datasource '{item.DataSource}', date '{item.Date.ToString(transactionSql23DateStyle)}', and company '{item.Company}' into SQL Server.", e);
+                throw new Exception($"Failed to insert stock price with tag '{item.Tag}', datasource '{item.DataSource}', date '{item.Date.ToString(transactionSql23DateStyle)}', and company '{item.Company}' into SQL Server.", e);
             }
         }
 
