@@ -745,7 +745,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
-                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price with tag '{testTag}', datasource '{testDataSource}', date '{testDate.ToString(transactionSql23DateStyle)}', and company '{testCompany}' into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to insert StockPriceGridItem {{ Tag = Market, DataSource = Bloomberg, Date = 2026-05-08, Company = Hitachi, Price = 4732 }} and into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -804,11 +804,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void UpdateGridItem()
         {
+            const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
             const String testCompany = "Toyota";
-            StockPrice testNewItem = new(testDataSource, testDate, testCompany, 3210);
-            StockPricePTO testSupersededItemItem = new(124, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            StockPriceGridItem testNewItem = new(testTag, testDataSource, testDate, testCompany, 3210);
+            StockPriceGridItemPTO testSupersededItemItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
             DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
             String expectedInsertCommandText = @$"
             INSERT 
@@ -999,7 +1000,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
-                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for tag 'Market', datasource 'Refinitiv', date '2026-05-16' into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for StockPriceOuterKeyProperties {{ Tag = Market, DataSource = Refinitiv, Date = 2026-05-16 }} into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1065,7 +1066,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for tag 'Market', datasource 'Refinitiv', date '2026-05-16', and version 2 into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for StockPriceOuterKeyProperties {{ Tag = Market, DataSource = Refinitiv, Date = 2026-05-16 }} and version 2 into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1286,27 +1287,27 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 return base.GetLatestGridVersion(connection, dataSource, date);
             }
 
-            public new IEnumerable<StockPricePTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
+            public new IEnumerable<StockPriceGridItemPTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
             {
                 return base.GetExistingGrid(connection, dataSource, date, transactionTimestamp);
             }
 
-            public new void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPrice item, DateTime insertDateTime)
+            public new void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItem item, DateTime insertDateTime)
             {
                 base.InsertGridItem(connection, transaction, item, insertDateTime);
             }
 
-            public new void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO supersededItem, StockPrice newItem, DateTime udpateDateTime)
+            public new void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO supersededItem, StockPriceGridItem newItem, DateTime udpateDateTime)
             {
                 base.UpdateGridItem(connection, transaction, supersededItem, newItem, udpateDateTime);
             }
 
-            public new void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPricePTO item, DateTime deleteDateTime)
+            public new void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO item, DateTime deleteDateTime)
             {
                 base.DeleteGridItem(connection, transaction, item, deleteDateTime);
             }
 
-            public new Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, IStockPriceOuterKeyProperties outerKeyProperties, DateTime createDateTime)
+            public new Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceOuterKeyProperties outerKeyProperties, DateTime createDateTime)
             {
                 return base.CreateGrid(readConnection, writeConnection, transaction, outerKeyProperties, createDateTime);
             }

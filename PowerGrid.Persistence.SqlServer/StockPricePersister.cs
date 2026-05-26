@@ -485,7 +485,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
-                throw new Exception($"Failed to insert stock price with tag '{item.Tag}', datasource '{item.DataSource}', date '{item.Date.ToString(transactionSql23DateStyle)}', and company '{item.Company}' into SQL Server.", e);
+                throw new Exception($"Failed to insert {item.ToString()} into SQL Server.", e);
             }
         }
 
@@ -579,7 +579,7 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"Failed to retrieve latest grid version number while inserting stock price grid for tag '{outerKeyProperties.Tag}', datasource '{outerKeyProperties.DataSource}', date '{outerKeyProperties.Date.ToString(transactionSql23DateStyle)}' into SQL Server.", e);
+                    throw new Exception($"Failed to retrieve latest grid version number while inserting stock price grid for {outerKeyProperties.ToString()} into SQL Server.", e);
                 }
             }
 
@@ -619,7 +619,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
-                throw new Exception($"Failed to insert stock price grid for tag '{outerKeyProperties.Tag}', datasource '{outerKeyProperties.DataSource}', date '{outerKeyProperties.Date.ToString(transactionSql23DateStyle)}', and version {gridVersionNumber} into SQL Server.", e);
+                throw new Exception($"Failed to insert stock price grid for {outerKeyProperties.ToString()} and version {gridVersionNumber} into SQL Server.", e);
             }
 
             return gridVersionNumber;
