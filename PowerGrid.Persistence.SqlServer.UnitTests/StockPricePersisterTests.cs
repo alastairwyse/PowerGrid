@@ -802,6 +802,60 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void UpdateGridItem_ExceptionUpdating()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
+            const String testCompany = "Toyota";
+            StockPriceGridItem testNewItem = new(testTag, testDataSource, testDate, testCompany, 3210);
+            StockPriceGridItemPTO testSupersededItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
+            String expectedInsertCommandText = @$"
+            INSERT 
+            INTO    StockPrices 
+                    (
+                        Tag, 
+                        DataSource, 
+                        [Date], 
+                        Company, 
+                        Price, 
+                        TransactionFrom, 
+                        TransactionTo 
+                    )
+            VALUES  (
+                        @Tag, 
+                        @DataSource, 
+                        CONVERT(date, @Date, 23), 
+                        @Company, 
+                        @Price, 
+                        CONVERT(datetime2, @InsertDateTime, 126), 
+                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                    );
+            ";
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;
+            ";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPricePersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to update stock price with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Failed to delete stock price with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.InnerException == mockException);
+            }
+        }
+
+        [Test]
         public void UpdateGridItem()
         {
             const String testTag = "Market";
@@ -849,6 +903,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000010").ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
@@ -859,63 +914,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void UpdateGridItem_ExceptionUpdating()
-        {
-            const String testDataSource = "Reuters";
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
-            const String testCompany = "Toyota";
-            StockPrice testNewItem = new(testDataSource, testDate, testCompany, 3210);
-            StockPricePTO testSupersededItem = new(124, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
-            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
-            String expectedInsertCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
-                    );
-            ";
-            String expectedDeleteCommandText = @$"
-            UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Id = @Id;
-            ";
-            var mockException = new Exception("Mock exception");
-            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText)).Do((callInfo) => throw mockException);
-
-            using (var connection = new SqlConnection(testConnectionString))
-            {
-                var e = Assert.Throws<Exception>(delegate
-                {
-                    testStockPricePersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
-                });
-
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
-                Assert.That(e.Message, Does.StartWith($"Failed to update stock price with id '{testSupersededItem.Id}' in SQL Server."));
-                Assert.That(e.InnerException.Message, Does.StartWith($"Failed to delete stock price with id '{testSupersededItem.Id}' in SQL Server."));
-                Assert.That(e.InnerException.InnerException == mockException);
-            }
-        }
-
-        [Test]
         public void DeleteGridItem()
         {
+            const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
             const String testCompany = "Sony";
-            StockPricePTO testItem = new(123, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            StockPriceGridItemPTO testItem = new(123, testTag, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
             DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
             String expectedCommandText = @$"
             UPDATE  StockPrices 
@@ -940,10 +945,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void DeleteGridItem_ExceptionDeleting()
         {
+            const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
             const String testCompany = "Sony";
-            StockPricePTO testItem = new(123, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            StockPriceGridItemPTO testItem = new(123, testTag, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
             DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
             String expectedCommandText = @$"
             UPDATE  StockPrices 
@@ -1138,6 +1144,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX(Id) AS MaxId
             FROM    StockPriceGrids 

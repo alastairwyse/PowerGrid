@@ -27,5 +27,7 @@ namespace PowerGrid.Grids
     /// <param name="Date">The date the price was quoted for.</param>
     public record StockPriceOuterKeyProperties(String Tag, String DataSource, DateOnly Date) : IStockPriceOuterKeyProperties
     {
+        // TODO: Need validation here
+
     }
 }

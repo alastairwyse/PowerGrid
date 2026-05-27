@@ -358,11 +358,10 @@ namespace PowerGrid.Persistence.SqlServer
         /// Gets the contents of a stock price grid.
         /// </summary>
         /// <param name="connection">The connection to use to retrieve the grid.</param>
-        /// <param name="dataSource">The datasource of the stock prices.</param>
-        /// <param name="date">The quotes date of the stock prices.</param>
+        /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
         /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
         /// <returns>The items in the grid.</returns>
-        protected IEnumerable<StockPriceGridItemPTO> GetExistingGrid(SqlConnection connection, String dataSource, DateOnly date, DateTime transactionTimestamp)
+        protected IEnumerable<StockPriceGridItemPTO> GetExistingGrid(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)
         {
             if (String.IsNullOrWhiteSpace(dataSource) == true)
                 throw new ArgumentException($"Parameter '{nameof(dataSource)}' must contain a value.", nameof(dataSource));
