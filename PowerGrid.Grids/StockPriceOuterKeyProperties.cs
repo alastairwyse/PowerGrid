@@ -22,12 +22,48 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
     /// </summary>
-    /// <param name="Tag">A tag used to classify the grid.</param>
-    /// <param name="DataSource">The source/entity which provided the price.</param>
-    /// <param name="Date">The date the price was quoted for.</param>
-    public record StockPriceOuterKeyProperties(String Tag, String DataSource, DateOnly Date) : IStockPriceOuterKeyProperties
+    public record StockPriceOuterKeyProperties : IStockPriceOuterKeyProperties
     {
-        // TODO: Need validation here
+        /// <summary>A tag used to classify the grid.</summary>
+        public String Tag { get; init; }
+
+        /// <summary>The source/entity which provided the price.</summary>
+        public String DataSource { get; init; }
+
+        /// <summary>The date the price was quoted for.</summary>
+        public DateOnly Date { get; init; }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Grids.StockPriceOuterKeyProperties class.
+        /// </summary>
+        /// <param name="tag">A tag used to classify the grid.</param>
+        /// <param name="dataSource">The source/entity which provided the price.</param>
+        /// <param name="date">The date the price was quoted for.</param>
+        public StockPriceOuterKeyProperties(String tag, String dataSource, DateOnly date)
+        {
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(dataSource), dataSource);
+
+            Tag = tag;
+            DataSource = dataSource;
+            Date = date;
+        }
+
+        #region Private/Protected Methods
+
+        #pragma warning disable 1591
+
+        protected void ThrowExceptionIfStringParameterNullOrWhitespace(String parameterName, String parameterValue)
+        {
+            if (String.IsNullOrWhiteSpace(parameterValue))
+            {
+                throw new ArgumentNullException(parameterName, $"Parameter '{parameterName}' must contain a value.");
+            }
+        }
+
+        #pragma warning restore 1591
+
+        #endregion
 
     }
 }
