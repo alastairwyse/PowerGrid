@@ -15,6 +15,7 @@
  */
 
 using System;
+using System.Text;
 using PowerGrid.Core;
 
 namespace PowerGrid.Grids
@@ -52,6 +53,14 @@ namespace PowerGrid.Grids
         #region Private/Protected Methods
 
         #pragma warning disable 1591
+
+        /// <inheritdoc/>
+        protected virtual bool PrintMembers(StringBuilder builder)
+        {
+            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(DataSource)} = '{DataSource}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}'");
+
+            return true;
+        }
 
         protected void ThrowExceptionIfStringParameterNullOrWhitespace(String parameterName, String parameterValue)
         {

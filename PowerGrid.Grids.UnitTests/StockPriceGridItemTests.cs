@@ -20,7 +20,7 @@ using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
 using NUnit.Framework;
 
-namespace PowerGrid.Core.UnitTests
+namespace PowerGrid.Grids.UnitTests
 {
     /// <summary>
     /// Tests implementations of the <see cref="IKeyPropertyComparable{T}"/> interface via the <see cref="StockPriceGridItem"/> class.
@@ -78,6 +78,21 @@ namespace PowerGrid.Core.UnitTests
 
             Assert.That(stockPrice1.KeyCompareTo(stockPrice2) == -1);
             Assert.That(stockPrice2.KeyCompareTo(stockPrice1) == 1);
+        }
+
+        [Test]
+        public void PrintMembers()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-30");
+            const String company = "Mitsubishi";
+            const Decimal price = 371;
+            StockPriceGridItem testStockPriceGridItem = new(testTag, testDataSource, testDate, company, price);
+
+            String result = testStockPriceGridItem.ToString();
+
+            Assert.That(result == "StockPriceGridItem { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30', Company = 'Mitsubishi', Price = 371 }");
         }
     }
 }

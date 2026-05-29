@@ -16,6 +16,7 @@
 
 using System;
 using NUnit.Framework;
+using PowerGrid.Core.UnitTests;
 
 namespace PowerGrid.Grids.UnitTests
 {
@@ -24,6 +25,14 @@ namespace PowerGrid.Grids.UnitTests
     /// </summary>
     public class StockPriceOuterKeyPropertiesTests
     {
+        private TestUtilities utils;
+
+        [SetUp]
+        protected void SetUp()
+        {
+            utils = new TestUtilities();
+        }
+
         [Test]
         public void Constructor_TagParameterNull()
         {
@@ -70,6 +79,19 @@ namespace PowerGrid.Grids.UnitTests
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
             Assert.That(e.ParamName == "dataSource");
+        }
+
+        [Test]
+        public void PrintMembers()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-30");
+            StockPriceOuterKeyProperties testStockPriceOuterKeyProperties = new(testTag, testDataSource, testDate);
+
+            String result = testStockPriceOuterKeyProperties.ToString();
+
+            Assert.That(result == "StockPriceOuterKeyProperties { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30' }");
         }
     }
 }

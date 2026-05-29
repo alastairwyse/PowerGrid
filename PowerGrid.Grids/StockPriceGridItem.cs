@@ -15,6 +15,7 @@
  */
 
 using System;
+using System.Text;
 using PowerGrid.Core;
 
 namespace PowerGrid.Grids
@@ -62,5 +63,17 @@ namespace PowerGrid.Grids
         {
             return base.ValuePropertiesEqual(other);
         }
+
+        #region Private/Protected Methods
+
+        /// <inheritdoc/>
+        protected override bool PrintMembers(StringBuilder builder)
+        {
+            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(DataSource)} = '{DataSource}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}', {nameof(Company)} = '{Company}', {nameof(Price)} = {Price}");
+
+            return true;
+        }
+
+        #endregion
     }
 }

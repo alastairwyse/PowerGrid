@@ -164,15 +164,15 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        public override (Int64, GridComparisonStatistics) PersistGrid(StockPriceOuterKeyProperties outerKeyProperties, IList<StockPrice> gridItems)
+        public override (Int32, GridComparisonStatistics) PersistGrid(StockPriceOuterKeyProperties outerKeyProperties, IList<StockPrice> items)
         {
-            if (gridItems.Count == 0)
-                throw new ArgumentException($"Parameter '{nameof(gridItems)}' contained no items.", nameof(gridItems));
+            if (items.Count == 0)
+                throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
 
             using (var readConnection = new SqlConnection(connectionString))
             using (var writeConnection = new SqlConnection(connectionString))
             {
-                Int64 gridVersion;
+                Int32 gridVersion;
                 GridComparisonStatistics comparisonStatistics;
                 PrepareConnection(readConnection);
                 sqlConnectionShim.Open(writeConnection);
@@ -181,7 +181,7 @@ namespace PowerGrid.Persistence.SqlServer
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
                 using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
                 {
-                    Action<SqlConnection, SqlTransaction, StockPrice, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPrice addedStockPrice, DateTime transactionDateTime) =>
+                    Action<SqlConnection, SqlTransaction, StockPriceGridItem, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPriceGridItem addedStockPrice, DateTime transactionDateTime) =>
                     {
                         InsertGridItem(connection, transaction, addedStockPrice, transactionDateTime);
                     };
@@ -199,53 +199,55 @@ namespace PowerGrid.Persistence.SqlServer
                     GridComparer<StockPriceGridItemPTO, StockPriceGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
 
                     // Setup IEnumerable 'chains' 
-                    //   Create a GridContentsValidator to check that all elements of 'gridItems' have the same data source and date
-                    GridContentsValidator<StockPrice> newGridContentsValidator = new();
-                    String expectedDataSource = gridItems[0].DataSource;
-                    DateOnly expectedDate = gridItems[0].Date;
-                    Action<StockPrice> newGridContentsValidationAction = (StockPrice stockPrice) =>
+                    //   Create a GridContentsValidator to check that the price is >= 0
+                    GridContentsValidator<StockPrice> newItemValidator = new();
+                    Action<StockPrice> newItemValidationAction = (StockPrice stockPrice) =>
                     {
-                        if (stockPrice.DataSource != expectedDataSource)
-                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}' found in grid which which was expected to contain {nameof(StockPrice.DataSource)} '{expectedDataSource}'.", stockPrice);
-                        if (stockPrice.Date != expectedDate)
-                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}' found in grid which which was expected to contain {nameof(StockPrice.Date)} '{expectedDate.ToString(transactionSql23DateStyle)}'.", stockPrice);
                         if (stockPrice.Price < 0)
-                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {nameof(StockPrice.DataSource)} '{stockPrice.DataSource}', {nameof(StockPrice.Date)} '{stockPrice.Date.ToString(transactionSql23DateStyle)}', and {nameof(StockPrice.Company)} '{stockPrice.Company}' has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
+                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {outerKeyProperties.ToString()}, and {nameof(StockPrice.Company)} '{stockPrice.Company}' has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
                     };
-                    GridContentsDuplicateChecker<StockPrice> newGridDuplicateChecker = new();
+                    GridContentsDuplicateChecker<StockPrice> newItemsDuplicateChecker = new();
+
                     // Order of below chain is 1 validate, 2 order, 3 dup check
-                    IEnumerable<StockPrice> newGridContents = newGridDuplicateChecker.CheckForDuplicates
+                    IEnumerable<StockPrice> newGridContents = newItemsDuplicateChecker.CheckForDuplicates
                     (
-                        newGridContentsValidator.ValidateItems
+                        newItemValidator.ValidateItems
                         (
-                            gridItems,
-                            newGridContentsValidationAction
+                            items,
+                            newItemValidationAction
                         ).Order(Comparer<StockPrice>.Create
                         (
                             (StockPrice first, StockPrice second) => { return first.KeyCompareTo(second); }
                         ))
                     );
+                    IEnumerable<StockPriceGridItem> ConvertStockPricesToStockPriceGridItems(IEnumerable<StockPrice> items)
+                    {
+                        foreach (StockPrice currentItem in items)
+                        {
+                            yield return new StockPriceGridItem(outerKeyProperties.Tag, outerKeyProperties.DataSource, outerKeyProperties.Date, currentItem.Company, currentItem.Price);
+                        } 
+                    }
 
                     try
                     {
                         sqlConnectionShim.Open(readConnection);
-                        IEnumerable<StockPricePTO> existingGridContents;
+                        IEnumerable<StockPriceGridItemPTO> existingGridContents;
                         try
                         {
-                            existingGridContents = GetExistingGrid(readConnection, expectedDataSource, expectedDate, transactionTimestamp);
+                            existingGridContents = GetExistingGrid(readConnection, outerKeyProperties, transactionTimestamp);
                         }
                         catch (Exception e)
                         {
-                            throw new Exception($"Failed to read existing stock price grid from SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                            throw new Exception($"Failed to read existing stock price grid from SQL Server for {outerKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
                         }
                         {
                             try
                             {
-                                comparisonStatistics = gridComparer.Compare(existingGridContents, newGridContents);
+                                comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertStockPricesToStockPriceGridItems(newGridContents));
                             }
                             catch (Exception e)
                             {
-                                Exception compareException = new($"Failed to compare new stock price grid to existing grid in SQL Server for data source '{expectedDataSource}', date '{expectedDate.ToString(transactionSql23DateStyle)}', and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e); 
+                                Exception compareException = new($"Failed to compare new stock price grid to existing grid in SQL Server for {outerKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e); 
                                 try
                                 {
                                     // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
@@ -258,7 +260,7 @@ namespace PowerGrid.Persistence.SqlServer
                                 throw compareException;
                             }
                         }
-                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, expectedDataSource, expectedDate, transactionTimestamp);
+                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, outerKeyProperties, transactionTimestamp);
                         sqlTransactionShim.Commit(transaction);
 
                         sqlConnectionShim.Close(writeConnection);
@@ -304,14 +306,15 @@ namespace PowerGrid.Persistence.SqlServer
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
-            WHERE   DataSource = {dataSourceParameterName} 
+            WHERE   Tag = {tagParameterName} 
+              AND   DataSource = {dataSourceParameterName} 
               AND   [Date] = CONVERT(date, {dateParameterName}, 126) 
               AND   [Version] = 
                     (
                       SELECT  MAX([Version])
                       FROM    StockPriceGrids 
-                      WHERE  Tag = {tagParameterName}
-                        AND  DataSource = {dataSourceParameterName}
+                      WHERE   Tag = {tagParameterName} 
+                        AND   DataSource = {dataSourceParameterName} 
                         AND   [Date] = CONVERT(date, {dateParameterName}, 126) 
                     );
             ";
@@ -377,10 +380,11 @@ namespace PowerGrid.Persistence.SqlServer
                    CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
             FROM   StockPrices 
             WHERE  Tag = {tagParameterName}
-                   DataSource = {dataSourceParameterName}
+              AND  DataSource = {dataSourceParameterName}
               AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
               AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY DataSource, 
+            ORDER  BY Tag, 
+                      DataSource, 
                       [Date], 
                       Company;
             ";
@@ -545,24 +549,24 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected Int64 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceOuterKeyProperties outerKeyProperties, DateTime createDateTime)
+        protected Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceOuterKeyProperties outerKeyProperties, DateTime createDateTime)
         {
             const String tagParameterName = "@Tag";
             const String dataSourceParameterName = "@DataSource";
             const String dateParameterName = "@Date";
-            String maxIdQuery = @$"
-            SELECT  MAX(Id) AS MaxId
+            String maxVersionQuery = @$"
+            SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
             WHERE   Tag = {tagParameterName}
               AND   DataSource = {dataSourceParameterName}
               AND   [Date] = CONVERT(date, {dateParameterName}, 23);
             ";
-            Int64 gridVersionNumber = 1;
+            Int32 gridVersionNumber = 1;
             using (var command = new SqlCommand())
             {
                 try
                 {
-                    sqlCommandShim.SetCommandText(command, maxIdQuery);
+                    sqlCommandShim.SetCommandText(command, maxVersionQuery);
                     PrepareCommand(readConnection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, outerKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, outerKeyProperties.DataSource);
@@ -571,9 +575,9 @@ namespace PowerGrid.Persistence.SqlServer
                     {
                         while (dataReader.Read())
                         {
-                            if (dataReader["MaxId"] != DBNull.Value)
+                            if (dataReader["MaxVersion"] != DBNull.Value)
                             {
-                                gridVersionNumber = (Int64)dataReader["MaxId"] + 1;
+                                gridVersionNumber = (Int32)dataReader["MaxVersion"] + 1;
                             }
                         }
                     }
@@ -610,7 +614,7 @@ namespace PowerGrid.Persistence.SqlServer
                 {
                     sqlCommandShim.SetCommandText(command, insertStatement);
                     PrepareCommand(writeConnection, transaction, command);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, outerKeyProperties.Tag);
+                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, outerKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, outerKeyProperties.DataSource);
                     sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, outerKeyProperties.Date.ToString(transactionSql23DateStyle));
                     sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, gridVersionNumber);
