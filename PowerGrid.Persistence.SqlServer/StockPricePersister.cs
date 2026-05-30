@@ -281,6 +281,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// <inheritdoc/>
         public override IEnumerable<StockPriceGridItemPTO> GetGrid(StockPriceOuterKeyProperties gridKeyProperties, Int64 version)
         {
+            if (version < 1)
+                throw new ArgumentOutOfRangeException(nameof(version), $"Parameter '{nameof(version)}' with value {version} must be greater than 0.");
+
             throw new NotImplementedException();
         }
 

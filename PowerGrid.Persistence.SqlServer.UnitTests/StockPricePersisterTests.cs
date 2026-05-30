@@ -406,6 +406,29 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void GetGrid_VersionParameterLessThan1()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+
+            var e = Assert.Throws<ArgumentOutOfRangeException>(delegate
+            {
+                testStockPricePersister.GetGrid(testOuterKeyProperties, 0);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'version' with value 0 must be greater than 0."));
+            Assert.That(e.ParamName == "version");
+        }
+
+        [Test]
+        public void GetGrid()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
         public void GetLatestGridVersion_ExceptionReading()
         {
             const String testTag = "Market";
