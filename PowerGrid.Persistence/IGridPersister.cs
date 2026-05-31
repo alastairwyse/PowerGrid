@@ -53,6 +53,6 @@ namespace PowerGrid.Persistence
         /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
         /// <param name="version"
         /// <returns>The items in the grid.</returns>
-        public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int64 version);
+        public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int32 version);
     }
 }
