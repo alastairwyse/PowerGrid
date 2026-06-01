@@ -284,7 +284,13 @@ namespace PowerGrid.Persistence.SqlServer
             if (version < 1)
                 throw new ArgumentOutOfRangeException(nameof(version), $"Parameter '{nameof(version)}' with value {version} must be greater than 0.");
 
-            throw new NotImplementedException();
+            using (var connection = new SqlConnection(connectionString))
+            {
+                sqlConnectionShim.Open(connection);
+                (Int32 returnedVersion, DateTime transactionTimestamp) = GetGridVersion(connection, gridKeyProperties, version);
+
+                return GetGrid(connection, gridKeyProperties, transactionTimestamp);
+            } 
         }
 
         #region Private/Protected Methods
@@ -360,11 +366,11 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// 
+        /// Gets the stock price grid details for the specified parameters and version.
         /// </summary>
         /// <param name="connection">The connection to use to retrieve the grid version.</param>
         /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid version to retrieve.</param>
-        /// <param name="version">The number version of the grid.</param>
+        /// <param name="version">The version number of the grid.</param>
         /// <returns>A tuple containing: the version number of the grid, and the transaction timestamp of the grid.</returns>
         /// <exception cref="Exception">A grid with the specified parameters does not exist.</exception>
         protected (Int32, DateTime) GetGridVersion(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, Int32 version)
@@ -412,10 +418,6 @@ namespace PowerGrid.Persistence.SqlServer
                     if (alreadyReadResult == false)
                     {
                         throw new Exception($"Stock price grid for {outerKeyProperties.ToString()}, and version {version} did not exist.");
-                    }
-                    if (version != gridVersionNumber)
-                    {
-                        throw new Exception($"Grid version in parameter '{version}' ({version}) and version retrieved ({gridVersionNumber}) were not equal for {outerKeyProperties.ToString()}.");
                     }
 
                     return (gridVersionNumber, transactionTimestamp);

@@ -1,5 +1,6 @@
 ﻿using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer;
 
 namespace PowerGrid.TestHarness
@@ -34,8 +35,15 @@ namespace PowerGrid.TestHarness
 
             StockPricePersister persister = new StockPricePersister(connectionString, 5, 5, 0);
             StockPriceOuterKeyProperties outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
-            persister.PersistGrid(outerKeyProps, testGridItems);
+            //persister.PersistGrid(outerKeyProps, testGridItems);
             //persister.TestGetUpdate2Connections("Reuters");
+
+            outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
+            Console.WriteLine("-- GetGrid() Results --");
+            foreach (StockPriceGridItemPTO currentPTO in persister.GetGrid(outerKeyProps, 1))
+            {
+                Console.WriteLine(currentPTO);
+            }
         }
     }
 }
