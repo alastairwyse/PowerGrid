@@ -40,7 +40,7 @@ namespace PowerGrid.TestHarness
 
             outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
             Console.WriteLine("-- GetGrid() Results --");
-            foreach (StockPriceGridItemPTO currentPTO in persister.GetGrid(outerKeyProps, 1))
+            foreach (StockPriceGridItemPTO currentPTO in persister.GetGrid(outerKeyProps, 3))
             {
                 Console.WriteLine(currentPTO);
             }

@@ -289,7 +289,10 @@ namespace PowerGrid.Persistence.SqlServer
                 sqlConnectionShim.Open(connection);
                 (Int32 returnedVersion, DateTime transactionTimestamp) = GetGridVersion(connection, gridKeyProperties, version);
 
-                return GetGrid(connection, gridKeyProperties, transactionTimestamp);
+                foreach (StockPriceGridItemPTO currentItem in GetGrid(connection, gridKeyProperties, transactionTimestamp))
+                {
+                    yield return currentItem;
+                }
             } 
         }
 
