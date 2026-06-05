@@ -9,6 +9,8 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
+* CHANGE PUBLIC METHODS ON PERSISTER TO BE ASYNC
+
 * Validation in persister should be an abstract method
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+
 * Review StockPriceGridLockKey... abstract, protected properties, and private members... could these be done better?
@@ -35,6 +37,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
   * Full compare
   * Add/update only
   * Delete only (is this possible? since we delete the things that are not in the set?)
+* Need to make a note in doco to ensure that DB sorting matches .NET sorting, or that filters are in place to only allow characters that will sort the same
 
 #### Terminology
 * Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/
