@@ -9,6 +9,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
+* Is exception handling correct??.. is there a need for exceptions to be thrown in protected methods?.. review.
 * CHANGE PUBLIC METHODS ON PERSISTER TO BE ASYNC
 
 * Validation in persister should be an abstract method

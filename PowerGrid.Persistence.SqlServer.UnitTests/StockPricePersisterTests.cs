@@ -415,7 +415,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
             var e = Assert.Throws<ArgumentOutOfRangeException>(delegate
             {
-                testStockPricePersister.GetGrid(testOuterKeyProperties, 0);
+                new List<StockPriceGridItemPTO>(testStockPricePersister.GetGrid(testOuterKeyProperties, 0));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'version' with value 0 must be greater than 0."));
