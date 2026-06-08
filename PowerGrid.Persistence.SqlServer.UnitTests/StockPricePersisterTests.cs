@@ -881,14 +881,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void GetGridTransactionTimestampOverload_GridDoesntExist()
-        {
-            // TODO: Implement when there's a public GetGrid() method
-
-            throw new NotImplementedException();
-        }
-
-        [Test]
         public void GetGridTransactionTimestampOverload()
         {
             const String testTag = "Market";

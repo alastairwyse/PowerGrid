@@ -38,7 +38,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
   * Full compare
   * Add/update only
   * Delete only (is this possible? since we delete the things that are not in the set?)
-* Need to make a note in doco to ensure that DB sorting matches .NET sorting, or that filters are in place to only allow characters that will sort the same
+* Need to make a note in doco to ensure that DB sorting matches .NET sorting, or that filters are in place to only allow characters that will sort the same.  Latin1_General_BIN2 supposed to match C# StringComparison.Ordinal
 
 #### Terminology
 * Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/
