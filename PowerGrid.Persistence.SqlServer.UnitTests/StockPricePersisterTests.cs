@@ -185,6 +185,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             GridContentsValidationException<StockPrice> innerInnerException = (GridContentsValidationException<StockPrice>)e.InnerException.InnerException;
             Assert.That(innerInnerException.Message, Does.StartWith($"Failed to validate item in grid."));
             Assert.That(innerInnerException.GridItem == testGridItems[0]);
+            Assert.That(innerInnerException.InnerException.Message == $"StockPrice with StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and Company 'Canon' has negative Price -1.");
         }
 
         [Test]
@@ -432,8 +433,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-06-03 23:54:31.0000202");
             String expectedVersionQueryCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+            SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
@@ -463,7 +463,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false, true, false);
             // Mock returns for grid version query
-            mockDataReader["Version"].Returns<Object>(testVersion);
             mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-03T23:54:31.0000202");
             // Mock returns for grid contents query
             mockDataReader["Id"].Returns<Object>(1L);
@@ -676,7 +675,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void GetGridVersion_MultipleRecordsReturned()
+        public void GetGridTransactionTimestamp_MultipleRecordsReturned()
         {
             const String testTag = "Calibrated";
             const String testDataSource = "Refinitiv";
@@ -684,8 +683,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Int32 testVersion = 9;
             StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+            SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
@@ -695,14 +693,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true);
-            mockDataReader["Version"].Returns<Object>(testVersion);
             mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-01T23:02:45.0000101");
 
             using (var connection = new SqlConnection(testConnectionString))
             {
                 var e = Assert.Throws<Exception>(delegate
                 {
-                    testStockPricePersister.GetGridVersion(connection, testOuterKeyProperties, testVersion);
+                    testStockPricePersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
@@ -718,7 +715,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void GetGridVersion_GridDoesntExist()
+        public void GetGridTransactionTimestamp_GridDoesntExist()
         {
             const String testTag = "Calibrated";
             const String testDataSource = "Refinitiv";
@@ -726,8 +723,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Int32 testVersion = 8;
             StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+            SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
@@ -737,14 +733,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(false);
-            mockDataReader["Version"].Returns<Object>(testVersion);
             mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-01T23:02:45.0000101");
 
             using (var connection = new SqlConnection(testConnectionString))
             {
                 var e = Assert.Throws<Exception>(delegate
                 {
-                    testStockPricePersister.GetGridVersion(connection, testOuterKeyProperties, testVersion);
+                    testStockPricePersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
@@ -754,13 +749,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
-                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 from SQL Server."));
-                Assert.That(e.InnerException.Message, Does.StartWith($"Stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 did not exist."));
+                Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 did not exist."));
             }
         }
 
         [Test]
-        public void GetGridVersion_ExceptionReading()
+        public void GetGridTransactionTimestamp_ExceptionReading()
         {
             const String testTag = "Calibrated";
             const String testDataSource = "Refinitiv";
@@ -768,8 +762,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Int32 testVersion = 7;
             StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+            SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
@@ -783,7 +776,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 var e = Assert.Throws<Exception>(delegate
                 {
-                    testStockPricePersister.GetGridVersion(connection, testOuterKeyProperties, testVersion);
+                    testStockPricePersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
@@ -799,7 +792,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void GetGridVersion()
+        public void GetGridTransactionTimestamp()
         {
             const String testTag = "Calibrated";
             const String testDataSource = "Refinitiv";
@@ -807,8 +800,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Int32 testVersion = 8;
             StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+            SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
@@ -818,12 +810,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
-            mockDataReader["Version"].Returns<Object>(testVersion);
             mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-01T23:02:45.0000101");
 
             using (var connection = new SqlConnection(testConnectionString))
             {
-                (Int32 resultVersion, DateTime resultTransactionTimestamp) = testStockPricePersister.GetGridVersion(connection, testOuterKeyProperties, testVersion);
+                DateTime result = testStockPricePersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
@@ -832,8 +823,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
-                Assert.That(testVersion == resultVersion);
-                Assert.That(utils.CreateDataTimeFromString("2026-06-01 23:02:45.0000101") == resultTransactionTimestamp);
+                Assert.That(utils.CreateDataTimeFromString("2026-06-01 23:02:45.0000101") == result);
             }
         }
 
@@ -1158,35 +1148,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void DeleteGridItem()
-        {
-            const String testTag = "Market";
-            const String testDataSource = "Bloomberg";
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
-            const String testCompany = "Sony";
-            StockPriceGridItemPTO testItem = new(123, testTag, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
-            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
-            String expectedCommandText = @$"
-            UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Id = @Id;
-            ";
-
-            using (var connection = new SqlConnection(testConnectionString))
-            {
-                testStockPricePersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
-
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
-                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
-                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
-                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-            }
-        }
-
-        [Test]
         public void DeleteGridItem_ExceptionDeleting()
         {
             const String testTag = "Market";
@@ -1213,6 +1174,35 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
                 Assert.That(e.Message, Does.StartWith($"Failed to delete stock price with id '{testItem.Id}' in SQL Server."));
                 Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void DeleteGridItem()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
+            const String testCompany = "Sony";
+            StockPriceGridItemPTO testItem = new(123, testTag, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
+            String expectedCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;
+            ";
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPricePersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
 
@@ -1532,14 +1522,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
             }
 
-            public new (Int32, DateTime) GetLatestGridVersion(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties)
+            public new (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties)
             {
                 return base.GetLatestGridVersion(connection, outerKeyProperties);
             }
 
-            public new (Int32, DateTime) GetGridVersion(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, Int32 version)
+            public new DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, Int32 version)
             {
-                return base.GetGridVersion(connection, outerKeyProperties, version);
+                return base.GetGridTransactionTimestamp(connection, outerKeyProperties, version);
             }
 
             public new IEnumerable<StockPriceGridItemPTO> GetGrid(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)

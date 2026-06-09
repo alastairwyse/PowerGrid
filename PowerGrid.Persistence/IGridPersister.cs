@@ -45,14 +45,18 @@ namespace PowerGrid.Persistence
         /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
         /// <param name="items">The items to persist.</param>
         /// <returns>A tuple containing: the version number of the written grid, and statistics containing counts of the items persisted.</returns>
-        public (Int32, GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> items);
+        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> items);
 
         /// <summary>
         /// Retrieve the grid with the specified properties.
         /// </summary>
         /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
-        /// <param name="version"
+        /// <param name="version">The version number of the grid to retrieve.</param>
         /// <returns>The items in the grid.</returns>
         public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int32 version);
+
+        // TODO:
+        //   GetGrids() for IGridCommonKeyProperties
+        //   and for OuterKeyproperties (returns a set of versions)
     }
 }
