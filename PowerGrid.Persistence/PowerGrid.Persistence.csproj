@@ -10,6 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ApplicationLogging" Version="2.0.0" />
+    <PackageReference Include="ApplicationMetrics" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PowerGrid.Core\PowerGrid.Core.csproj" />
     <ProjectReference Include="..\PowerGrid.Grids\PowerGrid.Grids.csproj" />
   </ItemGroup>

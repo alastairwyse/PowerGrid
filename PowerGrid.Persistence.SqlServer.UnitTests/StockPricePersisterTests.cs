@@ -19,12 +19,14 @@ using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
-using NUnit.Framework;
-using NSubstitute;
 using PowerGrid.Core;
 using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using ApplicationLogging;
+using ApplicationMetrics;
+using NUnit.Framework;
+using NSubstitute;
 
 namespace PowerGrid.Persistence.SqlServer.UnitTests
 {
@@ -51,6 +53,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         private TestUtilities utils;
         private List<SqlRetryingEventArgs> connectionRetryActionInvocationParameters;
         private EventHandler<SqlRetryingEventArgs> connectionRetryAction;
+        private IApplicationLogger mockLogger;
+        private IMetricLogger mockMetricLogger;
         private IDateTimeProvider mockDateTimeProvider;
         private ISqlConnectionShim mockSqlConnectionShim;
         private ISqlTransactionShim mockSqlTransactionShim;
@@ -60,12 +64,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [SetUp]
         protected void SetUp()
         {
+            mockLogger = Substitute.For<IApplicationLogger>();
+            mockMetricLogger = Substitute.For<IMetricLogger>();
             mockDateTimeProvider = Substitute.For<IDateTimeProvider>();
             mockSqlConnectionShim = Substitute.For<ISqlConnectionShim>();
             mockSqlTransactionShim = Substitute.For<ISqlTransactionShim>();
             mockSqlCommandShim = Substitute.For<ISqlCommandShim>();
             utils = new TestUtilities();
-            testStockPricePersister = new StockPricePersisterWithProtectedMembers(testConnectionString, 5, 10, 0, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
+            testStockPricePersister = new StockPricePersisterWithProtectedMembers(testConnectionString, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
         }
 
         [Test]
@@ -1146,7 +1152,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
             }
         }
-
+        
         [Test]
         public void DeleteGridItem_ExceptionDeleting()
         {
@@ -1514,11 +1520,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 Int32 retryCount,
                 Int32 retryInterval,
                 Int32 operationTimeout,
+                IApplicationLogger logger,
+                IMetricLogger metricLogger,
                 IDateTimeProvider dateTimeProvider,
                 ISqlConnectionShim sqlConnectionShim,
                 ISqlTransactionShim sqlTransactionShim,
                 ISqlCommandShim sqlCommandShim
-            ) : base(connectionString, retryCount, retryInterval, operationTimeout, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
+            ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
             {
             }
 

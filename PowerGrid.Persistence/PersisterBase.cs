@@ -19,6 +19,9 @@ using System.Collections.Generic;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using ApplicationMetrics;
+using ApplicationMetrics.MetricLoggers;
+using ApplicationLogging;
 
 namespace PowerGrid.Persistence
 {
@@ -35,6 +38,32 @@ namespace PowerGrid.Persistence
         where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
+        /// <summary>The logger for general logging.</summary>
+        protected IApplicationLogger logger;
+        /// <summary>The logger for metrics.</summary>
+        protected IMetricLogger metricLogger;
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.PersisterBase class.
+        /// </summary>
+        /// <param name="logger">The logger for general logging.</param>
+        public PersisterBase(IApplicationLogger logger)
+        {
+            this.logger = logger;
+            metricLogger = new NullMetricLogger();
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.PersisterBase class.
+        /// </summary>
+        /// <param name="logger">The logger for general logging.</param>
+        /// <param name="metricLogger">The logger for metrics.</param>
+        public PersisterBase(IApplicationLogger logger, IMetricLogger metricLogger)
+            : this(logger)
+        {
+            this.metricLogger = metricLogger;
+        }
+
         /// <inheritdoc/>
         public abstract (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> items);
 

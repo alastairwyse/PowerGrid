@@ -19,14 +19,15 @@ using System.Collections;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.Common;
 using System.Globalization;
 using System.Linq;
-using System.Transactions;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using PowerGrid.Persistence.SqlServer.Metrics;
+using ApplicationLogging;
+using ApplicationMetrics;
 
 namespace PowerGrid.Persistence.SqlServer
 {
@@ -72,13 +73,16 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
         public StockPricePersister
         (
             String connectionString,
             Int32 retryCount,
             Int32 retryInterval,
-            Int32 operationTimeout
+            Int32 operationTimeout,
+            IApplicationLogger logger
         )
+            : base(logger)
         {
             ThrowExceptionIfConnectionStringParameterNullOrWhitespace(nameof(connectionString), connectionString);
             ThrowExceptionIfOperationTimeoutParameterLessThanZero(nameof(operationTimeout), operationTimeout);
@@ -120,17 +124,38 @@ namespace PowerGrid.Persistence.SqlServer
                 Int32 retryDelayInSeconds = eventArgs.Delay.Seconds;
                 if (typeof(SqlException).IsAssignableFrom(lastException.GetType()) == true)
                 {
-                    // TODO: Uncomment lines when logging and metrics is implemented
-
                     var se = (SqlException)lastException;
-                    //logger.Log(this, LogLevel.Warning, $"SQL Server error with number {se.Number} occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", se);
+                    logger.Log(this, LogLevel.Warning, $"SQL Server error with number {se.Number} occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", se);
                 }
                 else
                 {
-                    //logger.Log(this, LogLevel.Warning, $"Exception occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", lastException);
+                    logger.Log(this, LogLevel.Warning, $"Exception occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", lastException);
                 }
-                //metricLogger.Increment(new SqlCommandExecutionRetried());
+                metricLogger.Increment(new SqlCommandExecutionRetried());
             };
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        /// <param name="metricLogger">The logger for metrics.</param>
+        public StockPricePersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger
+        )
+            : this(connectionString, retryCount, retryInterval, operationTimeout, logger)
+        {
+            this.metricLogger = metricLogger;
         }
 
         /// <summary>
@@ -151,11 +176,13 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger, 
             IDateTimeProvider dateTimeProvider,
             ISqlConnectionShim sqlConnectionShim, 
             ISqlTransactionShim sqlTransactionShim, 
             ISqlCommandShim sqlCommandShim
-        ) : this(connectionString, retryCount, retryInterval, operationTimeout)
+        ) : this(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
         {
             this.dateTimeProvider = dateTimeProvider;
             this.sqlConnectionShim = sqlConnectionShim;
