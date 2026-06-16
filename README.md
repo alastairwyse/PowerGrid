@@ -9,6 +9,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
+* All comments reffering to 'transaction timestamp' should say what it is (i.e. when the grid was created)
 * Get list of grids by some combination of those key properties
 * Admin endpoint to hard delete by an outer key or common key
 * StockPricePersister (and any other persister classes) should have logging and metrics.

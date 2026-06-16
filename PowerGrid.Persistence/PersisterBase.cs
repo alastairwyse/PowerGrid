@@ -18,10 +18,11 @@ using System;
 using System.Collections.Generic;
 using PowerGrid.Core;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using ApplicationLogging;
 using ApplicationMetrics;
 using ApplicationMetrics.MetricLoggers;
-using ApplicationLogging;
 
 namespace PowerGrid.Persistence
 {
@@ -32,8 +33,9 @@ namespace PowerGrid.Persistence
     /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
     /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
     /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
-    public abstract class PersisterBase<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO> : IGridPersister<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
+    public abstract class PersisterBase<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO> : IGridPersister<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO>
         where TEntity : IGridItem<TEntity>
+        where TCommonKeyProperties : Core.IGridCommonKeyProperties
         where TOuterKeyProperties : IGridItemOuterKeyProperties
         where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
@@ -69,5 +71,11 @@ namespace PowerGrid.Persistence
 
         /// <inheritdoc/>
         public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int32 version);
+
+        /// <inheritdoc/>
+        public abstract IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridKeyProperties);
+
+        /// <inheritdoc/>
+        public abstract IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties);
     }
 }

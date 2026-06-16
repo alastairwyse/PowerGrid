@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using PowerGrid.Core;
+using PowerGrid.Persistence.Models;
 
 namespace PowerGrid.Persistence
 {
@@ -27,8 +28,9 @@ namespace PowerGrid.Persistence
     /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
     /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
     /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
-    public interface IGridPersister<TEntity, TOuterKeyProperties, TGridItem, TGridItemPTO>
+    public interface IGridPersister<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO>
         where TEntity : IGridItem<TEntity>
+        where TCommonKeyProperties : IGridCommonKeyProperties
         where TOuterKeyProperties : IGridItemOuterKeyProperties
         where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
@@ -45,6 +47,7 @@ namespace PowerGrid.Persistence
         /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
         /// <param name="items">The items to persist.</param>
         /// <returns>A tuple containing: the version number of the written grid, and statistics containing counts of the items persisted.</returns>
+        /// <remarks>Any existing grid items which are deleted or updated as a result of this method call are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
         public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> items);
 
         /// <summary>
@@ -55,8 +58,25 @@ namespace PowerGrid.Persistence
         /// <returns>The items in the grid.</returns>
         public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int32 version);
 
+        /// <summary>
+        /// Gets details of all the grids stored in persistent storage with the specified key properties.
+        /// </summary>
+        /// <param name="gridKeyProperties">The key properties of the grids to retrieve the details for.</param>
+        /// <returns>A collection of versions and corresponding UTC transaction (creation) timestamps for the grids.</returns>
+        public IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridKeyProperties);
+
+        /// <summary>
+        /// Gets details of all the grids stored in persistent storage with the specified common key properties.
+        /// </summary>
+        /// <param name="gridCommonKeyProperties">The common key properties of the grids to retrieve the details for.</param>
+        /// <returns>A collection of tuples containing: outer key properties, and versions and corresponding UTC transaction (creation) timestamps for the grids.</returns>
+        public IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties);
+
         // TODO:
         //   GetGrids() for IGridCommonKeyProperties
         //   and for OuterKeyproperties (returns a set of versions)
+        //   Soft delete for TOuterKeyProperties param
+        //   Hard delete for TOuterKeyProperties
+        //   Hard delete for IGridCommonKeyProperties (and bring IGridCommonKeyProperties into generic signature)
     }
 }

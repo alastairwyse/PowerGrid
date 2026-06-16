@@ -24,17 +24,18 @@ using System.Linq;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer.Metrics;
-using ApplicationLogging;
 using ApplicationMetrics;
+using ApplicationLogging;
 
 namespace PowerGrid.Persistence.SqlServer
 {
     /// <summary>
     /// Reads and writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPricePersister : PersisterBase<StockPrice, StockPriceOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
+    public class StockPricePersister : PersisterBase<StockPrice, Grids.IGridCommonKeyProperties, StockPriceOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactionSql23DateStyle = "yyyy-MM-dd";
@@ -321,6 +322,18 @@ namespace PowerGrid.Persistence.SqlServer
                     yield return currentItem;
                 }
             } 
+        }
+
+        /// <inheritdoc/>
+        public override IList<GridVersionAndTransactionTimestamp> GetGridDetails(StockPriceOuterKeyProperties gridKeyProperties)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        public override IList<Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(Grids.IGridCommonKeyProperties gridCommonKeyProperties)
+        {
+            throw new NotImplementedException();
         }
 
         #region Private/Protected Methods
