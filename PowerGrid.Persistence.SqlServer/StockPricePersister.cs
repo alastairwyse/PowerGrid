@@ -327,7 +327,48 @@ namespace PowerGrid.Persistence.SqlServer
         /// <inheritdoc/>
         public override IList<GridVersionAndTransactionTimestamp> GetGridDetails(StockPriceOuterKeyProperties gridKeyProperties)
         {
-            throw new NotImplementedException();
+            const String tagParameterName = "@Tag";
+            const String dataSourceParameterName = "@DataSource";
+            const String dateParameterName = "@Date";
+            String query = @$"
+            SELECT  [Version] AS [Version], 
+                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+            FROM    StockPriceGrids 
+            WHERE   Tag = {tagParameterName} 
+              AND   DataSource = {dataSourceParameterName} 
+              AND   [Date] = CONVERT(date, {dateParameterName}, 126);
+            ";
+
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand())
+            {
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, query);
+                    PrepareCommand(connection, command);
+                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridKeyProperties.Tag);
+                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridKeyProperties.DataSource);
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridKeyProperties.Date.ToString(transactionSql23DateStyle));
+                    List<GridVersionAndTransactionTimestamp> returnList = new();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            Int32 version = (Int32)dataReader["Version"];
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
+                            returnList.Add(new GridVersionAndTransactionTimestamp(version, transactionTimestamp));
+                        }
+                    }
+
+                    return returnList;
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read grid details for {gridKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
         }
 
         /// <inheritdoc/>
