@@ -344,6 +344,8 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
                     sqlCommandShim.SetCommandText(command, query);
                     PrepareCommand(connection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridKeyProperties.Tag);
@@ -361,6 +363,7 @@ namespace PowerGrid.Persistence.SqlServer
                             returnList.Add(new GridVersionAndTransactionTimestamp(version, transactionTimestamp));
                         }
                     }
+                    sqlConnectionShim.Close(connection);
 
                     return returnList;
                 }

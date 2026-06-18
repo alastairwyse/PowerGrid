@@ -1,5 +1,6 @@
 ﻿using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer;
 using ApplicationLogging;
@@ -36,14 +37,19 @@ namespace PowerGrid.TestHarness
             ConsoleApplicationLogger consoleLogger = new(LogLevel.Debug, '|', "  ");
             StockPricePersister persister = new StockPricePersister(connectionString, 5, 5, 0, consoleLogger);
             StockPriceOuterKeyProperties outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
+            /*
             persister.PersistGrid(outerKeyProps, testGridItems);
-            //persister.TestGetUpdate2Connections("Reuters");
-
             outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
             Console.WriteLine("-- GetGrid() Results --");
             foreach (StockPriceGridItemPTO currentPTO in persister.GetGrid(outerKeyProps, 2))
             {
                 Console.WriteLine(currentPTO);
+            }
+            */
+            IList<GridVersionAndTransactionTimestamp> gridDetails = persister.GetGridDetails(outerKeyProps);
+            foreach (GridVersionAndTransactionTimestamp currentGridDetails in gridDetails)
+            {
+                Console.WriteLine($"{currentGridDetails.Version}, {currentGridDetails.TransactionTimestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff")}");
             }
         }
     }

@@ -507,6 +507,18 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void GetGridDetails_ExceptionReading()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
+        public void GetGridDetails()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
         public void GetLatestGridVersion_ExceptionReading()
         {
             const String testTag = "Market";
