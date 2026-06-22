@@ -45,11 +45,17 @@ namespace PowerGrid.TestHarness
             {
                 Console.WriteLine(currentPTO);
             }
-            */
             IList<GridVersionAndTransactionTimestamp> gridDetails = persister.GetGridDetails(outerKeyProps);
             foreach (GridVersionAndTransactionTimestamp currentGridDetails in gridDetails)
             {
                 Console.WriteLine($"{currentGridDetails.Version}, {currentGridDetails.TransactionTimestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff")}");
+            }
+            */
+            GridCommonKeyProperties commonKeyProperties = new("Test");
+            IList<Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp>> gridDetails = persister.GetGridDetails(commonKeyProperties);
+            foreach (Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp> currentResult in gridDetails)
+            {
+                Console.WriteLine($"{currentResult.Item1.ToString()}, {currentResult.Item2.Version}, {currentResult.Item2.TransactionTimestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff")}");
             }
         }
     }

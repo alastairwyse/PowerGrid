@@ -35,7 +35,7 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Reads and writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPricePersister : PersisterBase<StockPrice, Grids.IGridCommonKeyProperties, StockPriceOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
+    public class StockPricePersister : PersisterBase<StockPrice, GridCommonKeyProperties, StockPriceOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactionSql23DateStyle = "yyyy-MM-dd";
@@ -375,9 +375,51 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        public override IList<Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(Grids.IGridCommonKeyProperties gridCommonKeyProperties)
+        public override IList<Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(GridCommonKeyProperties gridCommonKeyProperties)
         {
-            throw new NotImplementedException();
+            const String tagParameterName = "@Tag";
+            String query = @$"
+            SELECT  DataSource, 
+                    CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                    [Version], 
+                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp 
+            FROM    StockPriceGrids 
+            WHERE   Tag = {tagParameterName};
+            ";
+
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    sqlCommandShim.SetCommandText(command, query);
+                    PrepareCommand(connection, command);
+                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+                    List<Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp>> returnList = new();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            String dataSource = (String)dataReader["DataSource"];
+                            DateOnly date = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            Int32 version = (Int32)dataReader["Version"];
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
+                            returnList.Add(Tuple.Create(new StockPriceOuterKeyProperties(gridCommonKeyProperties.Tag, dataSource, date), new GridVersionAndTransactionTimestamp(version, transactionTimestamp)));
+                        }
+                    }
+                    sqlConnectionShim.Close(connection);
+
+                    return returnList;
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
         }
 
         #region Private/Protected Methods
