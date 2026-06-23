@@ -15,14 +15,42 @@
  */
 
 using System;
+using System.Text;
 
 namespace PowerGrid.Grids
 {
     /// <summary>
     /// Defines key properties of grids that are common across all grids in a solution.
     /// </summary>
-    /// <param name="Tag">A tag used to classify the grid.</param>
-    public record GridCommonKeyProperties(String Tag) : IGridCommonKeyProperties
+    public record GridCommonKeyProperties : KeyPropertiesBase, IGridCommonKeyProperties
     {
+        /// <summary>A tag used to classify the grid.</summary>
+        public String Tag { get; init; }
+
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Grids.StockPriceOuterKeyProperties class.
+        /// </summary>
+        /// <param name="tag">A tag used to classify the grid.</param>
+        /// <param name="dataSource">The source/entity which provided the price.</param>
+        /// <param name="date">The date the price was quoted for.</param>
+        public GridCommonKeyProperties(String tag)
+        {
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
+
+            Tag = tag;
+        }
+
+        #region Private/Protected Methods
+
+        /// <inheritdoc/>
+        protected override bool PrintMembers(StringBuilder builder)
+        {
+            builder.Append($"{nameof(Tag)} = '{Tag}'");
+
+            return true;
+        }
+
+        #endregion
     }
 }

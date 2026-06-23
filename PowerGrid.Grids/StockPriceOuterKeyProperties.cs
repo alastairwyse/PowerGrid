@@ -23,7 +23,7 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
     /// </summary>
-    public record StockPriceOuterKeyProperties : IStockPriceOuterKeyProperties
+    public record StockPriceOuterKeyProperties : KeyPropertiesBase, IStockPriceOuterKeyProperties
     {
         /// <summary>A tag used to classify the grid.</summary>
         public String Tag { get; init; }
@@ -52,27 +52,14 @@ namespace PowerGrid.Grids
 
         #region Private/Protected Methods
 
-        #pragma warning disable 1591
-
         /// <inheritdoc/>
-        protected virtual bool PrintMembers(StringBuilder builder)
+        protected override bool PrintMembers(StringBuilder builder)
         {
             builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(DataSource)} = '{DataSource}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}'");
 
             return true;
         }
 
-        protected void ThrowExceptionIfStringParameterNullOrWhitespace(String parameterName, String parameterValue)
-        {
-            if (String.IsNullOrWhiteSpace(parameterValue))
-            {
-                throw new ArgumentNullException(parameterName, $"Parameter '{parameterName}' must contain a value.");
-            }
-        }
-
-        #pragma warning restore 1591
-
         #endregion
-
     }
 }

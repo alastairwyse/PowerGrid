@@ -422,6 +422,24 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
+        /// <inheritdoc/>
+        public override void SoftDeleteLatestGrid(StockPriceOuterKeyProperties gridKeyProperties)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        public override void HardDeleteGrids(StockPriceOuterKeyProperties gridKeyProperties)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        public override void HardDeleteGrids(GridCommonKeyProperties gridCommonKeyProperties)
+        {
+            throw new NotImplementedException();
+        }
+
         #region Private/Protected Methods
 
         /// <summary>

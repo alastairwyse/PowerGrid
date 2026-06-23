@@ -77,5 +77,14 @@ namespace PowerGrid.Persistence
 
         /// <inheritdoc/>
         public abstract IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties);
+
+        /// <inheritdoc/>
+        public abstract void SoftDeleteLatestGrid(TOuterKeyProperties gridKeyProperties);
+
+        /// <inheritdoc/>
+        public abstract void HardDeleteGrids(TOuterKeyProperties gridKeyProperties);
+
+        /// <inheritdoc/>
+        public abstract void HardDeleteGrids(TCommonKeyProperties gridCommonKeyProperties);
     }
 }

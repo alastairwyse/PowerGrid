@@ -72,11 +72,25 @@ namespace PowerGrid.Persistence
         /// <returns>A collection of tuples containing: outer key properties, and versions and corresponding UTC transaction (creation) timestamps for the grids.</returns>
         public IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties);
 
-        // TODO:
-        //   GetGrids() for IGridCommonKeyProperties
-        //   and for OuterKeyproperties (returns a set of versions)
-        //   Soft delete for TOuterKeyProperties param
-        //   Hard delete for TOuterKeyProperties
-        //   Hard delete for IGridCommonKeyProperties (and bring IGridCommonKeyProperties into generic signature)
+        /// <summary>
+        /// Soft deletes all items in the latest grid in persistent storage with the specified properties.
+        /// </summary>
+        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to delete.</param>
+        /// <remarks>All items are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
+        public void SoftDeleteLatestGrid(TOuterKeyProperties gridKeyProperties);
+
+        /// <summary>
+        /// Hard deletes all grids in persistent storage with the specified properties.
+        /// </summary>
+        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grids to delete.</param>
+        /// <remarks>All grids are 'hard' deleted by physically removing them from persistent storage.</remarks>
+        public void HardDeleteGrids(TOuterKeyProperties gridKeyProperties);
+
+        /// <summary>
+        /// Hard deletes all grids in persistent storage with the specified properties.
+        /// </summary>
+        /// <param name="gridCommonKeyProperties">The common key properties of the grids to delete.</param>
+        /// <remarks>All grids are 'hard' deleted by physically removing them from persistent storage.</remarks>
+        public void HardDeleteGrids(TCommonKeyProperties gridCommonKeyProperties);
     }
 }
