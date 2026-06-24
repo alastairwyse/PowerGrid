@@ -444,7 +444,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = @Version;
             ";
             String expectedGridQueryCommandText = @$"
@@ -520,7 +520,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126);
+              AND   [Date] = CONVERT(date, @Date, 23);
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
@@ -559,7 +559,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126);
+              AND   [Date] = CONVERT(date, @Date, 23);
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
@@ -687,6 +687,24 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void SoftDeleteLatestGrid_GridDoesntExist()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_ExceptionDeleting()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
         public void GetLatestGridVersion_ExceptionReading()
         {
             const String testTag = "Market";
@@ -699,14 +717,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = 
                     (
                       SELECT  MAX([Version])
                       FROM    StockPriceGrids 
                       WHERE   Tag = @Tag 
                         AND   DataSource = @DataSource 
-                        AND   [Date] = CONVERT(date, @Date, 126) 
+                        AND   [Date] = CONVERT(date, @Date, 23) 
                     );
             ";
             var mockException = new Exception("Mock exception");
@@ -738,14 +756,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = 
                     (
                       SELECT  MAX([Version])
                       FROM    StockPriceGrids 
                       WHERE   Tag = @Tag 
                         AND   DataSource = @DataSource 
-                        AND   [Date] = CONVERT(date, @Date, 126) 
+                        AND   [Date] = CONVERT(date, @Date, 23) 
                     );
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
@@ -781,14 +799,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = 
                     (
                       SELECT  MAX([Version])
                       FROM    StockPriceGrids 
                       WHERE   Tag = @Tag 
                         AND   DataSource = @DataSource 
-                        AND   [Date] = CONVERT(date, @Date, 126) 
+                        AND   [Date] = CONVERT(date, @Date, 23) 
                     );
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
@@ -828,14 +846,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = 
                     (
                       SELECT  MAX([Version])
                       FROM    StockPriceGrids 
                       WHERE   Tag = @Tag 
                         AND   DataSource = @DataSource 
-                        AND   [Date] = CONVERT(date, @Date, 126) 
+                        AND   [Date] = CONVERT(date, @Date, 23) 
                     );
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
@@ -873,7 +891,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = @Version;
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
@@ -913,7 +931,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = @Version;
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
@@ -952,7 +970,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = @Version;
             ";
             var mockException = new Exception("Mock exception");
@@ -990,7 +1008,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 126) 
+              AND   [Date] = CONVERT(date, @Date, 23) 
               AND   [Version] = @Version;
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();

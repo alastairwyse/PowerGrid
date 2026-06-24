@@ -44,26 +44,26 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Writes the specified grid to persistent storage.
         /// </summary>
-        /// <param name="outerKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
         /// <param name="items">The items to persist.</param>
         /// <returns>A tuple containing: the version number of the written grid, and statistics containing counts of the items persisted.</returns>
         /// <remarks>Any existing grid items which are deleted or updated as a result of this method call are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
-        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> items);
+        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items);
 
         /// <summary>
         /// Retrieve the grid with the specified properties.
         /// </summary>
-        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
         /// <param name="version">The version number of the grid to retrieve.</param>
         /// <returns>The items in the grid.</returns>
-        public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int32 version);
+        public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridOuterKeyProperties, Int32 version);
 
         /// <summary>
         /// Gets details of all the grids stored in persistent storage with the specified key properties.
         /// </summary>
-        /// <param name="gridKeyProperties">The key properties of the grids to retrieve the details for.</param>
+        /// <param name="gridOuterKeyProperties">The key properties of the grids to retrieve the details for.</param>
         /// <returns>A collection of versions and corresponding UTC transaction (creation) timestamps for the grids.</returns>
-        public IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridKeyProperties);
+        public IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <summary>
         /// Gets details of all the grids stored in persistent storage with the specified common key properties.
@@ -75,16 +75,16 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Soft deletes all items in the latest grid in persistent storage with the specified properties.
         /// </summary>
-        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to delete.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to delete.</param>
         /// <remarks>All items are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
-        public void SoftDeleteLatestGrid(TOuterKeyProperties gridKeyProperties);
+        public void SoftDeleteLatestGrid(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <summary>
         /// Hard deletes all grids in persistent storage with the specified properties.
         /// </summary>
-        /// <param name="gridKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grids to delete.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grids to delete.</param>
         /// <remarks>All grids are 'hard' deleted by physically removing them from persistent storage.</remarks>
-        public void HardDeleteGrids(TOuterKeyProperties gridKeyProperties);
+        public void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <summary>
         /// Hard deletes all grids in persistent storage with the specified properties.
