@@ -202,9 +202,16 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 Int32 gridVersion;
                 GridComparisonStatistics comparisonStatistics;
-                PrepareConnection(readConnection);
-                sqlConnectionShim.Open(writeConnection);
-                PrepareConnection(writeConnection, SessionDeadlockPriority.High);
+                try
+                {
+                    PrepareConnection(readConnection);
+                    sqlConnectionShim.Open(writeConnection);
+                    PrepareConnection(writeConnection, SessionDeadlockPriority.High);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
 
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
                 using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
@@ -314,7 +321,14 @@ namespace PowerGrid.Persistence.SqlServer
 
             using (var connection = new SqlConnection(connectionString))
             {
-                sqlConnectionShim.Open(connection);
+                try
+                {
+                    sqlConnectionShim.Open(connection);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
                 DateTime transactionTimestamp = GetGridTransactionTimestamp(connection, gridOuterKeyProperties, version);
 
                 foreach (StockPriceGridItemPTO currentItem in GetGrid(connection, gridOuterKeyProperties, transactionTimestamp))
@@ -429,10 +443,10 @@ namespace PowerGrid.Persistence.SqlServer
             const String dataSourceParameterName = "@DataSource";
             const String dateParameterName = "@Date";
             const String currentDateTimeParameterName = "@CurrentDateTime";
-            const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
+            const String deleteDateTimeParameterName = "@DeleteDateTime";
             String deleteStatement = @$"
             UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
+            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
             WHERE   Tag = {tagParameterName} 
               AND   DataSource = {dataSourceParameterName} 
               AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
@@ -441,6 +455,15 @@ namespace PowerGrid.Persistence.SqlServer
 
             using (var connection = new SqlConnection(connectionString))
             {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
                 (Int32 version, DateTime transactionTimestamp) = GetLatestGridVersion(connection, gridOuterKeyProperties);
                 if (version == 0)
                 {
@@ -452,16 +475,17 @@ namespace PowerGrid.Persistence.SqlServer
                 {
                     try
                     {
-                        PrepareConnection(connection);
-                        sqlConnectionShim.Open(connection);
+                        DateTime deleteTimestamp = dateTimeProvider.UtcNow();
                         sqlCommandShim.SetCommandText(command, deleteStatement);
                         PrepareCommand(connection, transaction, command);
                         sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                         sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
                         sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
-                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, dateTimeProvider.UtcNow().ToString(transactionSql126DateStyle));
-                        sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactionSql126DateStyle));
+                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.ToString(transactionSql126DateStyle));
+                        sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
                         ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
                     }
                     catch (Exception e)
                     {

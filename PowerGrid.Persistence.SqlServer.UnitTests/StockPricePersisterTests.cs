@@ -93,6 +93,35 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void PersistGrid_ExceptionConnectingToSqlServer()
+        {
+            const String testTag = "Calibration";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate); 
+            List<StockPrice> testGridItems = new()
+            {
+                new StockPrice("Hitachi", 4732)
+            };
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPricePersister.PersistGrid(testOuterKeyProperties, testGridItems);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
         public void PersistGrid_NewGridItemPriceLessThan0()
         {
             const String testTag = "Market";
@@ -431,6 +460,26 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void GetGrid_ExceptionConnectingToSqlServer()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            var mockException = new Exception("Mock exception");
+            mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                List<StockPriceGridItemPTO> results = new(testStockPricePersister.GetGrid(testOuterKeyProperties, 1));
+            });
+
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
         public void GetGrid()
         {
             const String testTag = "Market";
@@ -684,6 +733,31 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Assert.That(result[2].Item1.Date == utils.CreateDateOnlyFromString("2026-05-31"));
             Assert.That(result[2].Item2.Version == 1);
             Assert.That(result[2].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-06-23 21:55:56.9750913"));
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_ExceptionConnectingToSqlServer()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPricePersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
+            Assert.That(e.InnerException == mockException);
         }
 
         [Test]

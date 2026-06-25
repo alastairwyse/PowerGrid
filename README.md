@@ -9,6 +9,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
+* IMPORTANT - Have a messed up GridLockKey by now allowing deletes on common key properties (i.e. only a partial of the outer key properties)... might need to rethink
 * All comments reffering to 'transaction timestamp' should say what it is (i.e. when the grid was created)
 * Get list of grids by some combination of those key properties
 * Admin endpoint to hard delete by an outer key or common key
@@ -26,6 +27,9 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Make the persister inner DataBaseOperationEmitter class into a buffer with configurable size (on persister constructor).  Can set to 1 to minimize memory usage and stream things through... OR set huge to effectively write once (or close to once) to DB.  If coupled with option to write in bulk via a temp table or TVP, you would then have the option of high performance/throughput at the cost of memory usage.
 * Have an option to 'delete' (via setting TransactionTo) all current rows, before doing the compare... then it basically will insert everything new every time, and performance becomes similar to a straight insert/overwrite with no compare (since comparer will retrieve 0 existing rows).
 * Add another type of grid item (other than StockPrice), and use to push common functionality into 'Core' project, generic classes and methods, etc... (weather forecast)
+  * Inner key country and city
+  * Outer key date and source
+  * Common tag with stock price
 * Add a 'connectionRetryAction' Action to any persister classes which support transient error retries (possibly already done?).
 * Include validation filters which reject datasources etc which don't match a known whitelist... alternative to lookup tables and foreign key constraints (implement as some extension to base?)
 * Do deadlock testing (hammer test instance with concurrent reads and writes)
@@ -36,6 +40,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Need to make a note in doco to ensure that DB sorting matches .NET sorting, or that filters are in place to only allow characters that will sort the same.  Latin1_General_BIN2 supposed to match C# StringComparison.Ordinal
 * Interactions with SqlCommand should move to equivalent *Async() methods and bubble up to expose public StockPricePersister methods as async.  Also consider making GridComparer accept 2x IAsyncEnumerable inputs aswell.
   * Will need to check that LINQ methods like Order() are available for IAsyncEnumerable.
+* Look at possibly allowing override/specifying of comparison in GridComparer (or possibly it needs to be controlled by the IKeyPropertyComparable implementation on the grid item classes).  Latin1_General_BIN2 in SQL Server is supposed to match C# StringComparison.Ordinal.
 
 #### Terminology
 * Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/
