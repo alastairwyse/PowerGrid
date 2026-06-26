@@ -467,7 +467,7 @@ namespace PowerGrid.Persistence.SqlServer
                 (Int32 version, DateTime transactionTimestamp) = GetLatestGridVersion(connection, gridOuterKeyProperties);
                 if (version == 0)
                 {
-                    throw new Exception($"Stock price grid for {gridOuterKeyProperties.ToString()}, does not exist.");
+                    throw new Exception($"Stock price grid for {gridOuterKeyProperties.ToString()} does not exist.");
                 }
 
                 using (var command = new SqlCommand())

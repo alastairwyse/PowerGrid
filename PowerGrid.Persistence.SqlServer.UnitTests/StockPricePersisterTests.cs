@@ -763,19 +763,117 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void SoftDeleteLatestGrid_GridDoesntExist()
         {
-            throw new NotImplementedException();
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPricePersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} does not exist."));
         }
 
         [Test]
         public void SoftDeleteLatestGrid_ExceptionDeleting()
         {
-            throw new NotImplementedException();
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Tag = @Tag 
+              AND   DataSource = @DataSource 
+              AND   [Date] = CONVERT(date, @Date, 23) 
+              AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;
+            ";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-26T21:56:42.0000031");
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(testDeleteTimestamp); 
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPricePersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+            
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
+            Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
         }
 
         [Test]
         public void SoftDeleteLatestGrid()
         {
-            throw new NotImplementedException();
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Tag = @Tag 
+              AND   DataSource = @DataSource 
+              AND   [Date] = CONVERT(date, @Date, 23) 
+              AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;
+            ";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-26T21:56:42.0000031");
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(testDeleteTimestamp);
+
+            testStockPricePersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
         }
 
         [Test]
