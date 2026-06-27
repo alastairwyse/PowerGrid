@@ -27,8 +27,8 @@ using PowerGrid.Grids;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer.Metrics;
-using ApplicationMetrics;
 using ApplicationLogging;
+using ApplicationMetrics;
 
 namespace PowerGrid.Persistence.SqlServer
 {
@@ -498,13 +498,101 @@ namespace PowerGrid.Persistence.SqlServer
         /// <inheritdoc/>
         public override void HardDeleteGrids(StockPriceOuterKeyProperties gridOuterKeyProperties)
         {
-            throw new NotImplementedException();
+            const String tagParameterName = "@Tag";
+            const String dataSourceParameterName = "@DataSource";
+            const String dateParameterName = "@Date";
+            String stockPriceGridsDeleteStatement = @$"
+            DELETE 
+            FROM    StockPriceGrids 
+            WHERE   Tag = {tagParameterName} 
+              AND   DataSource = {dataSourceParameterName} 
+              AND   [Date] = CONVERT(date, {dateParameterName}, 23);
+            ";
+            String stockPricesDeleteStatement = @$"
+            DELETE 
+            FROM    StockPrices 
+            WHERE   Tag = {tagParameterName} 
+              AND   DataSource = {dataSourceParameterName} 
+              AND   [Date] = CONVERT(date, {dateParameterName}, 23);
+            ";
+
+            using (var connection = new SqlConnection(connectionString))
+            using (var stockPriceGridsDeleteCommand = new SqlCommand())
+            using (var stockPricesDeleteCommand = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                    {
+                        sqlCommandShim.SetCommandText(stockPriceGridsDeleteCommand, stockPriceGridsDeleteStatement);
+                        PrepareCommand(connection, transaction, stockPriceGridsDeleteCommand);
+                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
+                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
+                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPriceGridsDeleteCommand);
+                        sqlCommandShim.SetCommandText(stockPricesDeleteCommand, stockPricesDeleteStatement);
+                        PrepareCommand(connection, transaction, stockPricesDeleteCommand);
+                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
+                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
+                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPricesDeleteCommand);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to delete grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
+                }
+            }
         }
 
         /// <inheritdoc/>
         public override void HardDeleteGrids(GridCommonKeyProperties gridCommonKeyProperties)
         {
-            throw new NotImplementedException();
+            const String tagParameterName = "@Tag";
+            String stockPriceGridsDeleteStatement = @$"
+            DELETE 
+            FROM    StockPriceGrids 
+            WHERE   Tag = {tagParameterName};
+            ";
+            String stockPricesDeleteStatement = @$"
+            DELETE 
+            FROM    StockPrices 
+            WHERE   Tag = {tagParameterName};
+            ";
+
+            using (var connection = new SqlConnection(connectionString))
+            using (var stockPriceGridsDeleteCommand = new SqlCommand())
+            using (var stockPricesDeleteCommand = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                    {
+                        sqlCommandShim.SetCommandText(stockPriceGridsDeleteCommand, stockPriceGridsDeleteStatement);
+                        PrepareCommand(connection, transaction, stockPriceGridsDeleteCommand);
+                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPriceGridsDeleteCommand);
+                        sqlCommandShim.SetCommandText(stockPricesDeleteCommand, stockPricesDeleteStatement);
+                        PrepareCommand(connection, transaction, stockPricesDeleteCommand);
+                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPricesDeleteCommand);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to delete grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
+                }
+            }
         }
 
         #region Private/Protected Methods

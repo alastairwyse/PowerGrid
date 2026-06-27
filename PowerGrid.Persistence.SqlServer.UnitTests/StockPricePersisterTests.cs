@@ -871,7 +871,159 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactionSql126DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
-            mockSqlCommandShim.ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+        }
+
+        [Test]
+        public void HardDeleteGridsStockPriceOuterKeyPropertiesOverload_ExceptionDeleting()
+        {
+            const String testTag = "Calibration";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+            DELETE 
+            FROM    StockPriceGrids 
+            WHERE   Tag = @Tag 
+              AND   DataSource = @DataSource 
+              AND   [Date] = CONVERT(date, @Date, 23);
+            ";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+            
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPricePersister.HardDeleteGrids(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete grids for StockPriceOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void HardDeleteGridsStockPriceOuterKeyPropertiesOverload()
+        {
+            const String testTag = "Calibration";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
+            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+            DELETE 
+            FROM    StockPriceGrids 
+            WHERE   Tag = @Tag 
+              AND   DataSource = @DataSource 
+              AND   [Date] = CONVERT(date, @Date, 23);
+            ";
+            String expectedStockPricesDeleteCommandText = @$"
+            DELETE 
+            FROM    StockPrices 
+            WHERE   Tag = @Tag 
+              AND   DataSource = @DataSource 
+              AND   [Date] = CONVERT(date, @Date, 23);
+            ";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+
+            testStockPricePersister.HardDeleteGrids(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPricesDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+        }
+
+        [Test]
+        public void HardDeleteGridsCommonKeyPropertiesOverload_ExceptionDeleting()
+        {
+            const String testTag = "Calibration";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+            DELETE 
+            FROM    StockPriceGrids 
+            WHERE   Tag = @Tag;
+            ";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPricePersister.HardDeleteGrids(testCommonKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete grids for GridCommonKeyProperties {{ Tag = 'Calibration' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void HardDeleteGridsCommonKeyPropertiesOverload()
+        {
+            const String testTag = "Calibration";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+            DELETE 
+            FROM    StockPriceGrids 
+            WHERE   Tag = @Tag;
+            ";
+            String expectedStockPricesDeleteCommandText = @$"
+            DELETE 
+            FROM    StockPrices 
+            WHERE   Tag = @Tag;
+            ";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+
+            testStockPricePersister.HardDeleteGrids(testCommonKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPricesDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
             mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
         }

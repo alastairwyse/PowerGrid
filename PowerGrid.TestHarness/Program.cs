@@ -36,9 +36,10 @@ namespace PowerGrid.TestHarness
             String connectionString = File.ReadAllText(@"..\..\..\..\Documentation\TempConnectionString.txt");
             ConsoleApplicationLogger consoleLogger = new(LogLevel.Debug, '|', "  ");
             StockPricePersister persister = new StockPricePersister(connectionString, 5, 5, 0, consoleLogger);
-            StockPriceOuterKeyProperties outerKeyProps = new("Test", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
+            StockPriceOuterKeyProperties outerKeyProps = new("Test", refinitivDataSource, utils.CreateDateOnlyFromString("2026-06-22"));
             /*
             persister.PersistGrid(outerKeyProps, testGridItems);
+            
             outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
             Console.WriteLine("-- GetGrid() Results --");
             foreach (StockPriceGridItemPTO currentPTO in persister.GetGrid(outerKeyProps, 2))
@@ -59,7 +60,9 @@ namespace PowerGrid.TestHarness
             }
             */
 
-            persister.SoftDeleteLatestGrid(outerKeyProps);
+            //persister.SoftDeleteLatestGrid(outerKeyProps);
+            GridCommonKeyProperties commonKeyProps = new("Test");
+            persister.HardDeleteGrids(commonKeyProps);
         }
     }
 }
