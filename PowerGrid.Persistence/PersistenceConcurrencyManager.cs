@@ -35,7 +35,7 @@ namespace PowerGrid.Persistence
         {
             lockDictionary = new ConcurrentDictionary<IGridLockKey, Object>();
         }
-
+        /*
         /// <summary>
         /// Acquires an exclusive lock using the specified grid lock key, and invokes the specified action.
         /// </summary>
@@ -49,5 +49,8 @@ namespace PowerGrid.Persistence
                 action();
             }
         }
+        */
+        // TODO: Add method like above but which takes 2 lock keys
+        //   Do I need to check that the 2 params aren't the same lock key (i.e. can you lock again the same object in C#?)
     }
 }
