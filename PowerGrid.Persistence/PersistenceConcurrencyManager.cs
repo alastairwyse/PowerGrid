@@ -52,5 +52,29 @@ namespace PowerGrid.Persistence
         */
         // TODO: Add method like above but which takes 2 lock keys
         //   Do I need to check that the 2 params aren't the same lock key (i.e. can you lock again the same object in C#?)
+
+        // TODO: Remoarks on below as to why we have to pass 2x lock keys
+
+        /// <summary>
+        /// Acquires exclusive locks sequentially using the specified grid lock keys, and invokes the specified action.
+        /// </summary>
+        /// <param name="gridLockKey1">A key representing the first set of grid items to obtain an exclusive lock for.</param>
+        /// <param name="gridLockKey2">A key representing the second set of grid items to obtain an exclusive lock for.</param>
+        /// <param name="action">The action to invoke.</param>
+        public void AcquireLockAndInvokeAction(IGridLockKey gridLockKey1, IGridLockKey gridLockKey2, Action action)
+        {
+            if (gridLockKey1 == gridLockKey2)
+                throw new ArgumentException($"Parameters '{nameof(gridLockKey1)}' and '{nameof(gridLockKey2)}' cannot contain the same {nameof(IGridLockKey)} instance.", nameof(gridLockKey2));
+
+            Object lockObject1 = lockDictionary.GetOrAdd(gridLockKey1, new Object());
+            lock (lockObject1)
+            {
+                Object lockObject2 = lockDictionary.GetOrAdd(gridLockKey2, new Object());
+                lock (lockObject2)
+                {
+                    action();
+                }
+            }
+        }
     }
 }
