@@ -15,13 +15,19 @@
  */
 
 using System;
-using System.Collections.Generic;
+using PowerGrid.Core;
 
-namespace PowerGrid.Persistence
+namespace PowerGrid.Grids
 {
-    public record GridItemOuterKeyPropertySet(Type GridItemType) : IEquatable<GridItemOuterKeyPropertySet>
+    /// <summary>
+    /// Defines the <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of stock prices.
+    /// </summary>
+    public interface IStockPriceGridOuterKeyProperties : IGridOuterKeyProperties, Grids.IGridCommonKeyProperties
     {
-        // TODO... might need this when a grid contains extra key/classification properties which are separate from the grid items... but need to think about more
-        //   This should possibly be an interface, not a class
+        /// <summary>The source/entity which provided the price.</summary>
+        public String DataSource { get; }
+
+        /// <summary>The date the price was quoted for.</summary>
+        public DateOnly Date { get; }
     }
 }

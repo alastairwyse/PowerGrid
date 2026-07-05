@@ -20,25 +20,25 @@ using PowerGrid.Core;
 namespace PowerGrid.Grids
 {
     /// <summary>
-    /// An <see cref="IGridLockKey"/> implementation for <see cref="StockPriceGridItem"/> instances.
+    /// An <see cref="IGridLockKey"/> implementation for <see cref="GridCommonKeyProperties"/> instances.
     /// </summary>
-    public class StockPriceGridItemGridLockKey : GridLockKeyBase<StockPriceGridItem>
+    public class GridCommonKeyPropertiesLockKey : GridCommonKeyPropertiesLockKeyBase<GridCommonKeyProperties>
     {
         /// <inheritdoc/>
-        protected override Object[] UnderlyingGridItemKeyPropertyValues
+        protected override Object[] UnderlyingGridKeyPropertyValues
         {
             get
             {
-                return new Object[3] { underlyingGridItem.Tag, underlyingGridItem.DataSource, underlyingGridItem.Date };
+                return new Object[1] { underlyingGridKeyProperties.Tag };
             }
         }
 
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridItemGridLockKey class.
+        /// Initialises a new instance of the PowerGrid.Grids.GridCommonKeyPropertiesLockKey class.
         /// </summary>
-        /// <param name="underlyingStockPrice">The stock price grid item object to create a key for.</param>
-        public StockPriceGridItemGridLockKey(StockPriceGridItem underlyingStockPriceGridItem)
-            : base(underlyingStockPriceGridItem)
+        /// <param name="underlyingStockPrice">The common key properties object to create a <see cref="Dictionary{TKey, TValue}"/> key for.</param>
+        public GridCommonKeyPropertiesLockKey(GridCommonKeyProperties gridCommonKeyProperties)
+            : base(gridCommonKeyProperties)
         {
         }
     }

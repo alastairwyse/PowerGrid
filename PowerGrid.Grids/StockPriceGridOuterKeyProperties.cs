@@ -21,9 +21,9 @@ using PowerGrid.Core;
 namespace PowerGrid.Grids
 {
     /// <summary>
-    /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
+    /// Defines the <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of stock prices.
     /// </summary>
-    public record StockPriceOuterKeyProperties : KeyPropertiesBase, IStockPriceOuterKeyProperties
+    public record StockPriceGridOuterKeyProperties : KeyPropertiesBase, IStockPriceGridOuterKeyProperties
     {
         /// <summary>A tag used to classify the grid.</summary>
         public String Tag { get; init; }
@@ -35,12 +35,12 @@ namespace PowerGrid.Grids
         public DateOnly Date { get; init; }
 
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Grids.StockPriceOuterKeyProperties class.
+        /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridOuterKeyProperties class.
         /// </summary>
         /// <param name="tag">A tag used to classify the grid.</param>
         /// <param name="dataSource">The source/entity which provided the price.</param>
         /// <param name="date">The date the price was quoted for.</param>
-        public StockPriceOuterKeyProperties(String tag, String dataSource, DateOnly date)
+        public StockPriceGridOuterKeyProperties(String tag, String dataSource, DateOnly date)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(dataSource), dataSource);

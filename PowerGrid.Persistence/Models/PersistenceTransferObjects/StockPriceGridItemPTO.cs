@@ -42,7 +42,7 @@ namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
         DateTime TransactionFrom, 
         DateTime TransactionTo
     )
-        : StockPriceGridItem(Tag, DataSource, Date, Company, Price), IStockPriceOuterKeyProperties, IGridItem<StockPriceGridItem>, IPersistenceTransferObject
+        : StockPriceGridItem(Tag, DataSource, Date, Company, Price), IStockPriceGridOuterKeyProperties, IGridItem<StockPriceGridItem>, IPersistenceTransferObject
     {
     }
 }

@@ -24,7 +24,7 @@ namespace PowerGrid.Core.UnitTests
     /// <summary>
     /// Unit tests for the PowerGrid.Core.GridLockKeyBase class.
     /// </summary>
-    /// <remarks>Tests are performed on derived class PowerGrid.Grids.StockPriceGridItemGridLockKey since GridLockKeyBase is abstract.</remarks>
+    /// <remarks>Tests are performed on derived class PowerGrid.Grids.StockPriceGridOuterKeyPropertiesLockKey since GridLockKeyBase is abstract.</remarks>
     [TestFixture]
     public class GridLockKeyBaseTests
     {
@@ -36,21 +36,19 @@ namespace PowerGrid.Core.UnitTests
         private const String sonyCompany = "Sony";
 
         private TestUtilities utils;
-        StockPriceGridItem testStockPrice;
-        private StockPriceGridItemGridLockKey testStockPriceGridItemGridLockKey;
+        private StockPriceGridOuterKeyPropertiesLockKey testStockPriceGridOuterKeyPropertiesLockKey;
 
         [SetUp]
         protected void SetUp()
         {
             utils = new TestUtilities();
-            testStockPrice = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4431);
-            testStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(testStockPrice);
+            testStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey(new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15")));
         }
 
         [Test]
         public void KeyPropertyValues()
         {
-            Object[] result = testStockPriceGridItemGridLockKey.KeyPropertyValues;
+            Object[] result = testStockPriceGridOuterKeyPropertiesLockKey.KeyPropertyValues;
 
             Assert.That(result.Length == 4);
             Assert.That((Type)result[0] == typeof(StockPriceGridItem));
@@ -65,42 +63,52 @@ namespace PowerGrid.Core.UnitTests
         [Test]
         public void Equals()
         {
-            StockPriceGridItem otherStockPriceGridItem = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4431);
-            StockPriceGridItemGridLockKey otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPriceGridItem);
+            StockPriceGridOuterKeyPropertiesLockKey otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
 
-            Boolean result = testStockPriceGridItemGridLockKey.Equals(otherStockPriceGridItemGridLockKey);
+            Boolean result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
 
             Assert.That(result == true);
 
 
-            otherStockPriceGridItem = new(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4431);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPriceGridItem);
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
 
-            result = testStockPriceGridItemGridLockKey.Equals(otherStockPriceGridItemGridLockKey);
-
-            Assert.That(result == false);
-
-
-            otherStockPriceGridItem = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4431);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPriceGridItem);
-
-            result = testStockPriceGridItemGridLockKey.Equals(otherStockPriceGridItemGridLockKey);
+            result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
 
             Assert.That(result == false);
 
 
-            otherStockPriceGridItem = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-16"), canonCompany, 4431);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPriceGridItem);
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
 
-            result = testStockPriceGridItemGridLockKey.Equals(otherStockPriceGridItemGridLockKey);
+            result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
 
             Assert.That(result == false);
 
 
-            otherStockPriceGridItem = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-16"), sonyCompany, 4431);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPriceGridItem);
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-16"))
+            );
 
-            result = testStockPriceGridItemGridLockKey.Equals(otherStockPriceGridItemGridLockKey);
+            result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
+
+            Assert.That(result == false);
+
+
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-16"))
+            );
+
+            result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
 
             Assert.That(result == false);
         }
@@ -108,47 +116,57 @@ namespace PowerGrid.Core.UnitTests
         [Test]
         public new void GetHashCode()
         {
-            StockPriceGridItem otherStockPrice = new(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4431);
-            StockPriceGridItemGridLockKey otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPrice);
+            StockPriceGridOuterKeyPropertiesLockKey otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
 
-            Int32 result1 = testStockPriceGridItemGridLockKey.GetHashCode();
-            Int32 result2 = otherStockPriceGridItemGridLockKey.GetHashCode();
-
-            Assert.That(result1 != result2);
-
-
-            otherStockPrice = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4431);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPrice);
-
-            result1 = testStockPriceGridItemGridLockKey.GetHashCode();
-            result2 = otherStockPriceGridItemGridLockKey.GetHashCode();
+            Int32 result1 = testStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
+            Int32 result2 = otherStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
 
             Assert.That(result1 != result2);
 
 
-            otherStockPrice = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-14"), canonCompany, 4431);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPrice);
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
 
-            result1 = testStockPriceGridItemGridLockKey.GetHashCode();
-            result2 = otherStockPriceGridItemGridLockKey.GetHashCode();
+            result1 = testStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
+            result2 = otherStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
 
             Assert.That(result1 != result2);
 
 
-            otherStockPrice = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), sonyCompany, 4432);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPrice);
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-14"))
+            );
 
-            result1 = testStockPriceGridItemGridLockKey.GetHashCode();
-            result2 = otherStockPriceGridItemGridLockKey.GetHashCode();
+            result1 = testStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
+            result2 = otherStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
+
+            Assert.That(result1 != result2);
+
+
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
+
+            result1 = testStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
+            result2 = otherStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
 
             Assert.That(result1 == result2);
 
 
-            otherStockPrice = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"), canonCompany, 4432);
-            otherStockPriceGridItemGridLockKey = new StockPriceGridItemGridLockKey(otherStockPrice);
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
 
-            result1 = testStockPriceGridItemGridLockKey.GetHashCode();
-            result2 = otherStockPriceGridItemGridLockKey.GetHashCode();
+            result1 = testStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
+            result2 = otherStockPriceGridOuterKeyPropertiesLockKey.GetHashCode();
 
             Assert.That(result1 == result2);
         }

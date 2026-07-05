@@ -29,7 +29,7 @@ namespace PowerGrid.Grids
     /// <param name="Company">The company the price was quoted for.</param>
     /// <param name="Price">The price.</param>
     public record StockPriceGridItem(String Tag, String DataSource, DateOnly Date, String Company, Decimal Price)
-        : StockPrice(Company, Price), IStockPriceOuterKeyProperties, IGridItem<StockPriceGridItem>
+        : StockPrice(Company, Price), IStockPriceGridOuterKeyProperties, IGridItem<StockPriceGridItem>
     {
         /// <inheritdoc/>
         public int KeyCompareTo(StockPriceGridItem other)

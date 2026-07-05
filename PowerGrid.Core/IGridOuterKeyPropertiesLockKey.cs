@@ -15,19 +15,14 @@
  */
 
 using System;
-using PowerGrid.Core;
+using System.Collections.Generic;
 
-namespace PowerGrid.Grids
+namespace PowerGrid.Core
 {
     /// <summary>
-    /// Defines the <see cref="IGridItemOuterKeyProperties">outer key properties</see> for stock prices.
+    /// Implementations of <see cref="IGridLockKey"/> which define <see cref="Dictionary{TKey, TValue}"/> keys for <see cref="IGridOuterKeyProperties"/> implementations.
     /// </summary>
-    public interface IStockPriceOuterKeyProperties : IGridItemOuterKeyProperties, Grids.IGridCommonKeyProperties
+    public interface IGridOuterKeyPropertiesLockKey : IGridLockKey
     {
-        /// <summary>The source/entity which provided the price.</summary>
-        public String DataSource { get; }
-
-        /// <summary>The date the price was quoted for.</summary>
-        public DateOnly Date { get; }
     }
 }

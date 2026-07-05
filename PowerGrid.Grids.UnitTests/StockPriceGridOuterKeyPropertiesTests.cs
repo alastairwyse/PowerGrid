@@ -15,15 +15,15 @@
  */
 
 using System;
-using NUnit.Framework;
 using PowerGrid.Core.UnitTests;
+using NUnit.Framework;
 
 namespace PowerGrid.Grids.UnitTests
 {
     /// <summary>
-    /// Unit tests for the PowerGrid.Grids.StockPriceOuterKeyProperties class.
+    /// Unit tests for the PowerGrid.Grids.StockPriceGridOuterKeyProperties class.
     /// </summary>
-    public class StockPriceOuterKeyPropertiesTests
+    public class StockPriceGridOuterKeyPropertiesTests
     {
         private TestUtilities utils;
 
@@ -38,7 +38,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                StockPriceOuterKeyProperties testStockPriceOuterKeyProperties = new(null, "Bloomberg", DateOnly.FromDateTime(DateTime.UtcNow));
+                StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new(null, "Bloomberg", DateOnly.FromDateTime(DateTime.UtcNow));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
@@ -50,7 +50,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                StockPriceOuterKeyProperties testStockPriceOuterKeyProperties = new(" ", "Bloomberg", DateOnly.FromDateTime(DateTime.UtcNow));
+                StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new(" ", "Bloomberg", DateOnly.FromDateTime(DateTime.UtcNow));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
@@ -62,7 +62,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                StockPriceOuterKeyProperties testStockPriceOuterKeyProperties = new("Market", null, DateOnly.FromDateTime(DateTime.UtcNow));
+                StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new("Market", null, DateOnly.FromDateTime(DateTime.UtcNow));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
@@ -74,7 +74,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                StockPriceOuterKeyProperties testStockPriceOuterKeyProperties = new("Market", " ", DateOnly.FromDateTime(DateTime.UtcNow));
+                StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new("Market", " ", DateOnly.FromDateTime(DateTime.UtcNow));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
@@ -87,9 +87,9 @@ namespace PowerGrid.Grids.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-30");
-            StockPriceOuterKeyProperties testStockPriceOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new(testTag, testDataSource, testDate);
 
-            String result = testStockPriceOuterKeyProperties.ToString();
+            String result = testStockPriceGridOuterKeyProperties.ToString();
 
             Assert.That(result == "StockPriceOuterKeyProperties { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30' }");
         }

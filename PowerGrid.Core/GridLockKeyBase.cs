@@ -15,23 +15,24 @@
  */
 
 using System;
+using System.Collections.Generic;
 
 namespace PowerGrid.Core
 {
     /// <summary>
     /// Base for classes which implement <see cref="IGridLockKey"/>.
     /// </summary>
-    /// <typeparam name="T">The type of grid item the class creates a key for.</typeparam>
-    public abstract class GridLockKeyBase<T> : IGridLockKey where T : IGridItem<T>
+    /// <typeparam name="T">The type of grid key properties the class creates a <see cref="Dictionary{TKey, TValue}"/> key for.</typeparam>
+    public abstract class GridLockKeyBase<T> : IEquatable<GridLockKeyBase<T>>, IGridLockKey where T : IGridCommonKeyProperties
     {
-        /// <summary>The grid item object to generate key for.</summary>
-        protected T underlyingGridItem;
+        /// <summary>The grid properties object to generate key for.</summary>
+        protected T underlyingGridKeyProperties;
 
         /// <summary>The type of the object that this class creates a key for.</summary>
-        protected Type underlyingGridItemType;
+        protected Type underlyingGridKeyPropertiesType;
 
         /// <summary>The values of the <see cref="IKeyPropertyComparable{T}">key properties</see> of the object that this class creates a key for.</summary>
-        protected abstract Object[] UnderlyingGridItemKeyPropertyValues
+        protected abstract Object[] UnderlyingGridKeyPropertyValues
         {
             get;
         }
@@ -39,11 +40,11 @@ namespace PowerGrid.Core
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Core.GridLockKeyBase class.
         /// </summary>
-        /// <param name="underlyingGridItem">The type of grid item the class creates a key for.</param>
-        public GridLockKeyBase(T underlyingGridItem)
+        /// <param name="underlyingGridKeyProperties">The type of grid properties the class creates a <see cref="Dictionary{TKey, TValue}"/> key for.</param>
+        public GridLockKeyBase(T underlyingGridKeyProperties)
         {
-            this.underlyingGridItem = underlyingGridItem;
-            this.underlyingGridItemType = underlyingGridItem.GetType();
+            this.underlyingGridKeyProperties = underlyingGridKeyProperties;
+            this.underlyingGridKeyPropertiesType = underlyingGridKeyProperties.GetType();
         }
 
         /// <inheritdoc/>
@@ -51,11 +52,10 @@ namespace PowerGrid.Core
         {
             get
             {
-                return [underlyingGridItemType, .. UnderlyingGridItemKeyPropertyValues];
+                return [underlyingGridKeyPropertiesType, .. UnderlyingGridKeyPropertyValues];
             }
         }
 
-        /// <inheritdoc/>
         public Boolean Equals(IGridLockKey other)
         {
             if (this.KeyPropertyValues.Length != other.KeyPropertyValues.Length)
@@ -74,6 +74,12 @@ namespace PowerGrid.Core
 
                 return true;
             }
+        }
+
+        /// <inheritdoc/>
+        public Boolean Equals(GridLockKeyBase<T> other)
+        {
+            return this.Equals((IGridLockKey)other);
         }
 
         /// <inheritdoc/>

@@ -25,15 +25,15 @@ namespace PowerGrid.Persistence
     /// Defines methods to read and write grids from and to persistent storage.
     /// </summary>
     /// <typeparam name="TEntity">The type of data held in each item in the grid.</typeparam>
-    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
-    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
+    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
+    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridOuterKeyProperties">outer key properties</see>).</typeparam>
     /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
     public interface IGridPersister<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO>
         where TEntity : IGridItem<TEntity>
         where TCommonKeyProperties : IGridCommonKeyProperties
-        where TOuterKeyProperties : IGridItemOuterKeyProperties
-        where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
-        where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
+        where TOuterKeyProperties : IGridOuterKeyProperties
+        where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
+        where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         // TODO: Previously had granular CRUD methods here to deal with individual grid items, but realized that the whole comparison and all resulting updates need to be done in a transaction.
         //   In the future might want to add more granular methods... e.g. just to upsert a collection of grid items, or to delete a collection of grid items.
@@ -44,7 +44,7 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Writes the specified grid to persistent storage.
         /// </summary>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
         /// <param name="items">The items to persist.</param>
         /// <returns>A tuple containing: the version number of the written grid, and statistics containing counts of the items persisted.</returns>
         /// <remarks>Any existing grid items which are deleted or updated as a result of this method call are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
@@ -53,7 +53,7 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Retrieve the grid with the specified properties.
         /// </summary>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
         /// <param name="version">The version number of the grid to retrieve.</param>
         /// <returns>The items in the grid.</returns>
         public IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridOuterKeyProperties, Int32 version);
@@ -75,14 +75,14 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Soft deletes all items in the latest grid in persistent storage with the specified properties.
         /// </summary>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grid to delete.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to delete.</param>
         /// <remarks>All items are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
         public void SoftDeleteLatestGrid(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <summary>
         /// Hard deletes all grids in persistent storage with the specified properties.
         /// </summary>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the grids to delete.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grids to delete.</param>
         /// <remarks>All grids are 'hard' deleted by physically removing them from persistent storage.</remarks>
         public void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties);
 

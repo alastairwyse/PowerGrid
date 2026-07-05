@@ -81,7 +81,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-29");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
 
             var e = Assert.Throws<ArgumentException>(delegate
             {
@@ -98,7 +98,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Calibration";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate); 
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate); 
             List<StockPrice> testGridItems = new()
             {
                 new StockPrice("Hitachi", 4732)
@@ -130,7 +130,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String hitachiCompany = "Hitachi";
             const String sonyCompany = "Sony";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-05-16 16:36:41.0000023");
             List<StockPrice> testGridItems = new()
             {
@@ -216,12 +216,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             });
             
             Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
-            Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
+            Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
             Assert.That(e.InnerException.InnerException is GridContentsValidationException<StockPrice>);
             GridContentsValidationException<StockPrice> innerInnerException = (GridContentsValidationException<StockPrice>)e.InnerException.InnerException;
             Assert.That(innerInnerException.Message, Does.StartWith($"Failed to validate item in grid."));
             Assert.That(innerInnerException.GridItem == testGridItems[0]);
-            Assert.That(innerInnerException.InnerException.Message == $"StockPrice with StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and Company 'Canon' has negative Price -1.");
+            Assert.That(innerInnerException.InnerException.Message == $"StockPrice with StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and Company 'Canon' has negative Price -1.");
         }
 
         [Test]
@@ -233,7 +233,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String hitachiCompany = "Hitachi";
             const String sonyCompany = "Sony";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-05-16 16:36:41.0000023");
             List<StockPrice> testGridItems = new()
             {
@@ -319,7 +319,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             });
 
             Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
-            Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
+            Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
             Assert.That(e.InnerException.InnerException is GridContentsDuplicateItemsException<StockPrice>);
             GridContentsDuplicateItemsException<StockPrice> innerInnerException = (GridContentsDuplicateItemsException<StockPrice>)e.InnerException.InnerException;
             Assert.That(innerInnerException.Message, Does.StartWith($"Grid contains items with duplicate key values."));
@@ -335,7 +335,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String hitachiCompany = "Hitachi";
             const String sonyCompany = "Sony";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-05-16 16:36:41.0000023");
             List<StockPrice> testGridItems = new()
             {
@@ -448,7 +448,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
 
             var e = Assert.Throws<ArgumentOutOfRangeException>(delegate
             {
@@ -465,7 +465,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             var mockException = new Exception("Mock exception");
             mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
 
@@ -486,7 +486,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-05");
             Int32 testVersion = 13;
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-06-03 23:54:31.0000202");
             String expectedVersionQueryCommandText = @$"
             SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -557,12 +557,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void GetGridDetailsStockPriceOuterKeyPropertiesOverload_ExceptionReading()
+        public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload_ExceptionReading()
         {
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -591,17 +591,17 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-            Assert.That(e.Message, Does.StartWith($"Failed to read grid details for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-06-21' }} from SQL Server."));
+            Assert.That(e.Message, Does.StartWith($"Failed to read grid details for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-06-21' }} from SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
 
         [Test]
-        public void GetGridDetailsStockPriceOuterKeyPropertiesOverload()
+        public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload()
         {
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -705,7 +705,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader["Version"].Returns<Object>(1, 2, 1);
             mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-30T13:02:53.1837676", "2026-06-09T13:02:03.9134273", "2026-06-23T21:55:56.9750913");
 
-            IList<Tuple<StockPriceOuterKeyProperties, GridVersionAndTransactionTimestamp>> result = testStockPricePersister.GetGridDetails(testCommonKeyProperties);
+            IList<Tuple<StockPriceGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> result = testStockPricePersister.GetGridDetails(testCommonKeyProperties);
 
             mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
             mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
@@ -741,7 +741,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -766,7 +766,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
@@ -779,7 +779,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 testStockPricePersister.SoftDeleteLatestGrid(testOuterKeyProperties);
             });
 
-            Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} does not exist."));
+            Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} does not exist."));
         }
 
         [Test]
@@ -788,7 +788,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
             String expectedDeleteCommandText = @$"
             UPDATE  StockPrices 
@@ -827,7 +827,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactionSql126DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
-            Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} in SQL Server."));
+            Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
 
@@ -837,7 +837,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
             String expectedDeleteCommandText = @$"
             UPDATE  StockPrices 
@@ -877,12 +877,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void HardDeleteGridsStockPriceOuterKeyPropertiesOverload_ExceptionDeleting()
+        public void HardDeleteGridsStockPriceGridOuterKeyPropertiesOverload_ExceptionDeleting()
         {
             const String testTag = "Calibration";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedStockPriceGridsDeleteCommandText = @$"
             DELETE 
             FROM    StockPriceGrids 
@@ -912,17 +912,17 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-            Assert.That(e.Message, Does.StartWith($"Failed to delete grids for StockPriceOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
+            Assert.That(e.Message, Does.StartWith($"Failed to delete grids for StockPriceGridOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
 
         [Test]
-        public void HardDeleteGridsStockPriceOuterKeyPropertiesOverload()
+        public void HardDeleteGridsStockPriceGridOuterKeyPropertiesOverload()
         {
             const String testTag = "Calibration";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedStockPriceGridsDeleteCommandText = @$"
             DELETE 
             FROM    StockPriceGrids 
@@ -1034,7 +1034,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -1062,7 +1062,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
-                Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }} from SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }} from SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1073,7 +1073,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -1116,7 +1116,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -1152,8 +1152,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-                Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }} from SQL Server."));
-                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }}."));
+                Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }} from SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }}."));
             }
         }
 
@@ -1163,7 +1163,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  [Version] AS [Version], 
                     CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
@@ -1209,7 +1209,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
             Int32 testVersion = 9;
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
@@ -1237,8 +1237,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
-                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9 from SQL Server."));
-                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve stock price grid version for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9."));
+                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9 from SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9."));
             }
         }
 
@@ -1249,7 +1249,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
             Int32 testVersion = 8;
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
@@ -1277,7 +1277,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
-                Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 did not exist."));
+                Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 did not exist."));
             }
         }
 
@@ -1288,7 +1288,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
             Int32 testVersion = 7;
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
@@ -1314,7 +1314,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
-                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 7 from SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 7 from SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1326,7 +1326,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
             Int32 testVersion = 8;
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
             SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 
@@ -1361,7 +1361,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-05-16 11:45:40.0000012");
             String expectedCommandText = @$"
             SELECT Id, 
@@ -1393,7 +1393,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
-                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction timestamp '2026-05-16 11:45:40.0000012' from SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction timestamp '2026-05-16 11:45:40.0000012' from SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1404,7 +1404,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-05-16 11:45:40.0000012");
             String expectedCommandText = @$"
             SELECT Id, 
@@ -1741,7 +1741,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -1767,7 +1767,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
-                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1779,7 +1779,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -1833,7 +1833,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for StockPriceOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} and version 2 into SQL Server."));
+                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} and version 2 into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
         }
@@ -1845,7 +1845,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -1905,7 +1905,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
-            StockPriceOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -2052,17 +2052,17 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
             }
 
-            public new (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties)
+            public new (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, StockPriceGridOuterKeyProperties outerKeyProperties)
             {
                 return base.GetLatestGridVersion(connection, outerKeyProperties);
             }
 
-            public new DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, Int32 version)
+            public new DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceGridOuterKeyProperties outerKeyProperties, Int32 version)
             {
                 return base.GetGridTransactionTimestamp(connection, outerKeyProperties, version);
             }
 
-            public new IEnumerable<StockPriceGridItemPTO> GetGrid(SqlConnection connection, StockPriceOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)
+            public new IEnumerable<StockPriceGridItemPTO> GetGrid(SqlConnection connection, StockPriceGridOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)
             {
                 return base.GetGrid(connection, outerKeyProperties, transactionTimestamp);
             }
@@ -2082,7 +2082,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 base.DeleteGridItem(connection, transaction, item, deleteDateTime);
             }
 
-            public new Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceOuterKeyProperties outerKeyProperties, DateTime createDateTime)
+            public new Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceGridOuterKeyProperties outerKeyProperties, DateTime createDateTime)
             {
                 return base.CreateGrid(readConnection, writeConnection, transaction, outerKeyProperties, createDateTime);
             }

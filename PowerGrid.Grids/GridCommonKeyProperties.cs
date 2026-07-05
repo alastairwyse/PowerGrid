@@ -29,7 +29,7 @@ namespace PowerGrid.Grids
 
 
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Grids.StockPriceOuterKeyProperties class.
+        /// Initialises a new instance of the PowerGrid.Grids.GridCommonKeyProperties class.
         /// </summary>
         /// <param name="tag">A tag used to classify the grid.</param>
         /// <param name="dataSource">The source/entity which provided the price.</param>

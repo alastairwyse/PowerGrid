@@ -30,15 +30,15 @@ namespace PowerGrid.Persistence
     /// Base for classes which write and read grids to and from persistent storage.
     /// </summary>
     /// <typeparam name="TEntity">The type of data held in each item in the grid.</typeparam>
-    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridItemOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
-    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridItemOuterKeyProperties">outer key properties</see>).</typeparam>
+    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
+    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridOuterKeyProperties">outer key properties</see>).</typeparam>
     /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
     public abstract class PersisterBase<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO> : IGridPersister<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO>
         where TEntity : IGridItem<TEntity>
         where TCommonKeyProperties : Core.IGridCommonKeyProperties
-        where TOuterKeyProperties : IGridItemOuterKeyProperties
-        where TGridItem : TEntity, IGridItemOuterKeyProperties, IGridItem<TGridItem>
-        where TGridItemPTO : IGridItemOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
+        where TOuterKeyProperties : IGridOuterKeyProperties
+        where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
+        where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         /// <summary>The logger for general logging.</summary>
         protected IApplicationLogger logger;
