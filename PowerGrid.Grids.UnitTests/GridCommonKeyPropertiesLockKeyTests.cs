@@ -44,7 +44,7 @@ namespace PowerGrid.Grids.UnitTests
             Object[] keyPropertyValues = testGridCommonKeyPropertiesLockKey.KeyPropertyValues;
 
             Assert.That(keyPropertyValues.Length == 2);
-            Assert.That(keyPropertyValues[0].GetType() == typeof(Type));
+            Assert.That(keyPropertyValues[0].GetType().IsAssignableTo(typeof(Type)));
             Assert.That((Type)keyPropertyValues[0] == typeof(GridCommonKeyProperties));
             Assert.That(keyPropertyValues[1].GetType() == typeof(String));
             Assert.That((String)keyPropertyValues[1] == testTag);

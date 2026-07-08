@@ -15,7 +15,9 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Threading;
 using PowerGrid.Core;
 
 namespace PowerGrid.Persistence
@@ -23,58 +25,122 @@ namespace PowerGrid.Persistence
     /// <summary>
     /// Manages locks to allow concurrent persistence of grids.
     /// </summary>
-    public class PersistenceConcurrencyManager
+    public class PersistenceConcurrencyManager : IDisposable
     {
-        /// <summary>Maps <see cref="IGridLockKey"/> implementations to lock objects for the sets of grid items the <see cref="IGridLockKey"/> implementation represents.</summary>
-        protected ConcurrentDictionary<IGridLockKey, Object> lockDictionary;
+        /// <summary>Maps <see cref="IGridLockKey"/> implementations to <see cref="ReaderWriterLockSlim"/> instances which are used to apply mutual exclusion locks to common key properties of grids.</summary>
+        protected ConcurrentDictionary<IGridLockKey, ReaderWriterLockSlim> commonKeyPropertiesLockDictionary;
+        /// <summary>Maps <see cref="IGridLockKey"/> implementations to lock objects which are used to apply mutual exclusion locks to outer key properties of grids.</summary>
+        protected ConcurrentDictionary<IGridLockKey, Object> outerKeyPropertiesLockDictionary;
+        /// <summary>Indicates whether the object has been disposed.</summary>
+        protected Boolean disposed;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.PersistenceConcurrencyManager class.
         /// </summary>
         public PersistenceConcurrencyManager()
         {
-            lockDictionary = new ConcurrentDictionary<IGridLockKey, Object>();
+            commonKeyPropertiesLockDictionary = new ConcurrentDictionary<IGridLockKey, ReaderWriterLockSlim>();
+            outerKeyPropertiesLockDictionary = new ConcurrentDictionary<IGridLockKey, Object>();
+            disposed = false;
         }
-        /*
+        
         /// <summary>
-        /// Acquires an exclusive lock using the specified grid lock key, and invokes the specified action.
+        /// Acquires an exclusive lock on the grids with the specified common key properties, and invokes the specified action.
         /// </summary>
-        /// <param name="gridLockKey">A key representing the set of grid items to obtain an exclusive lock for.</param>
+        /// <typeparam name="TGridCommonKeyProperties">The type of the common key properties.</typeparam>
+        /// <param name="commonKeyPropertiesLock">The common key properties of the grid to obtain an exclusive lock for.</param>
         /// <param name="action">The action to invoke.</param>
-        public void AcquireLockAndInvokeAction(IGridLockKey gridLockKey, Action action)
+        public void AcquireLockAndInvokeAction<TGridCommonKeyProperties>(GridCommonKeyPropertiesLockKeyBase<TGridCommonKeyProperties> commonKeyPropertiesLock, Action action)
+            where TGridCommonKeyProperties : IGridCommonKeyProperties
         {
-            Object lockObject = lockDictionary.GetOrAdd(gridLockKey, new Object());
-            lock (lockObject)
+            ReaderWriterLockSlim commonKeyPropertiesLockObject = commonKeyPropertiesLockDictionary.GetOrAdd(commonKeyPropertiesLock, new ReaderWriterLockSlim());
+            try
             {
+                commonKeyPropertiesLockObject.EnterWriteLock();
                 action();
             }
+            finally
+            {
+                commonKeyPropertiesLockObject.ExitWriteLock();
+            }
         }
-        */
-        // TODO: Add method like above but which takes 2 lock keys
-        //   Do I need to check that the 2 params aren't the same lock key (i.e. can you lock again the same object in C#?)
-
-        // TODO: Remoarks on below as to why we have to pass 2x lock keys
 
         /// <summary>
-        /// Acquires exclusive locks sequentially using the specified grid lock keys, and invokes the specified action.
+        /// Acquires an exclusive lock on the grid with the specified outer key properties, and invokes the specified action.
         /// </summary>
-        /// <param name="gridLockKey1">A key representing the first set of grid items to obtain an exclusive lock for.</param>
-        /// <param name="gridLockKey2">A key representing the second set of grid items to obtain an exclusive lock for.</param>
+        /// <typeparam name="TGridCommonKeyProperties">The type of the common key properties.</typeparam>
+        /// <typeparam name="TGridOuterKeyProperties">The type of the outer key properties.</typeparam>
+        /// <param name="commonKeyPropertiesLock">The common key properties of the grid to obtain an exclusive lock for.</param>
+        /// <param name="outerKeyPropertiesLock">The outer key properties of the grid to obtain an exclusive lock for.</param>
         /// <param name="action">The action to invoke.</param>
-        public void AcquireLockAndInvokeAction(IGridLockKey gridLockKey1, IGridLockKey gridLockKey2, Action action)
+        public void AcquireLockAndInvokeAction<TGridCommonKeyProperties, TGridOuterKeyProperties>
+        (
+            GridCommonKeyPropertiesLockKeyBase<TGridCommonKeyProperties> commonKeyPropertiesLock, 
+            GridOuterKeyPropertiesLockKeyBase<TGridOuterKeyProperties> outerKeyPropertiesLock, 
+            Action action
+        )   where TGridCommonKeyProperties : IGridCommonKeyProperties
+            where TGridOuterKeyProperties : IGridOuterKeyProperties
         {
-            if (gridLockKey1 == gridLockKey2)
-                throw new ArgumentException($"Parameters '{nameof(gridLockKey1)}' and '{nameof(gridLockKey2)}' cannot contain the same {nameof(IGridLockKey)} instance.", nameof(gridLockKey2));
-
-            Object lockObject1 = lockDictionary.GetOrAdd(gridLockKey1, new Object());
-            lock (lockObject1)
+            ReaderWriterLockSlim commonKeyPropertiesLockObject = commonKeyPropertiesLockDictionary.GetOrAdd(commonKeyPropertiesLock, new ReaderWriterLockSlim());
+            try
             {
-                Object lockObject2 = lockDictionary.GetOrAdd(gridLockKey2, new Object());
-                lock (lockObject2)
+                commonKeyPropertiesLockObject.EnterReadLock();
+                Object outerKeyPropertiesLockObject = outerKeyPropertiesLockDictionary.GetOrAdd(outerKeyPropertiesLock, new Object());
+                lock (outerKeyPropertiesLockObject)
                 {
                     action();
                 }
             }
+            finally
+            {
+                commonKeyPropertiesLockObject.ExitReadLock();
+            }
         }
+
+        #region Finalize / Dispose Methods
+
+        /// <summary>
+        /// Releases the unmanaged resources used by the PersistenceConcurrencyManager.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        #pragma warning disable 1591
+
+        ~PersistenceConcurrencyManager()
+        {
+            Dispose(false);
+        }
+
+        #pragma warning restore 1591
+
+        /// <summary>
+        /// Provides a method to free unmanaged resources used by this class.
+        /// </summary>
+        /// <param name="disposing">Whether the method is being called as part of an explicit Dispose routine, and hence whether managed resources should also be freed.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                if (disposing)
+                {
+                    // Free other state (managed objects).
+                    foreach (ReaderWriterLockSlim currentLockObject in commonKeyPropertiesLockDictionary.Values)
+                    {
+                        currentLockObject.Dispose();
+                    }
+                }
+                // Free your own state (unmanaged objects).
+
+                // Set large fields to null.
+
+                disposed = true;
+            }
+        }
+
+        #endregion
     }
 }

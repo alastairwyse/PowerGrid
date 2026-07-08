@@ -56,6 +56,7 @@ namespace PowerGrid.Core
             }
         }
 
+        /// <inheritdoc/>
         public Boolean Equals(IGridLockKey other)
         {
             if (this.KeyPropertyValues.Length != other.KeyPropertyValues.Length)

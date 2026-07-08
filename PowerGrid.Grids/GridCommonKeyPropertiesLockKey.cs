@@ -15,6 +15,7 @@
  */
 
 using System;
+using System.Collections.Generic;
 using PowerGrid.Core;
 
 namespace PowerGrid.Grids

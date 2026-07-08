@@ -51,7 +51,7 @@ namespace PowerGrid.Core.UnitTests
             Object[] result = testStockPriceGridOuterKeyPropertiesLockKey.KeyPropertyValues;
 
             Assert.That(result.Length == 4);
-            Assert.That((Type)result[0] == typeof(StockPriceGridItem));
+            Assert.That((Type)result[0] == typeof(StockPriceGridOuterKeyProperties));
             Assert.That(result[1].GetType() == typeof(String));
             Assert.That((String)result[1] == marketTag);
             Assert.That(result[2].GetType() == typeof(String));
@@ -65,10 +65,20 @@ namespace PowerGrid.Core.UnitTests
         {
             StockPriceGridOuterKeyPropertiesLockKey otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
             (
-                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+                new StockPriceGridOuterKeyProperties("Market", "Bloomberg", utils.CreateDateOnlyFromString("2026-04-15"))
             );
 
             Boolean result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
+
+            Assert.That(result == true);
+
+
+            otherStockPriceGridOuterKeyPropertiesLockKey = new StockPriceGridOuterKeyPropertiesLockKey
+            (
+                new StockPriceGridOuterKeyProperties(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-15"))
+            );
+
+            result = testStockPriceGridOuterKeyPropertiesLockKey.Equals(otherStockPriceGridOuterKeyPropertiesLockKey);
 
             Assert.That(result == true);
 

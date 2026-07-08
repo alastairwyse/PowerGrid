@@ -27,19 +27,19 @@ namespace PowerGrid.TestHarness
 
             List<StockPrice> testGridItems = new()
             {
-                //new StockPrice(canonCompany, 4448),
+                new StockPrice(canonCompany, 4448),
                 new StockPrice(hitachiCompany, 4738),
-                new StockPrice(sonyCompany, 3221),
-                new StockPrice(toyotaCompany, 3265),
-                new StockPrice("Kamispring", 10000000003)
+                //new StockPrice(sonyCompany, 3221),
+                new StockPrice(toyotaCompany, 3666),
+                new StockPrice("Kamispring", 10000000004)
             };
             String connectionString = File.ReadAllText(@"..\..\..\..\Documentation\TempConnectionString.txt");
             ConsoleApplicationLogger consoleLogger = new(LogLevel.Debug, '|', "  ");
             StockPricePersister persister = new StockPricePersister(connectionString, 5, 5, 0, consoleLogger);
-            StockPriceGridOuterKeyProperties outerKeyProps = new("Test", refinitivDataSource, utils.CreateDateOnlyFromString("2026-06-22"));
-            /*
-            persister.PersistGrid(outerKeyProps, testGridItems);
+            StockPriceGridOuterKeyProperties outerKeyProps = new("Test", bloombergDataSource, utils.CreateDateOnlyFromString("2026-07-08"));
             
+            persister.PersistGrid(outerKeyProps, testGridItems);
+            /*
             outerKeyProps = new("Test2", bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-29"));
             Console.WriteLine("-- GetGrid() Results --");
             foreach (StockPriceGridItemPTO currentPTO in persister.GetGrid(outerKeyProps, 2))
@@ -58,11 +58,11 @@ namespace PowerGrid.TestHarness
             {
                 Console.WriteLine($"{currentResult.Item1.ToString()}, {currentResult.Item2.Version}, {currentResult.Item2.TransactionTimestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff")}");
             }
-            */
 
             //persister.SoftDeleteLatestGrid(outerKeyProps);
             GridCommonKeyProperties commonKeyProps = new("Test");
             persister.HardDeleteGrids(commonKeyProps);
+            */
         }
     }
 }

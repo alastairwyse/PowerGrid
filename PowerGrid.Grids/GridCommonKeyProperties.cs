@@ -20,7 +20,7 @@ using System.Text;
 namespace PowerGrid.Grids
 {
     /// <summary>
-    /// Defines key properties of grids that are common across all grids in a solution.
+    /// Defines key properties of grids that are common across all grids in the solution irrespective of the type of grid.
     /// </summary>
     public record GridCommonKeyProperties : KeyPropertiesBase, IGridCommonKeyProperties
     {
@@ -32,8 +32,6 @@ namespace PowerGrid.Grids
         /// Initialises a new instance of the PowerGrid.Grids.GridCommonKeyProperties class.
         /// </summary>
         /// <param name="tag">A tag used to classify the grid.</param>
-        /// <param name="dataSource">The source/entity which provided the price.</param>
-        /// <param name="date">The date the price was quoted for.</param>
         public GridCommonKeyProperties(String tag)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);

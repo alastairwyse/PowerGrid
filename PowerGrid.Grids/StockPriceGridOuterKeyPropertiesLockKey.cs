@@ -36,7 +36,7 @@ namespace PowerGrid.Grids
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridOuterKeyPropertiesLockKey class.
         /// </summary>
-        /// <param name="underlyingStockPrice">The stock price grid item object to create a key for.</param>
+        /// <param name="underlyingStockPrice">The stock price grid outer key properties object to create a key for.</param>
         public StockPriceGridOuterKeyPropertiesLockKey(StockPriceGridOuterKeyProperties stockPriceGridOuterKeyProperties)
             : base(stockPriceGridOuterKeyProperties)
         {

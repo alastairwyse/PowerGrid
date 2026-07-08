@@ -19,7 +19,7 @@ using System;
 namespace PowerGrid.Core
 {
     /// <summary>
-    /// Defines key properties of grids that are common across all grids in a solution.
+    /// Defines key properties of grids that are common across all grids in a solution irrespective of the type of grid.
     /// </summary>
     /// <remarks><see cref="IKeyPropertyComparable{T}">Key properties</see> refer to properties of items in a grid which collectively must be unique within a single grid.</remarks>
     public interface IGridCommonKeyProperties

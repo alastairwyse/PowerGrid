@@ -38,9 +38,11 @@ namespace PowerGrid.Persistence.SqlServer
     public class StockPricePersister : PersisterBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
-        protected const String transactionSql23DateStyle = "yyyy-MM-dd";
+        protected const String transactSql23DateStyle = "yyyy-MM-dd";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
-        protected const String transactionSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+        protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+        /// <summary>The type of collation to use when ordering results returned from SQL Server.</summary>
+        protected const String transactSqlCollation = "Latin1_General_BIN2";
         /// <summary>The maximum possible <see cref="DateTime"/> value to use as the upper bound for validity period in the persisted temporal model.</summary>
         protected readonly DateTime temporalMaximumDateTime = DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
 
@@ -273,7 +275,7 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                         catch (Exception e)
                         {
-                            throw new Exception($"Failed to read existing stock price grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e);
+                            throw new Exception($"Failed to read existing stock price grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
                         }
                         {
                             try
@@ -282,7 +284,7 @@ namespace PowerGrid.Persistence.SqlServer
                             }
                             catch (Exception e)
                             {
-                                Exception compareException = new($"Failed to compare new stock price grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactionSql126DateStyle)}'.", e); 
+                                Exception compareException = new($"Failed to compare new stock price grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e); 
                                 try
                                 {
                                     // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
@@ -364,7 +366,7 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(connection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                     List<GridVersionAndTransactionTimestamp> returnList = new();
 
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
@@ -372,7 +374,7 @@ namespace PowerGrid.Persistence.SqlServer
                         while (dataReader.Read())
                         {
                             Int32 version = (Int32)dataReader["Version"];
-                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                             transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
                             returnList.Add(new GridVersionAndTransactionTimestamp(version, transactionTimestamp));
                         }
@@ -418,9 +420,9 @@ namespace PowerGrid.Persistence.SqlServer
                         while (dataReader.Read())
                         {
                             String dataSource = (String)dataReader["DataSource"];
-                            DateOnly date = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            DateOnly date = DateOnly.ParseExact((String)dataReader["Date"], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
                             Int32 version = (Int32)dataReader["Version"];
-                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                             transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
                             returnList.Add(Tuple.Create(new StockPriceGridOuterKeyProperties(gridCommonKeyProperties.Tag, dataSource, date), new GridVersionAndTransactionTimestamp(version, transactionTimestamp)));
                         }
@@ -480,9 +482,9 @@ namespace PowerGrid.Persistence.SqlServer
                         PrepareCommand(connection, transaction, command);
                         sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                         sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                        sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
-                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.ToString(transactionSql126DateStyle));
-                        sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
+                        sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.ToString(transactSql126DateStyle));
+                        sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
                         ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                         sqlTransactionShim.Commit(transaction);
                         sqlConnectionShim.Close(connection);
@@ -530,13 +532,13 @@ namespace PowerGrid.Persistence.SqlServer
                         PrepareCommand(connection, transaction, stockPriceGridsDeleteCommand);
                         sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                         sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                         ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPriceGridsDeleteCommand);
                         sqlCommandShim.SetCommandText(stockPricesDeleteCommand, stockPricesDeleteStatement);
                         PrepareCommand(connection, transaction, stockPricesDeleteCommand);
                         sqlCommandShim.AddParameter(stockPricesDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                         sqlCommandShim.AddParameter(stockPricesDeleteCommand, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                         ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPricesDeleteCommand);
                         sqlTransactionShim.Commit(transaction);
                         sqlConnectionShim.Close(connection);
@@ -602,7 +604,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// </summary>
         /// <param name="connection">The connection to use to retrieve the grid version.</param>
         /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid version to retrieve.</param>
-        /// <returns>A tuple containing: the version number of the latest grid (or 0 if no grids exist for the specified parameters), and the transaction timestamp of the grid (or <see cref="DateTime.MinValue"/> if no grids exist for the specified parameters).</returns>
+        /// <returns>A tuple containing: the version number of the latest grid (or 0 if no grids exist for the specified parameters), and the transaction (creation) timestamp of the grid (or <see cref="DateTime.MinValue"/> if no grids exist for the specified parameters).</returns>
         protected (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
             // REFACTORING: 
@@ -638,7 +640,7 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(connection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                     Int32 latestGridVersionNumber = 0;
                     DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
 
@@ -652,7 +654,7 @@ namespace PowerGrid.Persistence.SqlServer
                                 throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for {gridOuterKeyProperties.ToString()}.");
                             }
                             latestGridVersionNumber = (Int32)dataReader["Version"];
-                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                             latestGridTransactionTimestamp = DateTime.SpecifyKind(latestGridTransactionTimestamp, DateTimeKind.Utc);
                             alreadyReadResult = true;
                         }
@@ -668,12 +670,12 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Gets the transaction timestamp for the stock price grid with the specified parameters and version.
+        /// Gets the transaction (creation) timestamp for the stock price grid with the specified parameters and version.
         /// </summary>
         /// <param name="connection">The connection to use to retrieve the grid version.</param>
         /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
         /// <param name="version">The version number of the grid.</param>
-        /// <returns>The transaction timestamp of the grid.</returns>
+        /// <returns>The transaction (creation) timestamp of the grid.</returns>
         /// <exception cref="Exception">A grid with the specified parameters does not exist.</exception>
         protected DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties, Int32 version)
         {
@@ -700,7 +702,7 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(connection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                     sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, version);
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                     {
@@ -710,7 +712,7 @@ namespace PowerGrid.Persistence.SqlServer
                             {
                                 throw new Exception($"Read multiple results from SQL Server when attempting to retrieve stock price grid version for {gridOuterKeyProperties.ToString()}, and version {version}.");
                             }
-                            transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                             alreadyReadResult = true;
                         }
                     }
@@ -755,10 +757,7 @@ namespace PowerGrid.Persistence.SqlServer
               AND  DataSource = {dataSourceParameterName}
               AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
               AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE {transactSqlCollation};
             ";
 
             using (var command = new SqlCommand())
@@ -770,8 +769,8 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(connection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
-                    sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactionSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactSql126DateStyle));
                     dataReader = sqlCommandShim.ExecuteReader(command);
                 }
                 catch (Exception e)
@@ -787,12 +786,12 @@ namespace PowerGrid.Persistence.SqlServer
                     Int64 currentId = (Int64)dataReader["Id"];
                     String currentTag = (String)dataReader["Tag"];
                     String currentDataSource = (String)dataReader["DataSource"];
-                    DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactionSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+                    DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
                     String currentCompany = (String)dataReader["Company"];
                     Decimal currentPrice = (Decimal)dataReader["Price"];
-                    DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                    DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                     currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
-                    DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactionSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                    DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                     currentTransactionTo = DateTime.SpecifyKind(currentTransactionTo, DateTimeKind.Utc);
 
                     yield return new StockPriceGridItemPTO(currentId, currentTag, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
@@ -852,11 +851,11 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(connection, transaction, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, item.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, item.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, item.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, item.Date.ToString(transactSql23DateStyle));
                     sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, item.Company);
                     sqlCommandShim.AddParameter(command, priceParameterName, SqlDbType.Money, item.Price);
-                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactionSql126DateStyle));
-                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactionSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                 }
             }
@@ -911,7 +910,7 @@ namespace PowerGrid.Persistence.SqlServer
                     sqlCommandShim.SetCommandText(command, deleteStatement);
                     PrepareCommand(connection, transaction, command);
                     sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
-                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactionSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
                 }
             }
@@ -951,7 +950,7 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(readConnection, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                     {
                         while (dataReader.Read())
@@ -997,9 +996,9 @@ namespace PowerGrid.Persistence.SqlServer
                     PrepareCommand(writeConnection, transaction, command);
                     sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
                     sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactionSql23DateStyle));
+                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
                     sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, gridVersionNumber);
-                    sqlCommandShim.AddParameter(command, createDateTimeParameterName, SqlDbType.NVarChar, createDateTime.ToString(transactionSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, createDateTimeParameterName, SqlDbType.NVarChar, createDateTime.ToString(transactSql126DateStyle));
                     ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
                 }
             }

@@ -9,15 +9,9 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
-* IMPORTANT - Have a messed up GridLockKey by now allowing deletes on common key properties (i.e. only a partial of the outer key properties)... might need to rethink
-* All comments reffering to 'transaction timestamp' should say what it is (i.e. when the grid was created)
-* Get list of grids by some combination of those key properties
-* Admin endpoint to hard delete by an outer key or common key
 * StockPricePersister (and any other persister classes) should have logging and metrics.
-* Validation in persister should be an abstract method
+* Validation in persister should be an abstract method, or passed to constructor (probably abstract method or lambda, as I can't see that it would need to be different for different persister instances)
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+
-* Review StockPriceGridLockKey... abstract, protected properties, and private members... could these be done better?
-* Review XML comments on IGridLockKey.  Could these be made better after 2nd read?
 * Should 'StockPriceGrids' table in database just be 'Grids' and have a column which denotes the grid type (e.g. 'StockPrice')?
 * Should PersistenceConcurrencyManager accept a Func rather than Action?
 * Validator and ordering 'chain' in StockPricePersister... would be easier to read if creating extension methods in LINQ style.  Find a way to do this, but limit the scope (don't let it be global)... maybe by adding a T type constraint to be be IGridItem, or limiting via defined namespace??
@@ -30,7 +24,6 @@ A prototype for a system persisting grids of data to a database, with advanced s
   * Inner key country and city
   * Outer key date and source
   * Common tag with stock price
-* Add a 'connectionRetryAction' Action to any persister classes which support transient error retries (possibly already done?).
 * Include validation filters which reject datasources etc which don't match a known whitelist... alternative to lookup tables and foreign key constraints (implement as some extension to base?)
 * Do deadlock testing (hammer test instance with concurrent reads and writes)
 * Add parameter to StockPricePersister.PersistGrid() method to specify comparison type i.e. likely...
@@ -43,8 +36,11 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Look at possibly allowing override/specifying of comparison in GridComparer (or possibly it needs to be controlled by the IKeyPropertyComparable implementation on the grid item classes).  Latin1_General_BIN2 in SQL Server is supposed to match C# StringComparison.Ordinal.
 
 #### Terminology
-* Grid - A collection of data points which are stored and managed as a set.  Equivalent to a set of rows in a relational database/
-* Grid Item - I single data point within a grid.  Equivalent to a single row in a relational database.
+* Grid - A collection of data points which are stored and managed as a set.  An example would be a set of closing stock prices for a market index (e.g. S&P 500) for a single day.
+* Grid Item - A single data point within a grid.  E.g. the closing price of a single stock (e.g. Apple) within a in market index for a single day.
 * Key Property - 
 * Value Property
 * Outer Key Property - (might change this terminology)
+* Common Key Property
+* Grid Lock Key (outer and common)
+* Plus do diagramatic explanation of common, outer, inner key properties

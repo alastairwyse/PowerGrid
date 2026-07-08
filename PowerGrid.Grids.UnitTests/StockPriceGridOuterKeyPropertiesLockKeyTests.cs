@@ -38,6 +38,7 @@ namespace PowerGrid.Grids.UnitTests
         [SetUp]
         protected void SetUp()
         {
+            utils = new TestUtilities();
             testDate = utils.CreateDateOnlyFromString("2026-07-05");
             testStockPriceGridOuterKeyPropertiesLockKey = new(new StockPriceGridOuterKeyProperties(testTag, testDataSource, testDate));
         }
@@ -48,8 +49,8 @@ namespace PowerGrid.Grids.UnitTests
             Object[] keyPropertyValues = testStockPriceGridOuterKeyPropertiesLockKey.KeyPropertyValues;
 
             Assert.That(keyPropertyValues.Length == 4);
-            Assert.That(keyPropertyValues[0].GetType() == typeof(Type));
-            Assert.That((Type)keyPropertyValues[0] == typeof(GridCommonKeyProperties));
+            Assert.That(keyPropertyValues[0].GetType().IsAssignableTo(typeof(Type)));
+            Assert.That((Type)keyPropertyValues[0] == typeof(StockPriceGridOuterKeyProperties));
             Assert.That(keyPropertyValues[1].GetType() == typeof(String));
             Assert.That((String)keyPropertyValues[1] == testTag);
             Assert.That(keyPropertyValues[2].GetType() == typeof(String));

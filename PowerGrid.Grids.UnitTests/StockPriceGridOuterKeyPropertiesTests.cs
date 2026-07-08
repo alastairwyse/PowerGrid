@@ -91,7 +91,7 @@ namespace PowerGrid.Grids.UnitTests
 
             String result = testStockPriceGridOuterKeyProperties.ToString();
 
-            Assert.That(result == "StockPriceOuterKeyProperties { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30' }");
+            Assert.That(result == "StockPriceGridOuterKeyProperties { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30' }");
         }
     }
 }

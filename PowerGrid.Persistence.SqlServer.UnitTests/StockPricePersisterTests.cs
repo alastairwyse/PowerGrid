@@ -46,9 +46,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         //   But, IMO it's a small price to pay, as opposed to having no units tests at all.
 
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
-        private const String transactionSql23DateStyle = "yyyy-MM-dd";
+        private const String transactSql23DateStyle = "yyyy-MM-dd";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
-        private const String transactionSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+        private const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
         private const String testConnectionString = "Server=127.0.0.1;Database=PowerGrid;User Id=user;Password=pwd=%X9sjQb;Encrypt=false;Authentication=SqlPassword";
 
         private TestUtilities utils;
@@ -156,10 +156,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
@@ -203,7 +200,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
             mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>(testDataSource);
-            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactionSql23DateStyle));
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
             mockDataReader["Company"].Returns<Object>(existingGridItems[0].Company, existingGridItems[1].Company);
             mockDataReader["Price"].Returns<Object>(existingGridItems[0].Price, existingGridItems[1].Price);
             mockDataReader["TransactionFrom"].Returns<Object>("2026-05-15T09:05:40.0000012");
@@ -259,10 +256,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
@@ -306,7 +300,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
             mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>(testDataSource);
-            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactionSql23DateStyle));
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
             mockDataReader["Company"].Returns<Object>(existingGridItems[0].Company, existingGridItems[1].Company);
             mockDataReader["Price"].Returns<Object>(existingGridItems[0].Price, existingGridItems[1].Price);
             mockDataReader["TransactionFrom"].Returns<Object>("2026-05-15T09:05:40.0000012");
@@ -361,10 +355,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
@@ -408,7 +399,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
             mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>(testDataSource);
-            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactionSql23DateStyle));
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
             mockDataReader["Company"].Returns<Object>(existingGridItems[0].Company, existingGridItems[1].Company);
             mockDataReader["Price"].Returns<Object>(existingGridItems[0].Price, existingGridItems[1].Price);
             mockDataReader["TransactionFrom"].Returns<Object>("2026-05-15T09:05:40.0000012");
@@ -428,14 +419,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.Received(1).BeginTransaction(Arg.Any<SqlConnection>());
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
             mockSqlTransactionShim.Received(1).Commit(null);
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
             mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), null);
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
             Assert.That(resultVersion == 2);
             Assert.That(resultStatistics.ItemsAddedCount == 1);
             Assert.That(resultStatistics.ItemsUpdatedCount == 1);
@@ -510,10 +501,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
@@ -524,7 +512,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader["Id"].Returns<Object>(1L);
             mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>(testDataSource);
-            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactionSql23DateStyle));
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
             mockDataReader["Company"].Returns<Object>("Canon");
             mockDataReader["Price"].Returns<Object>(new Decimal(4216));
             mockDataReader["TransactionFrom"].Returns<Object>("2026-06-05T11:12:41.0000303");
@@ -539,9 +527,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactSql126DateStyle));
             mockSqlCommandShim.Received(2).ExecuteReader(Arg.Any<SqlCommand>());
             Assert.That(results.Count == 1);
             Assert.That(results[0].Id == 1);
@@ -590,7 +578,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             Assert.That(e.Message, Does.StartWith($"Failed to read grid details for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-06-21' }} from SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -632,7 +620,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
             mockDataReader.Received(3).Read();
             mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
@@ -824,9 +812,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactionSql126DateStyle));
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
             Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -868,9 +856,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactionSql126DateStyle));
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactionSql126DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
             mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
@@ -910,7 +898,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             Assert.That(e.Message, Does.StartWith($"Failed to delete grids for StockPriceGridOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
@@ -953,7 +941,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
             mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
@@ -1103,7 +1091,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 Assert.That(versionNumberResult == 0);
                 Assert.That(transactionTimestampResult == DateTime.MinValue);
                 Assert.That(transactionTimestampResult.Kind == DateTimeKind.Utc);
@@ -1151,7 +1139,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }} from SQL Server."));
                 Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }}."));
             }
@@ -1195,7 +1183,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 Assert.That(versionNumberResult == 3);
                 Assert.That(transactionTimestampResult == utils.CreateDataTimeFromString("2026-05-16 13:39:41.0000013"));
                 Assert.That(transactionTimestampResult.Kind == DateTimeKind.Utc);
@@ -1235,7 +1223,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
                 Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9 from SQL Server."));
                 Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9."));
@@ -1275,7 +1263,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
                 Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 did not exist."));
             }
@@ -1312,7 +1300,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
                 Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 7 from SQL Server."));
                 Assert.That(e.InnerException == mockException);
@@ -1349,7 +1337,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
                 Assert.That(utils.CreateDataTimeFromString("2026-06-01 23:02:45.0000101") == result);
             }
@@ -1377,10 +1365,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
@@ -1420,10 +1405,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Tag, 
-                      DataSource, 
-                      [Date], 
-                      Company;
+            ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
@@ -1431,7 +1413,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockDataReader["Id"].Returns<Object>(1L);
             mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>(testDataSource);
-            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactionSql23DateStyle));
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
             mockDataReader["Company"].Returns<Object>("Canon");
             mockDataReader["Price"].Returns<Object>(new Decimal(4215));
             mockDataReader["TransactionFrom"].Returns<Object>("2026-05-15T09:05:40.0000012");
@@ -1446,8 +1428,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
                 Assert.That(results.Count == 1);
                 Assert.That(results[0].Id == 1);
@@ -1552,11 +1534,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testItem.Price);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
@@ -1662,16 +1644,16 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItemItem.Id);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000010").ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000010").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testNewItem.Price);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testUpdateDateTime.ToString(transactionSql126DateStyle));
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testUpdateDateTime.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactSql126DateStyle));
             }
         }
         
@@ -1729,7 +1711,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
@@ -1765,7 +1747,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
                 Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} into SQL Server."));
                 Assert.That(e.InnerException == mockException);
@@ -1826,12 +1808,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} and version 2 into SQL Server."));
                 Assert.That(e.InnerException == mockException);
@@ -1887,12 +1869,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 Assert.That(result == 2);
             }
@@ -1946,11 +1928,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
                 mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactionSql23DateStyle));
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 1);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactionSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 Assert.That(result == 1);
             }

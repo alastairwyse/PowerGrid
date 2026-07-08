@@ -49,139 +49,277 @@ namespace PowerGrid.Persistence.UnitTests
             testPersistenceConcurrencyManager = new PersistenceConcurrencyManager();
         }
 
-        [Test]
-        public void AcquireLockAndInvokeAction_LockObjectsDontExist()
+        [TearDown]
+        protected void TearDown()
         {
-            StockPriceGridItem stockPrice1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440);
-            StockPriceGridItem stockPrice2 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732);
-            StockPriceGridItem stockPrice3 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
-            StockPriceGridItem stockPrice4 = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
-            StockPriceGridItem stockPrice5 = new(calibratedTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey1 = new(stockPrice1);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey2 = new(stockPrice2);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey3 = new(stockPrice3);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey4 = new(stockPrice4);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey5 = new(stockPrice5);
+            testPersistenceConcurrencyManager.Dispose();
+        }
+
+        [Test]
+        public void AcquireLockAndInvokeActionCommonKeyPropertiesLockOverload()
+        {
+            GridCommonKeyProperties commonKeyProperties1 = new(marketTag);
+            GridCommonKeyProperties commonKeyProperties2 = new(calibratedTag);
+            GridCommonKeyProperties commonKeyProperties3 = new(marketTag);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey1 = new(commonKeyProperties1);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey2 = new(commonKeyProperties2);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey3 = new(commonKeyProperties3);
+            StockPriceGridOuterKeyProperties outerKeyProperties1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties2 = new(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey1 = new(outerKeyProperties1);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey2 = new(outerKeyProperties2);
             List<String> writeLog = new();
             using (AutoResetEvent completeSignal = new(false))
             {
                 Thread thread1 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey1, () =>
+                    // This thread starts first and locks 'Market'
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, () =>
                     {
-                        Thread.Sleep(300);
-                        writeLog.Add(nameof(stockPriceGridLockKey1));
+                        Thread.Sleep(500);
+                        writeLog.Add(nameof(commonKeyPropertiesLockKey1));
                     });
                 });
                 Thread thread2 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () => 
-                    { 
-                        writeLog.Add(nameof(stockPriceGridLockKey2));
+                    // This thread should be blocked by thread1 above as it locks tag 'Market'
+                    // Note that even though this thread is started before thread3, this will finish last, as thread3 uses a write lock on the common key properties
+                    //   whereas this thread uses a read lock.  The ReaderWriterLockSlim instances used inside PersistenceConcurrencyManager prioritze write lock
+                    //   requests over read lock requests.  See https://learn.microsoft.com/en-us/dotnet/api/system.threading.readerwriterlockslim.enterwritelock?view=net-10.0&redirectedfrom=MSDN#remarks
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey1, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey1));
                         completeSignal.Set();
                     });
                 });
                 Thread thread3 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey3, () => { writeLog.Add(nameof(stockPriceGridLockKey3)); });
+                    // This thread should be blocked by thread1 above as it locks tag 'Market'
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey3, () =>
+                    {
+                        writeLog.Add(nameof(commonKeyPropertiesLockKey3));
+                    });
                 });
+                // Below threads have no key clash with the 3 above, so all should complete before threads 1, 2, and 3
                 Thread thread4 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey4, () => { writeLog.Add(nameof(stockPriceGridLockKey4)); });
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, () =>
+                    {
+                        writeLog.Add(nameof(commonKeyPropertiesLockKey2));
+                    });
                 });
                 Thread thread5 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey5, () => { writeLog.Add(nameof(stockPriceGridLockKey5)); });
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, outerKeyPropertiesLockKey2, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey2));
+                    });
                 });
 
                 thread1.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread2.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread3.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread4.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread5.Start();
 
                 completeSignal.WaitOne();
                 Assert.That(writeLog.Count == 5);
-                Assert.That(writeLog[0] == nameof(stockPriceGridLockKey3));
-                Assert.That(writeLog[1] == nameof(stockPriceGridLockKey4));
-                Assert.That(writeLog[2] == nameof(stockPriceGridLockKey5));
-                Assert.That(writeLog[3] == nameof(stockPriceGridLockKey1));
-                Assert.That(writeLog[4] == nameof(stockPriceGridLockKey2));
+                Assert.That(writeLog[0] == nameof(commonKeyPropertiesLockKey2));
+                Assert.That(writeLog[1] == nameof(outerKeyPropertiesLockKey2));
+                Assert.That(writeLog[2] == nameof(commonKeyPropertiesLockKey1));
+                Assert.That(writeLog[3] == nameof(commonKeyPropertiesLockKey3));
+                Assert.That(writeLog[4] == nameof(outerKeyPropertiesLockKey1));
             }
         }
 
         [Test]
-        public void AcquireLockAndInvokeAction_LockObjectsAlreadyExists()
+        public void AcquireLockAndInvokeActionOuterKeyPropertiesLockOverload()
         {
-            StockPriceGridItem stockPrice1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), canonCompany, 4440);
-            StockPriceGridItem stockPrice2 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"), hitachiCompany, 4732);
-            StockPriceGridItem stockPrice3 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
-            StockPriceGridItem stockPrice4 = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
-            StockPriceGridItem stockPrice5 = new(calibratedTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-22"), canonCompany, 4440);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey1 = new(stockPrice1);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey2 = new(stockPrice2);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey3 = new(stockPrice3);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey4 = new(stockPrice4);
-            StockPriceGridItemGridLockKey stockPriceGridLockKey5 = new(stockPrice5);
-            // Call AcquireLockAndInvokeAction() with each GridLockKey once to create the lock objects
-            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey1, () => { });
-            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () => { });
-            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey3, () => { });
-            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey4, () => { });
-            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey5, () => { });
+            GridCommonKeyProperties commonKeyProperties1 = new(marketTag);
+            GridCommonKeyProperties commonKeyProperties2 = new(calibratedTag);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey1 = new(commonKeyProperties1);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey2 = new(commonKeyProperties2);
+            StockPriceGridOuterKeyProperties outerKeyProperties1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties2 = new(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties3 = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties4 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-22"));
+            StockPriceGridOuterKeyProperties outerKeyProperties5 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey1 = new(outerKeyProperties1);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey2 = new(outerKeyProperties2);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey3 = new(outerKeyProperties3);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey4 = new(outerKeyProperties4);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey5 = new(outerKeyProperties5);
             List<String> writeLog = new();
             using (AutoResetEvent completeSignal = new(false))
             {
                 Thread thread1 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey1, () =>
+                    // This thread starts first and locks 'Market'
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey1, () =>
                     {
-                        Thread.Sleep(300);
-                        writeLog.Add(nameof(stockPriceGridLockKey1));
+                        Thread.Sleep(600);
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey1));
                     });
                 });
                 Thread thread2 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey2, () =>
+                    // This thread should be blocked by thread1 above as it locks tag 'Market'
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey1, () =>
                     {
-                        writeLog.Add(nameof(stockPriceGridLockKey2));
+                        writeLog.Add($"{nameof(outerKeyPropertiesLockKey1)}-2");
                         completeSignal.Set();
                     });
                 });
+                // Below threads have no key clash with the 2 above, so all should complete before threads 1, and 2
                 Thread thread3 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey3, () => { writeLog.Add(nameof(stockPriceGridLockKey3)); });
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, outerKeyPropertiesLockKey2 , () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey2));
+                    });
                 });
                 Thread thread4 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey4, () => { writeLog.Add(nameof(stockPriceGridLockKey4)); });
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey3, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey3));
+                    });
                 });
                 Thread thread5 = new(() =>
                 {
-                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(stockPriceGridLockKey5, () => { writeLog.Add(nameof(stockPriceGridLockKey5)); });
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey4, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey4));
+                    });
+                });
+                Thread thread6 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, () =>
+                    {
+                        writeLog.Add(nameof(commonKeyPropertiesLockKey2));
+                    });
                 });
 
                 thread1.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread2.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread3.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread4.Start();
-                Thread.Sleep(50);
+                Thread.Sleep(100);
                 thread5.Start();
+                Thread.Sleep(100);
+                thread6.Start();
 
                 completeSignal.WaitOne();
-                Assert.That(writeLog.Count == 5);
-                Assert.That(writeLog[0] == nameof(stockPriceGridLockKey3));
-                Assert.That(writeLog[1] == nameof(stockPriceGridLockKey4));
-                Assert.That(writeLog[2] == nameof(stockPriceGridLockKey5));
-                Assert.That(writeLog[3] == nameof(stockPriceGridLockKey1));
-                Assert.That(writeLog[4] == nameof(stockPriceGridLockKey2));
+                Assert.That(writeLog.Count == 6);
+                Assert.That(writeLog[0] == nameof(outerKeyPropertiesLockKey2));
+                Assert.That(writeLog[1] == nameof(outerKeyPropertiesLockKey3));
+                Assert.That(writeLog[2] == nameof(outerKeyPropertiesLockKey4));
+                Assert.That(writeLog[3] == nameof(commonKeyPropertiesLockKey2));
+                Assert.That(writeLog[4] == nameof(outerKeyPropertiesLockKey1));
+                Assert.That(writeLog[5] == nameof(outerKeyPropertiesLockKey1) + "-2");
+            }
+        }
+
+        [Test]
+        public void AcquireLockAndInvokeAction_LockObjectsAlreadyExist()
+        {
+            GridCommonKeyProperties commonKeyProperties1 = new(marketTag);
+            GridCommonKeyProperties commonKeyProperties2 = new(calibratedTag);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey1 = new(commonKeyProperties1);
+            GridCommonKeyPropertiesLockKey commonKeyPropertiesLockKey2 = new(commonKeyProperties2);
+            StockPriceGridOuterKeyProperties outerKeyProperties1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties2 = new(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties3 = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyProperties outerKeyProperties4 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-22"));
+            StockPriceGridOuterKeyProperties outerKeyProperties5 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-03-23"));
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey1 = new(outerKeyProperties1);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey2 = new(outerKeyProperties2);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey3 = new(outerKeyProperties3);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey4 = new(outerKeyProperties4);
+            StockPriceGridOuterKeyPropertiesLockKey outerKeyPropertiesLockKey5 = new(outerKeyProperties5);
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey1, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, outerKeyPropertiesLockKey2, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey3, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey4, () => { });
+            testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, () => { });
+            List<String> writeLog = new();
+            using (AutoResetEvent completeSignal = new(false))
+            {
+                Thread thread1 = new(() =>
+                {
+                    // This thread starts first and locks 'Market'
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey1, () =>
+                    {
+                        Thread.Sleep(600);
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey1));
+                    });
+                });
+                Thread thread2 = new(() =>
+                {
+                    // This thread should be blocked by thread1 above as it locks tag 'Market'
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey1, () =>
+                    {
+                        writeLog.Add($"{nameof(outerKeyPropertiesLockKey1)}-2");
+                        completeSignal.Set();
+                    });
+                });
+                // Below threads have no key clash with the 2 above, so all should complete before threads 1, and 2
+                Thread thread3 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, outerKeyPropertiesLockKey2, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey2));
+                    });
+                });
+                Thread thread4 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey3, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey3));
+                    });
+                });
+                Thread thread5 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey1, outerKeyPropertiesLockKey4, () =>
+                    {
+                        writeLog.Add(nameof(outerKeyPropertiesLockKey4));
+                    });
+                });
+                Thread thread6 = new(() =>
+                {
+                    testPersistenceConcurrencyManager.AcquireLockAndInvokeAction(commonKeyPropertiesLockKey2, () =>
+                    {
+                        writeLog.Add(nameof(commonKeyPropertiesLockKey2));
+                    });
+                });
+
+                thread1.Start();
+                Thread.Sleep(100);
+                thread2.Start();
+                Thread.Sleep(100);
+                thread3.Start();
+                Thread.Sleep(100);
+                thread4.Start();
+                Thread.Sleep(100);
+                thread5.Start();
+                Thread.Sleep(100);
+                thread6.Start();
+
+                completeSignal.WaitOne();
+                Assert.That(writeLog.Count == 6);
+                Assert.That(writeLog[0] == nameof(outerKeyPropertiesLockKey2));
+                Assert.That(writeLog[1] == nameof(outerKeyPropertiesLockKey3));
+                Assert.That(writeLog[2] == nameof(outerKeyPropertiesLockKey4));
+                Assert.That(writeLog[3] == nameof(commonKeyPropertiesLockKey2));
+                Assert.That(writeLog[4] == nameof(outerKeyPropertiesLockKey1));
+                Assert.That(writeLog[5] == nameof(outerKeyPropertiesLockKey1) + "-2");
             }
         }
     }
