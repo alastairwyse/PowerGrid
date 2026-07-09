@@ -15,6 +15,7 @@
  */
 
 using System;
+using PowerGrid.Core.UnitTests;
 using NUnit.Framework;
 
 namespace PowerGrid.Grids.UnitTests
@@ -24,23 +25,101 @@ namespace PowerGrid.Grids.UnitTests
     /// </summary>
     public class WeatherForecastTests
     {
-        private WeatherForecast testWeatherForecast;
+        private TestUtilities utils;
 
         [SetUp]
         protected void SetUp()
         {
+            utils = new TestUtilities();
+        }
+
+        [Test]
+        public void Constructor_CountryParameterNull()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                WeatherForecast testWeatherForecast = new(null, "Tokyo", TimeOnly.FromDateTime(DateTime.UtcNow), 25);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'country' must contain a value."));
+            Assert.That(e.ParamName == "country");
+        }
+
+        [Test]
+        public void Constructor_CountryParameterWhitespace()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                WeatherForecast testWeatherForecast = new(" ", "Tokyo", TimeOnly.FromDateTime(DateTime.UtcNow), 25);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'country' must contain a value."));
+            Assert.That(e.ParamName == "country");
+        }
+
+        [Test]
+        public void Constructor_CityParameterNull()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                WeatherForecast testWeatherForecast = new("Japan", null, TimeOnly.FromDateTime(DateTime.UtcNow), 25);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'city' must contain a value."));
+            Assert.That(e.ParamName == "city");
+        }
+
+        [Test]
+        public void Constructor_CityParameterWhitespace()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                WeatherForecast testWeatherForecast = new("Japan", "", TimeOnly.FromDateTime(DateTime.UtcNow), 25);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'city' must contain a value."));
+            Assert.That(e.ParamName == "city");
         }
 
         [Test]
         public void KeyCompareTo()
         {
-            throw new NotImplementedException();
+            WeatherForecast testWeatherForecast1 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+            WeatherForecast testWeatherForecast2 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+
+            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) == 0);
+
+
+            testWeatherForecast1 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:39.0000000")), 25);
+            testWeatherForecast2 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+
+            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) == -1);
+            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) == 1);
+
+
+            testWeatherForecast1 = new("Japan", "Osaka", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+            testWeatherForecast2 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+
+            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) == -1);
+            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) == 1);
+
+
+            testWeatherForecast1 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+            testWeatherForecast2 = new("Nihon", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+
+            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) == -1);
+            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) == 1);
         }
 
         [Test]
         public void ValuePropertiesEqual()
         {
-            throw new NotImplementedException();
+            WeatherForecast testWeatherForecast1 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+            WeatherForecast testWeatherForecast2 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 25);
+            WeatherForecast testWeatherForecast3 = new("Japan", "Tokyo", TimeOnly.FromDateTime(utils.CreateDataTimeFromString("2026-07-09 22:39:40.0000000")), 26);
+
+            Assert.That(testWeatherForecast1.ValuePropertiesEqual(testWeatherForecast2) == true);
+            Assert.That(testWeatherForecast1.ValuePropertiesEqual(testWeatherForecast3) == false);
         }
     }
 }

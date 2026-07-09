@@ -9,6 +9,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
 #### Immediate TODO
+* Inconsistencies in [model class]GridItem and [model class] records... some are records with no param validation (e.g. for empty/null strings), some have param validation.  Validation is done in persister, so maybe that's why I left it off.  Need to decide approach and make consistent.
 * StockPricePersister (and any other persister classes) should have logging and metrics.
 * Validation in persister should be an abstract method, or passed to constructor (probably abstract method or lambda, as I can't see that it would need to be different for different persister instances)
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+

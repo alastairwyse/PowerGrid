@@ -81,6 +81,17 @@ namespace PowerGrid.Grids.UnitTests
         }
 
         [Test]
+        public void ValuePropertiesEqual()
+        {
+            StockPriceGridItem stockPrice1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4440);
+            StockPriceGridItem stockPrice2 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4440);
+            StockPriceGridItem stockPrice3 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4441);
+
+            Assert.That(stockPrice1.ValuePropertiesEqual(stockPrice2) == true);
+            Assert.That(stockPrice1.ValuePropertiesEqual(stockPrice3) == false);
+        }
+
+        [Test]
         public void PrintMembers()
         {
             const String testTag = "Market";

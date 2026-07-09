@@ -16,39 +16,40 @@
 
 using System;
 using System.Text;
+using PowerGrid.Core;
 
 namespace PowerGrid.Grids
 {
-    /// <summary>
-    /// Defines key properties of grids that are common across all grids in the solution irrespective of the type of grid.
-    /// </summary>
-    public record GridCommonKeyProperties : ModelBase, IGridCommonKeyProperties
+    public record WeatherForecastGridItem : WeatherForecast, IStockPriceGridOuterKeyProperties, IGridItem<WeatherForecastGridItem>
     {
         /// <summary>A tag used to classify the grid.</summary>
         public String Tag { get; init; }
 
-
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Grids.GridCommonKeyProperties class.
+        /// Initialises a new instance of the PowerGrid.Grids.WeatherForecastGridItem class.
         /// </summary>
-        /// <param name="tag">A tag used to classify the grid.</param>
-        public GridCommonKeyProperties(String tag)
+        /// <param name="company">The country of the city the weather was forecast for.</param>
+        /// <param name="city">The city the weather was forecast for.</param>
+        /// <param name="time">The time of day of the weather forecast.</param>
+        /// <param name="temperature">The forecast temperature.</param>
+        public WeatherForecastGridItem(String tag, String country, String city, TimeOnly time, Int32 temperature)
+            : base(country, city, time, temperature)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
 
             Tag = tag;
         }
 
-        #region Private/Protected Methods
-
         /// <inheritdoc/>
-        protected override bool PrintMembers(StringBuilder builder)
+        public Int32 KeyCompareTo(WeatherForecastGridItem other)
         {
-            builder.Append($"{nameof(Tag)} = '{Tag}'");
-
-            return true;
+            throw new NotImplementedException();
         }
 
-        #endregion
+        /// <inheritdoc/>
+        public Boolean ValuePropertiesEqual(WeatherForecastGridItem other)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

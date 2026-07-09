@@ -22,10 +22,27 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Model/container class holding a stock price.
     /// </summary>
-    /// <param name="Company">The company the price was quoted for.</param>
-    /// <param name="Price">The price.</param>
-    public record StockPrice(String Company, Decimal Price) : IGridItem<StockPrice>
+    public record StockPrice : ModelBase, IGridItem<StockPrice>
     {
+        /// <summary>The company the price was quoted for.</summary>
+        public String Company { get; init; }
+
+        /// <summary>The price.</summary>
+        public Decimal Price { get; init; }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Grids.StockPrice class.
+        /// </summary>
+        /// <param name="company">The company the price was quoted for.</param>
+        /// <param name="price">The price.</param>
+        public StockPrice(String company, Decimal price)
+        {
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(company), company);
+
+            Company = company;
+            Price = price;
+        }
+
         /// <inheritdoc/>
         public Int32 KeyCompareTo(StockPrice other)
         {

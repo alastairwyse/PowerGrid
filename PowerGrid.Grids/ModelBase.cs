@@ -19,9 +19,9 @@ using System;
 namespace PowerGrid.Grids
 {
     /// <summary>
-    /// Base for records that define key properties.
+    /// Base for entity model records.
     /// </summary>
-    public abstract record class KeyPropertiesBase
+    public abstract record class ModelBase
     {
         #region Private/Protected Methods
 

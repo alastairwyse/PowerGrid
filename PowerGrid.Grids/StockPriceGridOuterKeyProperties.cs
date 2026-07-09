@@ -23,7 +23,7 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Defines the <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of stock prices.
     /// </summary>
-    public record StockPriceGridOuterKeyProperties : KeyPropertiesBase, IStockPriceGridOuterKeyProperties
+    public record StockPriceGridOuterKeyProperties : ModelBase, IStockPriceGridOuterKeyProperties
     {
         /// <summary>A tag used to classify the grid.</summary>
         public String Tag { get; init; }

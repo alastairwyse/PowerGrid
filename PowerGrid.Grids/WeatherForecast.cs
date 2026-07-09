@@ -22,12 +22,38 @@ namespace PowerGrid.Grids
     /// <summary>
     /// Model/container class holding a weather forecast.
     /// </summary>
-    /// <param name="Country">The country of the city the weather was forecast for.</param>
-    /// <param name="City">The city the weather was forecast for.</param>
-    /// <param name="Time">The time of day of the weather forecast.</param>
-    /// <param name="Temperature">The forecast temperature.</param>
-    public record WeatherForecast(String Country, String City, TimeOnly Time, Int32 Temperature) : IGridItem<WeatherForecast>
+    public record WeatherForecast : ModelBase, IGridItem<WeatherForecast>
     {
+        /// <summary>The country of the city the weather was forecast for.</summary>
+        public String Country { get; init; }
+
+        /// <summary>The city the weather was forecast for.</summary>
+        public String City { get; init; }
+
+        /// <summary>The time of day of the weather forecast.</summary>
+        public TimeOnly Time { get; init; }
+
+        /// <summary>The forecast temperature.</summary>
+        public Int32 Temperature { get; init; }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Grids.WeatherForecast class.
+        /// </summary>
+        /// <param name="company">The country of the city the weather was forecast for.</param>
+        /// <param name="city">The city the weather was forecast for.</param>
+        /// <param name="time">The time of day of the weather forecast.</param>
+        /// <param name="temperature">The forecast temperature.</param>
+        public WeatherForecast(String country, String city, TimeOnly time, Int32 temperature)
+        {
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(country), country);
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(city), city);
+
+            Country = country;
+            City = city;
+            Time = time;
+            Temperature = temperature;
+        }
+
         /// <inheritdoc/>
         public Int32 KeyCompareTo(WeatherForecast other)
         {
