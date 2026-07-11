@@ -14,39 +14,34 @@
  * limitations under the License.
  */
 
-using System;
-using System.Text;
 using PowerGrid.Core;
+using System;
+using System.Diagnostics;
+using System.Text;
 
 namespace PowerGrid.Grids
 {
     /// <summary>
-    /// Defines the <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of stock prices.
+    /// Defines the <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of weather forecasts.
     /// </summary>
-    public record StockPriceGridOuterKeyProperties : ModelBase, IStockPriceGridOuterKeyProperties
+    public record WeatherForecastGridOuterKeyProperties : ModelBase, IWeatherForecastGridOuterKeyProperties
     {
         /// <inheritdoc/>
         public String Tag { get; init; }
 
         /// <inheritdoc/>
-        public String DataSource { get; init; }
-
-        /// <inheritdoc/>
         public DateOnly Date { get; init; }
 
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridOuterKeyProperties class.
+        /// Initialises a new instance of the PowerGrid.Grids.WeatherForecastGridOuterKeyProperties class.
         /// </summary>
         /// <param name="tag">A tag used to classify the grid.</param>
-        /// <param name="dataSource">The source/entity which provided the price.</param>
-        /// <param name="date">The date the price was quoted for.</param>
-        public StockPriceGridOuterKeyProperties(String tag, String dataSource, DateOnly date)
+        /// <param name="date">The date the weather was forecast for.</param>
+        public WeatherForecastGridOuterKeyProperties(String tag, DateOnly date)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
-            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(dataSource), dataSource);
 
             Tag = tag;
-            DataSource = dataSource;
             Date = date;
         }
 
@@ -55,7 +50,7 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         protected override bool PrintMembers(StringBuilder builder)
         {
-            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(DataSource)} = '{DataSource}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}'");
+            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}'");
 
             return true;
         }

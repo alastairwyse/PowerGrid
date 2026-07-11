@@ -20,36 +20,68 @@ using PowerGrid.Core;
 
 namespace PowerGrid.Grids
 {
-    public record WeatherForecastGridItem : WeatherForecast, IStockPriceGridOuterKeyProperties, IGridItem<WeatherForecastGridItem>
+    public record WeatherForecastGridItem : WeatherForecast, IWeatherForecastGridOuterKeyProperties, IGridItem<WeatherForecastGridItem>
     {
         /// <summary>A tag used to classify the grid.</summary>
         public String Tag { get; init; }
 
+        /// <summary>The date the weather was forecast for.</summary>
+        public DateOnly Date { get; init; }
+
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Grids.WeatherForecastGridItem class.
         /// </summary>
-        /// <param name="company">The country of the city the weather was forecast for.</param>
+        /// <param name="tag">A tag used to classify the grid.</param>
+        /// <param name="date">The date the weather was forecast for.</param>
+        /// <param name="country">The country of the city the weather was forecast for.</param>
         /// <param name="city">The city the weather was forecast for.</param>
         /// <param name="time">The time of day of the weather forecast.</param>
         /// <param name="temperature">The forecast temperature.</param>
-        public WeatherForecastGridItem(String tag, String country, String city, TimeOnly time, Int32 temperature)
+        public WeatherForecastGridItem(String tag, DateOnly date, String country, String city, TimeOnly time, Int32 temperature)
             : base(country, city, time, temperature)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
 
+            Date = date;
             Tag = tag;
         }
 
         /// <inheritdoc/>
         public Int32 KeyCompareTo(WeatherForecastGridItem other)
         {
-            throw new NotImplementedException();
+            if (this.Tag.CompareTo(other.Tag) == 0)
+            {
+                if (this.Date.CompareTo(other.Date) == 0)
+                {
+                    return base.KeyCompareTo(other);
+                }
+                else
+                {
+                    return this.Date.CompareTo(other.Date);
+                }
+            }
+            else
+            {
+                return this.Tag.CompareTo(other.Tag);
+            }
         }
 
         /// <inheritdoc/>
         public Boolean ValuePropertiesEqual(WeatherForecastGridItem other)
         {
-            throw new NotImplementedException();
+            return base.ValuePropertiesEqual(other);
         }
+
+        #region Private/Protected Methods
+
+        /// <inheritdoc/>
+        protected override bool PrintMembers(StringBuilder builder)
+        {
+            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}', {nameof(Country)} = '{Country}', {nameof(City)} = '{City}', {nameof(Time)} = '{Time.ToString("HH:mm:ss")}', {nameof(Temperature)} = {Temperature}");
+
+            return true;
+        }
+
+        #endregion
     }
 }

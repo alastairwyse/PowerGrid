@@ -45,5 +45,15 @@ namespace PowerGrid.Core.UnitTests
 
             return DateTime.SpecifyKind(returnDateTime, DateTimeKind.Utc);
         }
+
+        /// <summary>
+        /// Creates a TimeOnly from the specified HH:mm:ss format string.
+        /// </summary>
+        /// <param name="stringifiedTimeOnly">The stringified time to convert.</param>
+        /// <returns>A TimeOnly.</returns>
+        public TimeOnly CreateTimeOnlyFromString(String stringifiedTimeOnly)
+        {
+            return TimeOnly.ParseExact(stringifiedTimeOnly, "HH:mm:ss", DateTimeFormatInfo.InvariantInfo);
+        }
     }
 }

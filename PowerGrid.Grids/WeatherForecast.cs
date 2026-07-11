@@ -39,7 +39,7 @@ namespace PowerGrid.Grids
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Grids.WeatherForecast class.
         /// </summary>
-        /// <param name="company">The country of the city the weather was forecast for.</param>
+        /// <param name="country">The country of the city the weather was forecast for.</param>
         /// <param name="city">The city the weather was forecast for.</param>
         /// <param name="time">The time of day of the weather forecast.</param>
         /// <param name="temperature">The forecast temperature.</param>

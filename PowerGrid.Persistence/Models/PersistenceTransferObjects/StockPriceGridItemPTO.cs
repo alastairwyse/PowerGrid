@@ -21,7 +21,7 @@ using System;
 namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
 {
     /// <summary>
-    /// Model/container class holding a <see cref="StockPriceGridItem"/> augmented with properties allowing it to be transferred to and form persistent storage.
+    /// Model/container class holding a <see cref="StockPriceGridItem"/> augmented with properties allowing it to be transferred to and from persistent storage.
     /// </summary>
     /// <param name="Id">A unique id for the object within persistent storage.</param>
     /// <param name="Tag">A tag used to classify the grid.</param>

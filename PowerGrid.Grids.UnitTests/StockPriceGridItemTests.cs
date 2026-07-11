@@ -16,6 +16,7 @@
 
 using System;
 using System.Globalization;
+using PowerGrid.Core;
 using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
 using NUnit.Framework;
@@ -41,6 +42,54 @@ namespace PowerGrid.Grids.UnitTests
         protected void SetUp()
         {
             utils = new TestUtilities();
+        }
+
+        [Test]
+        public void Constructor_TagParameterNull()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                StockPriceGridItem testStockPriceGridItem = new(null, bloombergDataSource, utils.CreateDateOnlyFromString("2026-07-11"), canonCompany, 123.45m);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
+            Assert.That(e.ParamName == "tag");
+        }
+
+        [Test]
+        public void Constructor_TagParameterWhitespace()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                StockPriceGridItem testStockPriceGridItem = new("", bloombergDataSource, utils.CreateDateOnlyFromString("2026-07-11"), canonCompany, 123.45m);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
+            Assert.That(e.ParamName == "tag");
+        }
+
+        [Test]
+        public void Constructor_DataSourceParameterNull()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                StockPriceGridItem testStockPriceGridItem = new(marketTag, null, utils.CreateDateOnlyFromString("2026-07-11"), canonCompany, 123.45m);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
+            Assert.That(e.ParamName == "dataSource");
+        }
+
+        [Test]
+        public void Constructor_DataSourceParameterWhitespace()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                StockPriceGridItem testStockPriceGridItem = new(marketTag, " ", utils.CreateDateOnlyFromString("2026-07-11"), canonCompany, 123.45m);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'dataSource' must contain a value."));
+            Assert.That(e.ParamName == "dataSource");
         }
 
         [Test]
@@ -94,16 +143,11 @@ namespace PowerGrid.Grids.UnitTests
         [Test]
         public void PrintMembers()
         {
-            const String testTag = "Market";
-            const String testDataSource = "Bloomberg";
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-30");
-            const String company = "Mitsubishi";
-            const Decimal price = 371;
-            StockPriceGridItem testStockPriceGridItem = new(testTag, testDataSource, testDate, company, price);
+            StockPriceGridItem testStockPriceGridItem = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-05-30"), sonyCompany, 371);
 
             String result = testStockPriceGridItem.ToString();
 
-            Assert.That(result == "StockPriceGridItem { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30', Company = 'Mitsubishi', Price = 371 }");
+            Assert.That(result == "StockPriceGridItem { Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-30', Company = 'Sony', Price = 371 }");
         }
     }
 }

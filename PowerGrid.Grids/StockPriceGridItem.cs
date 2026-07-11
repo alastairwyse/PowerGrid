@@ -28,9 +28,38 @@ namespace PowerGrid.Grids
     /// <param name="Date">The date the price was quoted for.</param>
     /// <param name="Company">The company the price was quoted for.</param>
     /// <param name="Price">The price.</param>
-    public record StockPriceGridItem(String Tag, String DataSource, DateOnly Date, String Company, Decimal Price)
-        : StockPrice(Company, Price), IStockPriceGridOuterKeyProperties, IGridItem<StockPriceGridItem>
+    public record StockPriceGridItem : StockPrice, IStockPriceGridOuterKeyProperties, IGridItem<StockPriceGridItem>
     {
+        /// <summary>A tag used to classify the grid.</summary>
+        public String Tag { get; init; }
+
+        /// <summary>The source/entity which provided the price.</summary>
+        public String DataSource { get; init; }
+
+        /// <summary>The date the price was quoted for.</summary>
+        public DateOnly Date { get; init; }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Grids.StockPriceGridItem class.
+        /// </summary>
+        /// <param name="tag">A tag used to classify the grid.</param>
+        /// <param name="dataSource">The source/entity which provided the price.</param>
+        /// <param name="date">The date the price was quoted for.</param>
+        /// <param name="company">The company the price was quoted for.</param>
+        /// <param name="price">The price.</param>
+        public StockPriceGridItem(String tag, String dataSource, DateOnly date, String company, Decimal price)
+            : base(company, price)
+        {
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
+            ThrowExceptionIfStringParameterNullOrWhitespace(nameof(dataSource), dataSource);
+
+            Tag = tag;
+            DataSource = dataSource;
+            Date = date;
+            Company = company;
+            Price = price;
+        }
+
         /// <inheritdoc/>
         public int KeyCompareTo(StockPriceGridItem other)
         {
