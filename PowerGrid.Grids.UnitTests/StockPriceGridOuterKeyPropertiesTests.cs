@@ -84,10 +84,7 @@ namespace PowerGrid.Grids.UnitTests
         [Test]
         public void PrintMembers()
         {
-            const String testTag = "Market";
-            const String testDataSource = "Bloomberg";
-            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-30");
-            StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new(testTag, testDataSource, testDate);
+            StockPriceGridOuterKeyProperties testStockPriceGridOuterKeyProperties = new("Market", "Bloomberg", utils.CreateDateOnlyFromString("2026-05-30"));
 
             String result = testStockPriceGridOuterKeyProperties.ToString();
 

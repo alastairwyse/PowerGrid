@@ -25,5 +25,46 @@ namespace PowerGrid.Grids.UnitTests
     /// </summary>
     public class WeatherForecastGridOuterKeyPropertiesTests
     {
+        private TestUtilities utils;
+
+        [SetUp]
+        protected void SetUp()
+        {
+            utils = new TestUtilities();
+        }
+
+        [Test]
+        public void Constructor_TagParameterNull()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new(null, utils.CreateDateOnlyFromString("2026-07-12"));
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
+            Assert.That(e.ParamName == "tag");
+        }
+
+        [Test]
+        public void Constructor_TagParameterWhitespace()
+        {
+            var e = Assert.Throws<ArgumentNullException>(delegate
+            {
+                WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new(" ", utils.CreateDateOnlyFromString("2026-07-12"));
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
+            Assert.That(e.ParamName == "tag");
+        }
+
+        [Test]
+        public void PrintMembers()
+        {
+            WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new("Official", utils.CreateDateOnlyFromString("2026-07-12"));
+
+            String result = testWeatherForecastGridOuterKeyProperties.ToString();
+
+            Assert.That(result == "WeatherForecastGridOuterKeyProperties { Tag = 'Official', Date = '2026-07-12' }");
+        }
     }
 }
