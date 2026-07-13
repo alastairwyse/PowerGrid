@@ -67,22 +67,22 @@ namespace PowerGrid.Persistence
         }
 
         /// <inheritdoc/>
-        public abstract (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties outerKeyProperties, IList<TEntity> items);
+        public abstract (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items);
 
         /// <inheritdoc/>
-        public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridKeyProperties, Int32 version);
+        public abstract IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridOuterKeyProperties, Int32 version);
 
         /// <inheritdoc/>
-        public abstract IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridKeyProperties);
+        public abstract IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <inheritdoc/>
         public abstract IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties);
 
         /// <inheritdoc/>
-        public abstract void SoftDeleteLatestGrid(TOuterKeyProperties gridKeyProperties);
+        public abstract void SoftDeleteLatestGrid(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <inheritdoc/>
-        public abstract void HardDeleteGrids(TOuterKeyProperties gridKeyProperties);
+        public abstract void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties);
 
         /// <inheritdoc/>
         public abstract void HardDeleteGrids(TCommonKeyProperties gridCommonKeyProperties);
