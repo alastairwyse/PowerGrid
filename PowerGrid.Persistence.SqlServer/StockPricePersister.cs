@@ -37,15 +37,6 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class StockPricePersister : PersisterBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
-        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
-        protected const String transactSql23DateStyle = "yyyy-MM-dd";
-        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
-        protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
-        /// <summary>The type of collation to use when ordering results returned from SQL Server.</summary>
-        protected const String transactSqlCollation = "Latin1_General_BIN2";
-        /// <summary>The maximum possible <see cref="DateTime"/> value to use as the upper bound for validity period in the persisted temporal model.</summary>
-        protected readonly DateTime temporalMaximumDateTime = DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
-
         /// <summary>The string to use to connect to the SQL Server database.</summary>
         protected String connectionString;
         /// <summary>The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</summary>
@@ -168,7 +159,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
-        /// <param name="mockDateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
+        /// <param name="dateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
         /// <param name="sqlConnectionShim">A mock <see cref="ISqlConnectionShim"/>.</param>
         /// <param name="sqlTransactionShim">A mock <see cref="ISqlTransactionShim"/>.</param>
         /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>

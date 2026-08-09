@@ -16,6 +16,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Should 'StockPriceGrids' table in database just be 'Grids' and have a column which denotes the grid type (e.g. 'StockPrice')?
 * Should PersistenceConcurrencyManager accept a Func rather than Action?
 * Validator and ordering 'chain' in StockPricePersister... would be easier to read if creating extension methods in LINQ style.  Find a way to do this, but limit the scope (don't let it be global)... maybe by adding a T type constraint to be be IGridItem, or limiting via defined namespace??
+* StockPricePersister needs test for constructor parameters
 
 #### Longer Term TODO
 * 2x grid params.. upsert only + full sync
