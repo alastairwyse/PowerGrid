@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36518.9 d17.14
+VisualStudioVersion = 17.14.36518.9
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Core", "PowerGrid.Core\PowerGrid.Core.csproj", "{4EC488A0-6BB9-4508-ACE5-3055FD8928A7}"
 EndProject
@@ -20,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.TestHarness", "PowerGrid.TestHarness\PowerGrid.TestHarness.csproj", "{9DBBA009-518D-40AF-B5E9-A8ACF752D663}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Persistence.SqlServer.UnitTests", "PowerGrid.Persistence.SqlServer.UnitTests\PowerGrid.Persistence.SqlServer.UnitTests.csproj", "{23D2131A-91DB-4599-BF6E-6183F3C1AA76}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Hosting.Rest", "PowerGrid.Hosting.Rest\PowerGrid.Hosting.Rest.csproj", "{074DB4E4-286B-437A-B43B-EC9960968596}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,6 +65,10 @@ Global
 		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{23D2131A-91DB-4599-BF6E-6183F3C1AA76}.Release|Any CPU.Build.0 = Release|Any CPU
+		{074DB4E4-286B-437A-B43B-EC9960968596}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{074DB4E4-286B-437A-B43B-EC9960968596}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{074DB4E4-286B-437A-B43B-EC9960968596}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{074DB4E4-286B-437A-B43B-EC9960968596}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
