@@ -19,4 +19,8 @@
     <Folder Include="Controllers\" />
   </ItemGroup>
   
+  <ItemGroup>
+    <ProjectReference Include="..\PowerGrid.Persistence.SqlServer\PowerGrid.Persistence.SqlServer.csproj" />
+  </ItemGroup>
+  
 </Project>
