@@ -15,7 +15,12 @@
  */
 
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
+using PowerGrid.Hosting.Rest.Models.Options;
+using PowerGrid.Persistence;
 
 namespace PowerGrid.Hosting.Rest
 {
@@ -26,15 +31,52 @@ namespace PowerGrid.Hosting.Rest
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+            builder.Services.AddOptions<DatabaseConnectionOptions>()
+                .Bind(builder.Configuration.GetSection(DatabaseConnectionOptions.DatabaseConnectionOptionsName))
+                .ValidateDataAnnotations().ValidateOnStart();
+            builder.Services.AddSingleton<PersistenceConcurrencyManager>(new PersistenceConcurrencyManager());
+
+            // TODO: Add a StockPricePersister
 
             builder.Services.AddControllers();
 
-            var app = builder.Build();
+            // Allow APIs to be versioned
+            builder.Services.SetupApiVersioning();
+
+            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen((SwaggerGenOptions swaggerGenOptions) =>
+            {
+                swaggerGenOptions.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Version = "v1",
+                    Title = "PowerGrid",
+                    Description = "Persists grids of data to a database, with advanced storage features"
+                });
+            });
+
+            WebApplication app = builder.Build();
 
             // Configure the HTTP request pipeline.
+            app.UseSwagger();
+            // Setup the Swagger UI
+            app.SetupSwaggerUI(true);
 
-            app.UseAuthorization();
-
+            // Setup custom exception handler in the application's pipeline, so that any exceptions are caught and returned from the API as HttpErrorResponse objects
+            var errorHandlingOptions = new ErrorHandlingOptions();
+            app.Configuration.GetSection(ErrorHandlingOptions.ErrorHandlingOptionsName).Bind(errorHandlingOptions);
+            var exceptionToHttpStatusCodeConverter = new ExceptionToHttpStatusCodeConverter();
+            ExceptionToHttpErrorResponseConverter exceptionToHttpErrorResponseConverter = null;
+            if (errorHandlingOptions.IncludeInnerExceptions.Value == true)
+            {
+                exceptionToHttpErrorResponseConverter = new ExceptionToHttpErrorResponseConverter();
+            }
+            else
+            {
+                exceptionToHttpErrorResponseConverter = new ExceptionToHttpErrorResponseConverter(0);
+            }
+            var middlewareUtilities = new MiddlewareUtilities();
+            middlewareUtilities.SetupExceptionHandler(app, errorHandlingOptions, exceptionToHttpStatusCodeConverter, exceptionToHttpErrorResponseConverter);
 
             app.MapControllers();
 

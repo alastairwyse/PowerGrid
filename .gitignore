@@ -6,6 +6,9 @@
 # Documentation folders
 Documentation/
 
+# Environment-specific appsettings
+appsettings.Production.json
+
 # User-specific files
 *.rsuser
 *.suo
