@@ -10,14 +10,11 @@
   </PropertyGroup>
   
   <ItemGroup>
+    <PackageReference Include="ApplicationLogging.Adapters.MicrosoftLoggingExtensions" Version="1.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning" Version="5.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="5.1.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.3" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Folder Include="Controllers\" />
   </ItemGroup>
   
   <ItemGroup>

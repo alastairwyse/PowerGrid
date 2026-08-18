@@ -44,7 +44,7 @@ namespace PowerGrid.Persistence
         /// <summary>
         /// Writes the specified grid to persistent storage.
         /// </summary>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="gridItems"/>.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="items"/>.</param>
         /// <param name="items">The items to persist.</param>
         /// <returns>A tuple containing: the version number of the written grid, and statistics containing counts of the items persisted.</returns>
         /// <remarks>Any existing grid items which are deleted or updated as a result of this method call are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>

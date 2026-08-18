@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
+using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using PowerGrid.Hosting.Rest.Models.Options;
 using PowerGrid.Persistence;
+using PowerGrid.Persistence.SqlServer;
+using ApplicationLogging.Adapters.MicrosoftLoggingExtensions;
 
 namespace PowerGrid.Hosting.Rest
 {
@@ -35,8 +39,16 @@ namespace PowerGrid.Hosting.Rest
                 .Bind(builder.Configuration.GetSection(DatabaseConnectionOptions.DatabaseConnectionOptionsName))
                 .ValidateDataAnnotations().ValidateOnStart();
             builder.Services.AddSingleton<PersistenceConcurrencyManager>(new PersistenceConcurrencyManager());
-
-            // TODO: Add a StockPricePersister
+            DatabaseConnectionOptions databaseConnectionOptions = builder.Configuration.GetSection(DatabaseConnectionOptions.DatabaseConnectionOptionsName).Get<DatabaseConnectionOptions>();
+            String connectionString = databaseConnectionOptions.ConnectionString;
+            Int32 retryCount = databaseConnectionOptions.RetryCount;
+            Int32 retryInterval = databaseConnectionOptions.RetryInterval;
+            Int32 operationTimeout = databaseConnectionOptions.OperationTimeout;
+            ILogger stockPricePersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<StockPricePersister>>();
+            builder.Services.AddSingleton<StockPricePersister>
+            (
+                new StockPricePersister(connectionString, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
+            );
 
             builder.Services.AddControllers();
 
