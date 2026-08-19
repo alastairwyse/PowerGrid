@@ -15,7 +15,12 @@
  */
 
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -65,6 +70,36 @@ namespace PowerGrid.Hosting.Rest
                     Title = "PowerGrid",
                     Description = "Persists grids of data to a database, with advanced storage features"
                 });
+
+                // Group endpoint routes together in the swagger page by their 'ApiExplorerSettings' > 'GroupName' attribute
+                //   This allows endpoints defined across multiple files too all appear in the same group
+                //   e.g. as occurs for endpoints in the 'UserEventProcessorControllerBase' and 'AddPrimaryUserEventProcessorControllerBase' controller classes
+                swaggerGenOptions.TagActionsBy((ApiDescription apiDescription) =>
+                {
+                    if (apiDescription.GroupName != null)
+                    {
+                        return new List<String> { apiDescription.GroupName };
+                    }
+                    else
+                    {
+                        var controllerActionDescriptor = (ControllerActionDescriptor)apiDescription.ActionDescriptor;
+                        if (controllerActionDescriptor != null)
+                        {
+                            throw new Exception($"'{nameof(apiDescription.GroupName)}' could not be found for controller '{controllerActionDescriptor.ControllerName}'.");
+                        }
+                        else
+                        {
+                            throw new Exception($"'{nameof(apiDescription.GroupName)}' could not be found for controller.");
+                        }
+                    }
+                });
+                // Omitting this causes only the first encountered 'ApiExplorerSettings' > 'GroupName' attribute to render in swagger
+                //   Including it renders groups defined for all controllers
+                swaggerGenOptions.DocInclusionPredicate((name, api) => { return true; });
+
+                // Add XML comments to swagger
+                var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                swaggerGenOptions.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
             });
 
             WebApplication app = builder.Build();

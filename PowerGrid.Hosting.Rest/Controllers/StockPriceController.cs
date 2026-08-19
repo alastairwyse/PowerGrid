@@ -15,10 +15,14 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PowerGrid.Hosting.Rest.Models.DataTransferObjects;
+using PowerGrid.Persistence;
+using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using PowerGrid.Persistence.SqlServer;
 
 namespace PowerGrid.Hosting.Rest.Controllers
 {
@@ -28,7 +32,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
     [ApiController]
     [ApiVersion("1")]
     [Route("api/v{version:apiVersion}")]
-    //[ApiExplorerSettings(GroupName = "StockPrices")]
+    [ApiExplorerSettings(GroupName = "StockPrices")]
     [Produces(MediaTypeNames.Application.Json)]
     public class StockPriceController : ControllerBase
     {
@@ -38,9 +42,9 @@ namespace PowerGrid.Hosting.Rest.Controllers
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Hosting.Rest.Controllers.StockPriceController class.
         /// </summary>
-        public StockPriceController(StockPricePersisterHost persisterHost)
+        public StockPriceController(PersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
         {
-            this.persisterHost = persisterHost;
+            persisterHost = new(concurrencyManager, stockPricePersister);
         }
 
         /// <summary>
@@ -53,7 +57,63 @@ namespace PowerGrid.Hosting.Rest.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<PersistGridResponseParameters> PersistGrid([FromBody] PersistGridRequestParameters requestParameters)
         {
-            throw new NotImplementedException();
+            Grids.StockPriceGridOuterKeyProperties stockPriceGridOuterKeyProperties = new
+            (
+                requestParameters.StockPriceGridOuterKeyProperties.Tag,
+                requestParameters.StockPriceGridOuterKeyProperties.DataSource,
+                requestParameters.StockPriceGridOuterKeyProperties.Date
+            );
+            (Int32 version, Core.GridComparisonStatistics gridComparisonStatistics) response = persisterHost.PersistGrid(stockPriceGridOuterKeyProperties, requestParameters.Items);
+
+            return new ActionResult<PersistGridResponseParameters>
+            (
+                new PersistGridResponseParameters()
+                {
+                    Version = response.version, 
+                    GridComparisonStatistics = new Core.GridComparisonStatistics
+                    (
+                        response.gridComparisonStatistics.ItemsAddedCount,
+                        response.gridComparisonStatistics.ItemsUpdatedCount,
+                        response.gridComparisonStatistics.ItemsDeletedCount
+                    )
+                }
+            );
+        }
+
+        /// <summary>
+        /// Retrieve the grid of stock prices with the specified properties.
+        /// </summary>
+        /// <param name="tag">A tag used to classify the grid.</param>
+        /// <param name="dataSource">The source/entity which provided the price.</param>
+        /// <param name="date">The date the price was quoted for.</param>
+        /// <param name="gridVersion">The version number of the grid to retrieve.</param>
+        /// <returns>The stock prices.</returns>
+        [HttpGet]
+        [Route("stockPrices/tag/{tag}/dataSource/{dataSource}/date/{date}/gridVersion/{gridVersion}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IEnumerable<StockPriceGridItemPTO> GetGrid([FromRoute] String tag, [FromRoute] String dataSource, [FromRoute] String date, [FromRoute] String gridVersion)
+        {
+            String decodedTag = Uri.UnescapeDataString(tag);
+            String decodedDataSource = Uri.UnescapeDataString(dataSource);
+            // TODO: Should probably be calling Uri.UnescapeDataString() on date and gridVersion aswell
+            Boolean dateParseResult = DateOnly.TryParse(date, out DateOnly parsedDate);
+            if (dateParseResult == false)
+            {
+                throw new ArgumentException($"Parameter '{nameof(date)}' with value {date} could not be converted to a {typeof(DateOnly).Name}.");
+            }
+            Boolean versionParseResult = Int32.TryParse(gridVersion, out Int32 parsedVersion);
+            if (versionParseResult == false)
+            {
+                throw new ArgumentException($"Parameter '{nameof(gridVersion)}' with value {gridVersion} could not be converted to a {typeof(Int32).Name}.");
+            }
+            Grids.StockPriceGridOuterKeyProperties stockPriceGridOuterKeyProperties = new
+            (
+                decodedTag,
+                decodedDataSource,
+                parsedDate
+            );
+
+            return persisterHost.GetGrid(stockPriceGridOuterKeyProperties, parsedVersion);
         }
     }
 }

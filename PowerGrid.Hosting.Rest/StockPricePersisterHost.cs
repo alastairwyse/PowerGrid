@@ -73,7 +73,7 @@ namespace PowerGrid.Hosting.Rest
 
         public IEnumerable<StockPriceGridItemPTO> GetGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, Int32 version)
         {
-            throw new NotImplementedException();
+            return stockPricePersister.GetGrid(gridOuterKeyProperties, version);
         }
 
         public IList<GridVersionAndTransactionTimestamp> GetGridDetails(StockPriceGridOuterKeyProperties gridOuterKeyProperties)

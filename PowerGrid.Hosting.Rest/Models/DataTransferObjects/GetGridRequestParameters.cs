@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-using System.Collections.Generic;
+using System;
 using PowerGrid.Grids;
 
 namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects
 {
     /// <summary>
-    /// DTO container class holding the parameters to a <see cref="StockPricePersisterHost.PersistGrid(Grids.StockPriceGridOuterKeyProperties, System.Collections.Generic.IList{Grids.StockPrice})"/> method call.
+    /// DTO container class holding the parameters to a <see cref="StockPricePersisterHost.GetGrid(Grids.StockPriceGridOuterKeyProperties, Int32)"/> method call.
     /// </summary>
-    public class PersistGridRequestParameters
+    public class GetGridRequestParameters
     {
-        /// <summary>The outer key properties of the items.</summary>
+        /// <summary>The outer key properties to retrieve the grid for.</summary>
         public StockPriceGridOuterKeyProperties StockPriceGridOuterKeyProperties { get; set; }
 
-        /// <summary>The stock prices to persist.</summary>
-        public IList<StockPrice> Items { get; set; }
+        /// <summary>The version of the grid.</summary>
+        public Int32 Version { get; set; }
     }
 }
