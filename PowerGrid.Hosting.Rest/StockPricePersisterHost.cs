@@ -78,27 +78,27 @@ namespace PowerGrid.Hosting.Rest
 
         public IList<GridVersionAndTransactionTimestamp> GetGridDetails(StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
-            throw new NotImplementedException();
+            return stockPricePersister.GetGridDetails(gridOuterKeyProperties);
         }
 
         public IList<Tuple<StockPriceGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(GridCommonKeyProperties gridCommonKeyProperties)
         {
-            throw new NotImplementedException();
+            return stockPricePersister.GetGridDetails(gridCommonKeyProperties);
         }
 
         public void SoftDeleteLatestGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
-            throw new NotImplementedException();
+            stockPricePersister.SoftDeleteLatestGrid(gridOuterKeyProperties);
         }
 
         public void HardDeleteGrids(StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
-            throw new NotImplementedException();
+            stockPricePersister.HardDeleteGrids(gridOuterKeyProperties);
         }
 
         public void HardDeleteGrids(GridCommonKeyProperties gridCommonKeyProperties)
         {
-            throw new NotImplementedException();
+            stockPricePersister.HardDeleteGrids(gridCommonKeyProperties);
         }
     }
 }
