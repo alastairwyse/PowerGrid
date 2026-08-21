@@ -24,7 +24,7 @@ namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects
     /// </summary>
     public class PersistGridResponse
     {
-        /// <summary>The version number of the persisted grid</summary>
+        /// <summary>The version number of the persisted grid.</summary>
         public Int32 Version { get; set; }
 
         /// <summary>Statistics containing counts of the items persisted.</summary>

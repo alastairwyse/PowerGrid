@@ -55,7 +55,11 @@ namespace PowerGrid.Hosting.Rest
                 new StockPricePersister(connectionString, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
             );
 
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+            // Override the default model-binding failure behaviour, to return a HttpErrorResponse object rather than the standard ProblemDetails
+            .MapModelBindingFailureToHttpErrorResponse()
+            // Return HTTP 406 (not acceptable) statuses if the 'Accept' request header does not match the controller's 'ProducesResponseType' attribute (i.e. '*/*' or 'application/json')
+            .ReturnHttpNotAcceptableOnUnsupportedAcceptHeader();
 
             // Allow APIs to be versioned
             builder.Services.SetupApiVersioning();

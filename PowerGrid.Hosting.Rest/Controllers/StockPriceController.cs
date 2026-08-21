@@ -70,7 +70,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
             (
                 new PersistGridResponse()
                 {
-                    Version = result.version, 
+                    Version = result.version,
                     GridComparisonStatistics = new Core.GridComparisonStatistics
                     (
                         result.gridComparisonStatistics.ItemsAddedCount,
