@@ -8,8 +8,8 @@
 
 :Setvar DatabaseName PowerGrid
 
---CREATE DATABASE $(DatabaseName);
---GO
+CREATE DATABASE $(DatabaseName);
+GO
 
 USE $(DatabaseName);
 GO 

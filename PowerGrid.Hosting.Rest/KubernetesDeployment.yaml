@@ -1,0 +1,116 @@
+# SQL Server pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sqlserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sqlserver
+  template:
+    metadata:
+      labels:
+        app: sqlserver
+    spec:
+      containers:
+      - name: sqlserver
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports:
+        - containerPort: 1433
+        env:
+        - name: ACCEPT_EULA
+          value: "y"
+        - name: MSSQL_SA_PASSWORD
+          value: "h8en9s8N"
+        resources:
+          requests:
+            cpu: 250m
+            memory: 250Mi
+            
+---
+# Expose SQL Server on port 1433
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlserver-service
+spec:
+  ports:
+  - port: 1433
+    targetPort: 1433
+  selector:
+    app: sqlserver
+  type: ClusterIP  
+
+---
+# Powergrid pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: powergrid
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: powergrid
+  template:
+    metadata:
+      labels:
+        app: powergrid
+    spec:
+      terminationGracePeriodSeconds: 3600
+      containers:
+      - name: powergrid
+        image: alastairwyse/powergrid:20260822-2329
+        ports:
+        - containerPort: 5000
+        env:
+        - name: Logging__LogLevel__Default
+          value: "Information"
+        - name: Logging__LogLevel__Microsoft.AspNetCore"
+          value: "Warning"
+        - name: Logging__LogLevel__Microsoft.AspNetCore"
+          value: Warning
+        - name: "AllowedHosts"
+          value: "*"
+        - name: ErrorHandling__IncludeInnerExceptions
+          value: "true"
+        - name: ErrorHandling__OverrideInternalServerErrors
+          value: "false"
+        - name: ErrorHandling__InternalServerErrorMessageOverride
+          value: "An internal server error occurred"
+        - name: DatabaseConnection__ConnectionString
+          value: "Server=sqlserver-service;Database=PowerGrid;User Id=sa;Password=h8en9s8N;Encrypt=false;Authentication=SqlPassword"
+        - name: DatabaseConnection__RetryCount
+          value: "10"
+        - name: DatabaseConnection__RetryInterval
+          value: "20"
+        - name: DatabaseConnection__OperationTimeout
+          value: "0"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 120Mi
+      # InitContainer to create the ApplicationAccess database and objects in SQL Server
+      initContainers:
+      - name: sqlserver-database-creation
+        image: ubuntu:focal
+        command: ['bash', '-c', 'apt-get update; apt-get -y install netcat; until nc -zv sqlserver-service 1433; do echo waiting for sqlserver; sleep 2; done; apt-get -y install curl; curl -O https://raw.githubusercontent.com/alastairwyse/PowerGrid/refs/heads/main/PowerGrid.Hosting.Rest/InitializeSqlServerDatabase.sh; chmod 0777 InitializeSqlServerDatabase.sh; ./InitializeSqlServerDatabase.sh sqlserver-service 1433 sa h8en9s8N; exit;']
+        resources:
+          requests:
+            cpu: 250m
+            memory: 250Mi
+
+---
+# Expose port 5000 publically (and route to the ApplicationAccess pod)
+apiVersion: v1
+kind: Service
+metadata:
+  name: powergrid-service
+spec:
+  ports:
+  - port: 5000
+    targetPort: 5000
+  selector:
+    app: powergrid
+  type: LoadBalancer
