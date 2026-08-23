@@ -61,17 +61,15 @@ spec:
       terminationGracePeriodSeconds: 3600
       containers:
       - name: powergrid
-        image: alastairwyse/powergrid:20260822-2329
+        image: alastairwyse/powergrid:20260823-1132
         ports:
         - containerPort: 5000
         env:
         - name: Logging__LogLevel__Default
           value: "Information"
-        - name: Logging__LogLevel__Microsoft.AspNetCore"
+        - name: Logging__LogLevel__Microsoft.AspNetCore
           value: "Warning"
-        - name: Logging__LogLevel__Microsoft.AspNetCore"
-          value: Warning
-        - name: "AllowedHosts"
+        - name: AllowedHosts
           value: "*"
         - name: ErrorHandling__IncludeInnerExceptions
           value: "true"
@@ -87,6 +85,8 @@ spec:
           value: "20"
         - name: DatabaseConnection__OperationTimeout
           value: "0"
+        - name: ASPNETCORE_URLS
+          value: "http://*:5000"
         resources:
           requests:
             cpu: 500m
