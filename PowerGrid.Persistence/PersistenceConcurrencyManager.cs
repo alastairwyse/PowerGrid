@@ -25,7 +25,7 @@ namespace PowerGrid.Persistence
     /// <summary>
     /// Manages locks to allow concurrent persistence of grids.
     /// </summary>
-    public class PersistenceConcurrencyManager : IDisposable
+    public class PersistenceConcurrencyManager : IPersistenceConcurrencyManager, IDisposable
     {
         /// <summary>Maps <see cref="IGridLockKey"/> implementations to <see cref="ReaderWriterLockSlim"/> instances which are used to apply mutual exclusion locks to common key properties of grids.</summary>
         protected ConcurrentDictionary<IGridLockKey, ReaderWriterLockSlim> commonKeyPropertiesLockDictionary;
@@ -44,12 +44,7 @@ namespace PowerGrid.Persistence
             disposed = false;
         }
         
-        /// <summary>
-        /// Acquires an exclusive lock on the grids with the specified common key properties, and invokes the specified action.
-        /// </summary>
-        /// <typeparam name="TGridCommonKeyProperties">The type of the common key properties.</typeparam>
-        /// <param name="commonKeyPropertiesLock">The common key properties of the grid to obtain an exclusive lock for.</param>
-        /// <param name="action">The action to invoke.</param>
+        /// <inheritdoc/>
         public void AcquireLockAndInvokeAction<TGridCommonKeyProperties>(GridCommonKeyPropertiesLockKeyBase<TGridCommonKeyProperties> commonKeyPropertiesLock, Action action)
             where TGridCommonKeyProperties : IGridCommonKeyProperties
         {
@@ -65,14 +60,7 @@ namespace PowerGrid.Persistence
             }
         }
 
-        /// <summary>
-        /// Acquires an exclusive lock on the grid with the specified outer key properties, and invokes the specified action.
-        /// </summary>
-        /// <typeparam name="TGridCommonKeyProperties">The type of the common key properties.</typeparam>
-        /// <typeparam name="TGridOuterKeyProperties">The type of the outer key properties.</typeparam>
-        /// <param name="commonKeyPropertiesLock">The common key properties of the grid to obtain an exclusive lock for.</param>
-        /// <param name="outerKeyPropertiesLock">The outer key properties of the grid to obtain an exclusive lock for.</param>
-        /// <param name="action">The action to invoke.</param>
+        /// <inheritdoc/>
         public void AcquireLockAndInvokeAction<TGridCommonKeyProperties, TGridOuterKeyProperties>
         (
             GridCommonKeyPropertiesLockKeyBase<TGridCommonKeyProperties> commonKeyPropertiesLock, 

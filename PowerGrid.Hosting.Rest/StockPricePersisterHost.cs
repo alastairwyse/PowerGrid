@@ -36,7 +36,7 @@ namespace PowerGrid.Hosting.Rest
         //   * etc
 
         /// <summary>Manages locks to allow concurrent persistence of grids.</summary>
-        protected PersistenceConcurrencyManager concurrencyManager;
+        protected IPersistenceConcurrencyManager concurrencyManager;
         /// <summary>Persister for grids of stock prices.</summary>
         protected StockPricePersister stockPricePersister;
 
@@ -45,7 +45,7 @@ namespace PowerGrid.Hosting.Rest
         /// </summary>
         /// <param name="concurrencyManager">Manages locks to allow concurrent persistence of grids.</param>
         /// <param name="stockPricePersister">Persister for grids of stock prices.</param>
-        public StockPricePersisterHost(PersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
+        public StockPricePersisterHost(IPersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
         {
             this.concurrencyManager = concurrencyManager;
             this.stockPricePersister = stockPricePersister;

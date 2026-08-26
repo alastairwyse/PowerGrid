@@ -43,7 +43,7 @@ namespace PowerGrid.Hosting.Rest
             builder.Services.AddOptions<DatabaseConnectionOptions>()
                 .Bind(builder.Configuration.GetSection(DatabaseConnectionOptions.DatabaseConnectionOptionsName))
                 .ValidateDataAnnotations().ValidateOnStart();
-            builder.Services.AddSingleton<PersistenceConcurrencyManager>(new PersistenceConcurrencyManager());
+            builder.Services.AddSingleton<IPersistenceConcurrencyManager>(new PersistenceConcurrencyManager());
             DatabaseConnectionOptions databaseConnectionOptions = builder.Configuration.GetSection(DatabaseConnectionOptions.DatabaseConnectionOptionsName).Get<DatabaseConnectionOptions>();
             String connectionString = databaseConnectionOptions.ConnectionString;
             Int32 retryCount = databaseConnectionOptions.RetryCount;
