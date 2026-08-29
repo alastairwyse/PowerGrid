@@ -29,7 +29,7 @@ namespace PowerGrid.Grids
         {
             get
             {
-                return new Object[2] { underlyingGridKeyProperties.Tag, underlyingGridKeyProperties.Date };
+                return new Object[3] { underlyingGridKeyProperties.Tag, underlyingGridKeyProperties.Date, underlyingGridKeyProperties.Time };
             }
         }
 

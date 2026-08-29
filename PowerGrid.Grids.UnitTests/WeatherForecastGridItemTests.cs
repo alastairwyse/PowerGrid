@@ -49,7 +49,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                WeatherForecastGridItem testWeatherForecastGridItem = new(null, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+                WeatherForecastGridItem testWeatherForecastGridItem = new(null, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
@@ -61,7 +61,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                WeatherForecastGridItem testWeatherForecastGridItem = new("  ", utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+                WeatherForecastGridItem testWeatherForecastGridItem = new("  ", utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
@@ -71,42 +71,42 @@ namespace PowerGrid.Grids.UnitTests
         [Test]
         public void KeyCompareTo()
         {
-            WeatherForecastGridItem weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            WeatherForecastGridItem weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+            WeatherForecastGridItem weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
+            WeatherForecastGridItem weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
             Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == 0);
 
 
-            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            weatherForecast2 = new(preliminaryTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
+            weatherForecast2 = new(preliminaryTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity,  26);
 
             Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
             Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
 
 
-            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-12"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
+            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-12"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
             Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
             Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
 
 
-            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), australiaCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
+            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("22:00:00"), japanCountry, tokyoCity, 26);
 
             Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
             Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
 
 
-            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, osakaCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), australiaCountry, tokyoCity, 26);
+            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
             Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
             Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
 
 
-            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, osakaCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("22:00:00"), 26);
+            weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, osakaCity, 26);
+            weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
             Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
             Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
@@ -115,9 +115,9 @@ namespace PowerGrid.Grids.UnitTests
         [Test]
         public void ValuePropertiesEqual()
         {
-            WeatherForecastGridItem weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            WeatherForecastGridItem weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
-            WeatherForecastGridItem weatherForecast3 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 27);
+            WeatherForecastGridItem weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
+            WeatherForecastGridItem weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
+            WeatherForecastGridItem weatherForecast3 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 27);
 
             Assert.That(weatherForecast1.ValuePropertiesEqual(weatherForecast2) == true);
             Assert.That(weatherForecast1.ValuePropertiesEqual(weatherForecast3) == false);
@@ -126,11 +126,11 @@ namespace PowerGrid.Grids.UnitTests
         [Test]
         public void PrintMembers()
         {
-            WeatherForecastGridItem testWeatherForecastGridItem = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), japanCountry, tokyoCity, utils.CreateTimeOnlyFromString("21:00:00"), 26);
+            WeatherForecastGridItem testWeatherForecastGridItem = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
             String result = testWeatherForecastGridItem.ToString();
 
-            Assert.That(result == "WeatherForecastGridItem { Tag = 'Official', Date = '2026-07-11', Country = 'Japan', City = 'Tokyo', Time = '21:00:00', Temperature = 26 }");
+            Assert.That(result == "WeatherForecastGridItem { Tag = 'Official', Date = '2026-07-11', Time = '21:00:00', Country = 'Japan', City = 'Tokyo', Temperature = 26 }");
         }
     }
 }

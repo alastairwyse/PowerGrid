@@ -28,22 +28,26 @@ namespace PowerGrid.Grids
         /// <summary>The date the weather was forecast for.</summary>
         public DateOnly Date { get; init; }
 
+        /// <summary>The time of day of the weather was forecast for.</summary>
+        public TimeOnly Time { get; init; }
+
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Grids.WeatherForecastGridItem class.
         /// </summary>
         /// <param name="tag">A tag used to classify the grid.</param>
         /// <param name="date">The date the weather was forecast for.</param>
+        /// <param name="time">The time of day of the weather was forecast for.</param>
         /// <param name="country">The country of the city the weather was forecast for.</param>
         /// <param name="city">The city the weather was forecast for.</param>
-        /// <param name="time">The time of day of the weather forecast.</param>
         /// <param name="temperature">The forecast temperature.</param>
-        public WeatherForecastGridItem(String tag, DateOnly date, String country, String city, TimeOnly time, Int32 temperature)
-            : base(country, city, time, temperature)
+        public WeatherForecastGridItem(String tag, DateOnly date, TimeOnly time, String country, String city, Int32 temperature)
+            : base(country, city, temperature)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
 
-            Date = date;
             Tag = tag;
+            Time = time;
+            Date = date;
         }
 
         /// <inheritdoc/>
@@ -53,7 +57,14 @@ namespace PowerGrid.Grids
             {
                 if (this.Date.CompareTo(other.Date) == 0)
                 {
-                    return base.KeyCompareTo(other);
+                    if (this.Time.CompareTo(other.Time) == 0)
+                    {
+                        return base.KeyCompareTo(other);
+                    }
+                    else
+                    {
+                        return this.Time.CompareTo(other.Time);
+                    }
                 }
                 else
                 {
@@ -77,7 +88,7 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         protected override bool PrintMembers(StringBuilder builder)
         {
-            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}', {nameof(Country)} = '{Country}', {nameof(City)} = '{City}', {nameof(Time)} = '{Time.ToString("HH:mm:ss")}', {nameof(Temperature)} = {Temperature}");
+            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}', {nameof(Time)} = '{Time.ToString("HH:mm:ss")}', {nameof(Country)} = '{Country}', {nameof(City)} = '{City}', {nameof(Temperature)} = {Temperature}");
 
             return true;
         }

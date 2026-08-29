@@ -26,5 +26,8 @@ namespace PowerGrid.Grids
     {
         /// <summary>The date the weather was forecast for.</summary>
         public DateOnly Date { get; }
+
+        /// <summary>The time of day of the weather was forecast for.</summary>
+        public TimeOnly Time { get; }
     }
 }

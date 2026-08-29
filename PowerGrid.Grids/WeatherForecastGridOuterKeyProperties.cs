@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-using PowerGrid.Core;
 using System;
-using System.Diagnostics;
 using System.Text;
+using PowerGrid.Core;
 
 namespace PowerGrid.Grids
 {
@@ -32,17 +31,22 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         public DateOnly Date { get; init; }
 
+        /// <inheritdoc/>
+        public TimeOnly Time { get; init; }
+
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Grids.WeatherForecastGridOuterKeyProperties class.
         /// </summary>
         /// <param name="tag">A tag used to classify the grid.</param>
         /// <param name="date">The date the weather was forecast for.</param>
-        public WeatherForecastGridOuterKeyProperties(String tag, DateOnly date)
+        /// <param name="time">The time of day of the weather was forecast for.</param>
+        public WeatherForecastGridOuterKeyProperties(String tag, DateOnly date, TimeOnly time)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(tag), tag);
 
             Tag = tag;
             Date = date;
+            Time = time;
         }
 
         #region Private/Protected Methods
@@ -50,7 +54,7 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         protected override bool PrintMembers(StringBuilder builder)
         {
-            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}'");
+            builder.Append($"{nameof(Tag)} = '{Tag}', {nameof(Date)} = '{Date.ToString("yyyy-MM-dd")}', {nameof(Time)} = '{Time.ToString("HH:mm:ss")}'");
 
             return true;
         }

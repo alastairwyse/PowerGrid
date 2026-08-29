@@ -26,9 +26,9 @@ namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
     /// <param name="Id">A unique id for the object within persistent storage.</param>
     /// <param name="Tag">A tag used to classify the grid.</param>
     /// <param name="Date">The date the weather was forecast for.</param>
+    /// <param name="Time">The time of day of the weather was forecast for.</param>
     /// <param name="Country">The country of the city the weather was forecast for.</param>
     /// <param name="City">The city the weather was forecast for.</param>
-    /// <param name="Time">The time of day of the weather forecast.</param>
     /// <param name="Temperature">The forecast temperature.</param>
     /// <param name="TransactionFrom">The date and time that the object became active.</param>
     /// <param name="TransactionTo">The date and time that the object was superseded or deleted.</param>
@@ -36,15 +36,15 @@ namespace PowerGrid.Persistence.Models.PersistenceTransferObjects
     (
         Int64 Id,
         String Tag, 
-        DateOnly Date, 
+        DateOnly Date,
+        TimeOnly Time,
         String Country, 
-        String City, 
-        TimeOnly Time, 
+        String City,  
         Int32 Temperature,
         DateTime TransactionFrom,
         DateTime TransactionTo
     )
-        : WeatherForecastGridItem(Tag, Date, Country, City, Time, Temperature), IWeatherForecastGridOuterKeyProperties, IGridItem<WeatherForecastGridItem>, IPersistenceTransferObject
+        : WeatherForecastGridItem(Tag, Date, Time, Country, City, Temperature), IWeatherForecastGridOuterKeyProperties, IGridItem<WeatherForecastGridItem>, IPersistenceTransferObject
     {
     }
 }

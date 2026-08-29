@@ -38,7 +38,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new(null, utils.CreateDateOnlyFromString("2026-07-12"));
+                WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new(null, utils.CreateDateOnlyFromString("2026-07-12"), utils.CreateTimeOnlyFromString("21:00:00"));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
@@ -50,7 +50,7 @@ namespace PowerGrid.Grids.UnitTests
         {
             var e = Assert.Throws<ArgumentNullException>(delegate
             {
-                WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new(" ", utils.CreateDateOnlyFromString("2026-07-12"));
+                WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new(" ", utils.CreateDateOnlyFromString("2026-07-12"), utils.CreateTimeOnlyFromString("21:00:00"));
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'tag' must contain a value."));
@@ -60,11 +60,11 @@ namespace PowerGrid.Grids.UnitTests
         [Test]
         public void PrintMembers()
         {
-            WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new("Official", utils.CreateDateOnlyFromString("2026-07-12"));
+            WeatherForecastGridOuterKeyProperties testWeatherForecastGridOuterKeyProperties = new("Official", utils.CreateDateOnlyFromString("2026-07-12"), utils.CreateTimeOnlyFromString("21:00:00"));
 
             String result = testWeatherForecastGridOuterKeyProperties.ToString();
 
-            Assert.That(result == "WeatherForecastGridOuterKeyProperties { Tag = 'Official', Date = '2026-07-12' }");
+            Assert.That(result == "WeatherForecastGridOuterKeyProperties { Tag = 'Official', Date = '2026-07-12', Time = '21:00:00' }");
         }
     }
 }

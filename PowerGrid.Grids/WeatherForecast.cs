@@ -30,9 +30,6 @@ namespace PowerGrid.Grids
         /// <summary>The city the weather was forecast for.</summary>
         public String City { get; init; }
 
-        /// <summary>The time of day of the weather forecast.</summary>
-        public TimeOnly Time { get; init; }
-
         /// <summary>The forecast temperature.</summary>
         public Int32 Temperature { get; init; }
 
@@ -41,16 +38,14 @@ namespace PowerGrid.Grids
         /// </summary>
         /// <param name="country">The country of the city the weather was forecast for.</param>
         /// <param name="city">The city the weather was forecast for.</param>
-        /// <param name="time">The time of day of the weather forecast.</param>
         /// <param name="temperature">The forecast temperature.</param>
-        public WeatherForecast(String country, String city, TimeOnly time, Int32 temperature)
+        public WeatherForecast(String country, String city, Int32 temperature)
         {
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(country), country);
             ThrowExceptionIfStringParameterNullOrWhitespace(nameof(city), city);
 
             Country = country;
             City = city;
-            Time = time;
             Temperature = temperature;
         }
 
@@ -59,14 +54,7 @@ namespace PowerGrid.Grids
         {
             if (this.Country.CompareTo(other.Country) == 0)
             {
-                if (this.City.CompareTo(other.City) == 0)
-                {
-                    return this.Time.CompareTo(other.Time);
-                }
-                else
-                {
-                    return this.City.CompareTo(other.City);
-                }
+                return this.City.CompareTo(other.City);
             }
             else
             {

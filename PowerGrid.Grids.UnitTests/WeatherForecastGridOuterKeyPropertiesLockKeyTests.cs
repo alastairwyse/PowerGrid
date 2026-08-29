@@ -30,6 +30,7 @@ namespace PowerGrid.Grids.UnitTests
     {
         private const String testTag = "Official";
         private DateOnly testDate;
+        private TimeOnly testTime;
 
         private TestUtilities utils;
         private WeatherForecastGridOuterKeyPropertiesLockKey testWeatherForecastGridOuterKeyPropertiesLockKey;
@@ -39,7 +40,8 @@ namespace PowerGrid.Grids.UnitTests
         {
             utils = new TestUtilities();
             testDate = utils.CreateDateOnlyFromString("2026-07-12");
-            testWeatherForecastGridOuterKeyPropertiesLockKey = new(new WeatherForecastGridOuterKeyProperties(testTag, testDate));
+            testTime = utils.CreateTimeOnlyFromString("21:00:00");
+            testWeatherForecastGridOuterKeyPropertiesLockKey = new(new WeatherForecastGridOuterKeyProperties(testTag, testDate, testTime));
         }
 
         [Test]
@@ -47,13 +49,15 @@ namespace PowerGrid.Grids.UnitTests
         {
             Object[] keyPropertyValues = testWeatherForecastGridOuterKeyPropertiesLockKey.KeyPropertyValues;
 
-            Assert.That(keyPropertyValues.Length == 3);
+            Assert.That(keyPropertyValues.Length == 4);
             Assert.That(keyPropertyValues[0].GetType().IsAssignableTo(typeof(Type)));
             Assert.That((Type)keyPropertyValues[0] == typeof(WeatherForecastGridOuterKeyProperties));
             Assert.That(keyPropertyValues[1].GetType() == typeof(String));
             Assert.That((String)keyPropertyValues[1] == testTag);
             Assert.That(keyPropertyValues[2].GetType() == typeof(DateOnly));
             Assert.That((DateOnly)keyPropertyValues[2] == testDate);
+            Assert.That(keyPropertyValues[3].GetType() == typeof(TimeOnly));
+            Assert.That((TimeOnly)keyPropertyValues[3] == testTime);
         }
     }
 }
