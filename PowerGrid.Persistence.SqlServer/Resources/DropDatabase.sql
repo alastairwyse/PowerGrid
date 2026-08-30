@@ -11,5 +11,7 @@ GO
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
+DROP TABLE $(DatabaseName).dbo.WeatherForecastGrids;
+DROP TABLE $(DatabaseName).dbo.WeatherForecasts;
 DROP TABLE $(DatabaseName).dbo.StockPriceGrids;
 DROP TABLE $(DatabaseName).dbo.StockPrices;

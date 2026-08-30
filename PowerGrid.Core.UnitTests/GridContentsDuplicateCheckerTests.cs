@@ -75,7 +75,7 @@ namespace PowerGrid.Core.UnitTests
                 List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
             });
 
-            Assert.That(e.Message, Does.StartWith("Grid contains items with duplicate key values."));
+            Assert.That(e.Message, Does.StartWith($"Grid contains items with duplicate key values.  The duplicated item was {gridContents[1].ToString()}."));
             Assert.That(e.GridItem == gridContents[1]);
 
 
@@ -92,7 +92,7 @@ namespace PowerGrid.Core.UnitTests
                 List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
             });
 
-            Assert.That(e.Message, Does.StartWith("Grid contains items with duplicate key values."));
+            Assert.That(e.Message, Does.StartWith($"Grid contains items with duplicate key values.  The duplicated item was {gridContents[2].ToString()}."));
             Assert.That(e.GridItem == gridContents[2]);
 
 
@@ -109,7 +109,7 @@ namespace PowerGrid.Core.UnitTests
                 List<StockPrice> result = new(testGridContentsDuplicateChecker.CheckForDuplicates(gridContents));
             });
 
-            Assert.That(e.Message, Does.StartWith("Grid contains items with duplicate key values."));
+            Assert.That(e.Message, Does.StartWith($"Grid contains items with duplicate key values.  The duplicated item was {gridContents[3].ToString()}."));
             Assert.That(e.GridItem == gridContents[3]);
         }
     }

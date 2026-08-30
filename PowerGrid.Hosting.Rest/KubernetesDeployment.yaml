@@ -61,7 +61,7 @@ spec:
       terminationGracePeriodSeconds: 3600
       containers:
       - name: powergrid
-        image: alastairwyse/powergrid:20260823-1132
+        image: alastairwyse/powergrid:20260830-2044
         ports:
         - containerPort: 5000
         env:

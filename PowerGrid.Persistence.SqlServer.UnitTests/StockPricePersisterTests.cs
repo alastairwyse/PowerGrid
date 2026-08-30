@@ -34,7 +34,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
     /// <summary>
     /// Unit tests for the PowerGrid.Persistence.SqlServer.StockPricePersister class.
     /// </summary>
-    public class StockPricePersisterTests
+    public class StockPricePersisterTests : PersisterTestsBase
     {
         // Note:
         //   Have found creative ways to mock SQL Server dependencies using 'shim' interfaces.
@@ -45,33 +45,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         //   Obviously this isn't perfect, as it won't catch if the code under test is passing null in error
         //   But, IMO it's a small price to pay, as opposed to having no units tests at all.
 
-        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
-        private const String transactSql23DateStyle = "yyyy-MM-dd";
-        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
-        private const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
-        private const String testConnectionString = "Server=127.0.0.1;Database=PowerGrid;User Id=user;Password=pwd=%X9sjQb;Encrypt=false;Authentication=SqlPassword";
-
-        private TestUtilities utils;
-        private List<SqlRetryingEventArgs> connectionRetryActionInvocationParameters;
-        private EventHandler<SqlRetryingEventArgs> connectionRetryAction;
-        private IApplicationLogger mockLogger;
-        private IMetricLogger mockMetricLogger;
-        private IDateTimeProvider mockDateTimeProvider;
-        private ISqlConnectionShim mockSqlConnectionShim;
-        private ISqlTransactionShim mockSqlTransactionShim;
-        private ISqlCommandShim mockSqlCommandShim;
         private StockPricePersisterWithProtectedMembers testStockPricePersister;
 
         [SetUp]
-        protected void SetUp()
+        protected override void SetUp()
         {
-            mockLogger = Substitute.For<IApplicationLogger>();
-            mockMetricLogger = Substitute.For<IMetricLogger>();
-            mockDateTimeProvider = Substitute.For<IDateTimeProvider>();
-            mockSqlConnectionShim = Substitute.For<ISqlConnectionShim>();
-            mockSqlTransactionShim = Substitute.For<ISqlTransactionShim>();
-            mockSqlCommandShim = Substitute.For<ISqlCommandShim>();
-            utils = new TestUtilities();
+            base.SetUp();
             testStockPricePersister = new StockPricePersisterWithProtectedMembers(testConnectionString, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
         }
 
@@ -1979,35 +1958,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(6).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
-
-        #region Private/Protected Methods
-
-        // Base of Below courtesy of https://blog.jonathanchannon.com/2014-01-02-unit-testing-with-sqlexception/ (required a few tweaks to get to the pass the right params to SqlError constructor)
-        private SqlException GetSqlException(Int32 errorNumber, String errorMessage, Int32 constructorIndex)
-        {
-            SqlErrorCollection collection = ConstructObject<SqlErrorCollection>();
-            var underlyingException = new Exception("Mock underlying deadlock exception");
-            SqlError error = ConstructObject<SqlError>(errorNumber, (byte)56, (byte)13, "server name", errorMessage, "proc", 442, 1, underlyingException);
-
-            typeof(SqlErrorCollection)
-                .GetMethod("Add", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(collection, new object[] { error });
-
-            var e = typeof(SqlException)
-                .GetMethod("CreateException", BindingFlags.NonPublic | BindingFlags.Static, null, CallingConventions.ExplicitThis, new[] { typeof(SqlErrorCollection), typeof(string) }, new ParameterModifier[] { })
-                .Invoke(null, new object[] { collection, "11.0.0" }) as SqlException;
-
-            return e;
-        }
-
-        private T ConstructObject<T>(params object[] parameters)
-        {
-            ConstructorInfo constructor = typeof(T).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)[0];
-
-            return (T)constructor.Invoke(parameters);
-        }
-
-        #endregion
 
         #region Nested Classes
 

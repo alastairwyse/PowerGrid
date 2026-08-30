@@ -148,5 +148,23 @@ namespace PowerGrid.Persistence.SqlServer
         {
             throw new NotImplementedException();
         }
+
+        #region Private/Protected Methods
+
+        /// <summary>
+        /// Creates a new grid.
+        /// </summary>
+        /// <param name="readConnection">The connection to use to read existing data.</param>
+        /// <param name="writeConnection">The connection to use to write the grid.</param>
+        /// <param name="transaction">The transaction to execute the write operation in.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to create.</param>
+        /// <param name="createDateTime">The timestamp when the grid was created.</param>
+        /// <returns>The version number of the new grid.</returns>
+        protected override Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
     }
 }

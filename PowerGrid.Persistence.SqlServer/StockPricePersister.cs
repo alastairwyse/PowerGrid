@@ -837,7 +837,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to create.</param>
         /// <param name="createDateTime">The timestamp when the grid was created.</param>
         /// <returns>The version number of the new grid.</returns>
-        protected Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceGridOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
+        protected override Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceGridOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
         {
             const String tagParameterName = "@Tag";
             const String dataSourceParameterName = "@DataSource";

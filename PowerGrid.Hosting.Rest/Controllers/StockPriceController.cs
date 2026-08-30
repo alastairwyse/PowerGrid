@@ -42,7 +42,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Hosting.Rest.Controllers.StockPriceController class.
         /// </summary>
-        public StockPriceController(PersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
+        public StockPriceController(IPersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
         {
             persisterHost = new(concurrencyManager, stockPricePersister);
         }

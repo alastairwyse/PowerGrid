@@ -133,5 +133,26 @@ namespace PowerGrid.Hosting.Rest
 
             app.Run();
         }
+
+        //protected void AddExceptionHandilngMappingForGridItemType<T>()
+
+        /// <summary>
+        /// Creates an <see cref="HttpErrorResponse"/> from the specified parameters.
+        /// </summary>
+        /// <param name="code">The 'code' property of the <see cref="HttpErrorResponse"/>.</param>
+        /// <param name="exception">The exception to map to the <see cref="HttpErrorResponse"/>.</param>
+        /// <param name="attributes">The values to map to the 'attributes' property of the <see cref="HttpErrorResponse"/>.</param>
+        /// <returns></returns>
+        protected static HttpErrorResponse ConstructHttpErrorResponseFromException(String code, Exception exception, List<Tuple<String, String>> attributes)
+        {
+            if (exception.TargetSite == null)
+            {
+                return new HttpErrorResponse(code, exception.Message, attributes);
+            }
+            else
+            {
+                return new HttpErrorResponse(code, exception.Message, exception.TargetSite.Name, attributes);
+            }
+        }
     }
 }

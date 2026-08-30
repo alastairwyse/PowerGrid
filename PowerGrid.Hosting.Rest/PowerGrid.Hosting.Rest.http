@@ -1,6 +1,0 @@
-@PowerGrid.Hosting.Rest_HostAddress = http://localhost:5131
-
-GET {{PowerGrid.Hosting.Rest_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

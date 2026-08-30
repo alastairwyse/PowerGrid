@@ -48,7 +48,7 @@ namespace PowerGrid.Core
                 {
                     if (lastItem.KeyCompareTo(currentItem) == 0)
                     {
-                        throw new GridContentsDuplicateItemsException<T>("Grid contains items with duplicate key values.", currentItem);
+                        throw new GridContentsDuplicateItemsException<T>($"Grid contains items with duplicate key values.  The duplicated item was {currentItem.ToString()}.", currentItem);
                     }
                     else
                     {

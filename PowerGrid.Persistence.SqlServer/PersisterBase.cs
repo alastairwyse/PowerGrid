@@ -19,11 +19,9 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
-using PowerGrid.Persistence;
 using PowerGrid.Persistence.SqlServer.Metrics;
 using ApplicationLogging;
 using ApplicationMetrics;
-using ApplicationMetrics.MetricLoggers;
 
 namespace PowerGrid.Persistence.SqlServer
 {
@@ -197,6 +195,20 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #region Private/Protected Methods
+
+        /// <summary>
+        /// Creates a new grid.
+        /// </summary>
+        /// <param name="readConnection">The connection to use to read existing data.</param>
+        /// <param name="writeConnection">The connection to use to write the grid.</param>
+        /// <param name="transaction">The transaction to execute the write operation in.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to create.</param>
+        /// <param name="createDateTime">The timestamp when the grid was created.</param>
+        /// <returns>The version number of the new grid.</returns>
+        protected virtual Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, TOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
+        {
+            throw new NotImplementedException();
+        }
 
         /// <summary>
         /// Attempts to execute a non-query SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
