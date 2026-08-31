@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Data;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Persistence.SqlServer.Metrics;
@@ -195,6 +196,25 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #region Private/Protected Methods
+
+        /// <summary>
+        /// The human readable name of the type of data which is held in a grid item.
+        /// </summary>
+        /// <remarks>For use in exception messages.  All words should be lower case and singular, e.g. 'stock price'.</remarks>
+        protected abstract String GridItemEntityName { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the maximum version of a grid, given the outer key properties.
+        /// </summary>
+        protected abstract String MaxVersionQuery { get; }
+
+        /// <summary>
+        /// Sets the maximum grid version query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
+        /// </summary>
+        /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
+        /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
+        /// <param name="gridOuterKeyProperties">The outer key properties to use in the parameters.</param>
+        protected abstract void AddMaxVersionQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TOuterKeyProperties gridOuterKeyProperties);
 
         /// <summary>
         /// Creates a new grid.

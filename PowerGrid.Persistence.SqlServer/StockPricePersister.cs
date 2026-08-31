@@ -34,6 +34,45 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class StockPricePersister : PersisterBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
+        #region TEMP StockPricePersisterRefactoring
+
+        const String maxVersionColumnAlias = "MaxVersion";
+
+        const String tagParameterName = "@Tag";
+        const String dataSourceParameterName = "@DataSource";
+        const String dateParameterName = "@Date";
+
+        /// <inheritdoc/>
+        protected override String GridItemEntityName
+        {
+            get { return "stock price"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String MaxVersionQuery 
+        {
+            get
+            {
+                return @$"
+                SELECT  MAX([Version]) AS {maxVersionColumnAlias} 
+                FROM    StockPriceGrids 
+                WHERE   Tag = {tagParameterName}
+                  AND   DataSource = {dataSourceParameterName}
+                  AND   [Date] = CONVERT(date, {dateParameterName}, 23);
+                ";
+            } 
+        }
+
+        /// <inheritdoc/>
+        protected override void AddMaxVersionQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
+        {
+            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
+            sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
+            sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+        }
+
+        #endregion
+
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister class.
         /// </summary>
@@ -839,43 +878,31 @@ namespace PowerGrid.Persistence.SqlServer
         /// <returns>The version number of the new grid.</returns>
         protected override Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceGridOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
         {
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            String maxVersionQuery = @$"
-            SELECT  MAX([Version]) AS MaxVersion 
-            FROM    StockPriceGrids 
-            WHERE   Tag = {tagParameterName}
-              AND   DataSource = {dataSourceParameterName}
-              AND   [Date] = CONVERT(date, {dateParameterName}, 23);
-            ";
             Int32 gridVersionNumber = 1;
             using (var command = new SqlCommand())
             {
                 try
                 {
-                    sqlCommandShim.SetCommandText(command, maxVersionQuery);
+                    sqlCommandShim.SetCommandText(command, MaxVersionQuery);
                     PrepareCommand(readConnection, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+                    AddMaxVersionQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                     {
                         while (dataReader.Read())
                         {
-                            if (dataReader["MaxVersion"] != DBNull.Value)
+                            if (dataReader[maxVersionColumnAlias] != DBNull.Value)
                             {
-                                gridVersionNumber = (Int32)dataReader["MaxVersion"] + 1;
+                                gridVersionNumber = (Int32)dataReader[maxVersionColumnAlias] + 1;
                             }
                         }
                     }
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"Failed to retrieve latest grid version number while inserting stock price grid for {gridOuterKeyProperties.ToString()} into SQL Server.", e);
+                    throw new Exception($"Failed to retrieve latest grid version number while inserting {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} into SQL Server.", e);
                 }
             }
-
+            // 2026-08-31 TODO: Continue from here
             const String versionParameterName = "@Version";
             const String createDateTimeParameterName = "@CreateDateTime";
             String insertStatement = $@"
