@@ -145,13 +145,115 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_GridAlreadyExists()
         {
-            throw new NotImplementedException();
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-02");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedMaxIdQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag
+                  AND   [Date] = CONVERT(date, @Date, 23)
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            String expectedInsertStatementText = @$"
+                INSERT 
+                INTO    WeatherForecastGrids 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            CONVERT(date, @Date, 23), 
+                            CONVERT(time, @Time, 24), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+
+            using (var readConnection = new SqlConnection(testConnectionString))
+            using (var writeConnection = new SqlConnection(testConnectionString))
+            {
+                Int32 result = testWeatherForecastPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                Assert.That(result == 2);
+            }
         }
 
         [Test]
         public void CreateGrid_NoGridExists()
         {
-            throw new NotImplementedException();
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-02");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedMaxIdQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag
+                  AND   [Date] = CONVERT(date, @Date, 23)
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            String expectedInsertStatementText = @$"
+                INSERT 
+                INTO    WeatherForecastGrids 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            CONVERT(date, @Date, 23), 
+                            CONVERT(time, @Time, 24), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            using (var readConnection = new SqlConnection(testConnectionString))
+            using (var writeConnection = new SqlConnection(testConnectionString))
+            {
+                Int32 result = testWeatherForecastPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 1);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                Assert.That(result == 1);
+            }
         }
 
         #region Nested Classes
