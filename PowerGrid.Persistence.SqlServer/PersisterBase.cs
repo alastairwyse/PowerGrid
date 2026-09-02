@@ -40,8 +40,14 @@ namespace PowerGrid.Persistence.SqlServer
         where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
+        protected const String maxVersionColumnAlias = "MaxVersion";
+        protected const String versionParameterName = "@Version";
+        protected const String createDateTimeParameterName = "@CreateDateTime";
+
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactSql23DateStyle = "yyyy-MM-dd";
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 24 time style</see>.</summary>
+        protected const String transactSql24TimeStyle = "HH:mm:ss";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
         protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
         /// <summary>The type of collation to use when ordering results returned from SQL Server.</summary>
@@ -209,12 +215,17 @@ namespace PowerGrid.Persistence.SqlServer
         protected abstract String MaxVersionQuery { get; }
 
         /// <summary>
-        /// Sets the maximum grid version query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
+        /// The text for a SQL statement which inserts a grid.
+        /// </summary>
+        protected abstract String GridInsertStatementSqlText { get; }
+
+        /// <summary>
+        /// Sets grid outer key property query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
         /// </summary>
         /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
         /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
         /// <param name="gridOuterKeyProperties">The outer key properties to use in the parameters.</param>
-        protected abstract void AddMaxVersionQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TOuterKeyProperties gridOuterKeyProperties);
+        protected abstract void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TOuterKeyProperties gridOuterKeyProperties);
 
         /// <summary>
         /// Creates a new grid.
@@ -227,7 +238,49 @@ namespace PowerGrid.Persistence.SqlServer
         /// <returns>The version number of the new grid.</returns>
         protected virtual Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, TOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
         {
-            throw new NotImplementedException();
+            Int32 gridVersionNumber = 1;
+            using (var command = new SqlCommand())
+            {
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, MaxVersionQuery);
+                    PrepareCommand(readConnection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            if (dataReader[maxVersionColumnAlias] != DBNull.Value)
+                            {
+                                gridVersionNumber = (Int32)dataReader[maxVersionColumnAlias] + 1;
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to retrieve latest grid version number while inserting {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} into SQL Server.", e);
+                }
+            }
+
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, GridInsertStatementSqlText);
+                    PrepareCommand(writeConnection, transaction, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, gridVersionNumber);
+                    sqlCommandShim.AddParameter(command, createDateTimeParameterName, SqlDbType.NVarChar, createDateTime.ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to insert {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} and version {gridVersionNumber} into SQL Server.", e);
+            }
+
+            return gridVersionNumber;
         }
 
         /// <summary>

@@ -31,10 +31,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
     /// </summary>
     public abstract class PersisterTestsBase
     {
-        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
+        /// <summary>DateOnly format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactSql23DateStyle = "yyyy-MM-dd";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
         protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+        /// <summary>TimeOnly format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 24 time style</see>.</summary>
+        protected const String transactSql24TimeStyle = "HH:mm:ss";
         protected const String testConnectionString = "Server=127.0.0.1;Database=PowerGrid;User Id=user;Password=pwd=%X9sjQb;Encrypt=false;Authentication=SqlPassword";
 
         protected TestUtilities utils;

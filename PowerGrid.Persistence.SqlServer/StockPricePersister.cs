@@ -36,8 +36,6 @@ namespace PowerGrid.Persistence.SqlServer
     {
         #region TEMP StockPricePersisterRefactoring
 
-        const String maxVersionColumnAlias = "MaxVersion";
-
         const String tagParameterName = "@Tag";
         const String dataSourceParameterName = "@DataSource";
         const String dateParameterName = "@Date";
@@ -58,13 +56,37 @@ namespace PowerGrid.Persistence.SqlServer
                 FROM    StockPriceGrids 
                 WHERE   Tag = {tagParameterName}
                   AND   DataSource = {dataSourceParameterName}
-                  AND   [Date] = CONVERT(date, {dateParameterName}, 23);
-                ";
+                  AND   [Date] = CONVERT(date, {dateParameterName}, 23);";
             } 
         }
 
         /// <inheritdoc/>
-        protected override void AddMaxVersionQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
+        protected override String GridInsertStatementSqlText 
+        { 
+            get
+            {
+                return $@"
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            {dataSourceParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            {versionParameterName}, 
+                            CONVERT(datetime2, {createDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
             sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
             sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
@@ -865,84 +887,6 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 throw new Exception($"Failed to delete stock price with id '{item.Id}' in SQL Server.", e);
             }
-        }
-
-        /// <summary>
-        /// Creates a new grid.
-        /// </summary>
-        /// <param name="readConnection">The connection to use to read existing data.</param>
-        /// <param name="writeConnection">The connection to use to write the grid.</param>
-        /// <param name="transaction">The transaction to execute the write operation in.</param>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to create.</param>
-        /// <param name="createDateTime">The timestamp when the grid was created.</param>
-        /// <returns>The version number of the new grid.</returns>
-        protected override Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceGridOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
-        {
-            Int32 gridVersionNumber = 1;
-            using (var command = new SqlCommand())
-            {
-                try
-                {
-                    sqlCommandShim.SetCommandText(command, MaxVersionQuery);
-                    PrepareCommand(readConnection, command);
-                    AddMaxVersionQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
-                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
-                    {
-                        while (dataReader.Read())
-                        {
-                            if (dataReader[maxVersionColumnAlias] != DBNull.Value)
-                            {
-                                gridVersionNumber = (Int32)dataReader[maxVersionColumnAlias] + 1;
-                            }
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to retrieve latest grid version number while inserting {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} into SQL Server.", e);
-                }
-            }
-            // 2026-08-31 TODO: Continue from here
-            const String versionParameterName = "@Version";
-            const String createDateTimeParameterName = "@CreateDateTime";
-            String insertStatement = $@"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        {tagParameterName}, 
-                        {dataSourceParameterName}, 
-                        CONVERT(date, {dateParameterName}, 23), 
-                        {versionParameterName}, 
-                        CONVERT(datetime2, {createDateTimeParameterName}, 126)
-                    );
-            ";
-            try
-            {
-                using (var command = new SqlCommand())
-                {
-                    sqlCommandShim.SetCommandText(command, insertStatement);
-                    PrepareCommand(writeConnection, transaction, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
-                    sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, gridVersionNumber);
-                    sqlCommandShim.AddParameter(command, createDateTimeParameterName, SqlDbType.NVarChar, createDateTime.ToString(transactSql126DateStyle));
-                    ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
-                }
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"Failed to insert stock price grid for {gridOuterKeyProperties.ToString()} and version {gridVersionNumber} into SQL Server.", e);
-            }
-
-            return gridVersionNumber;
         }
 
         #endregion

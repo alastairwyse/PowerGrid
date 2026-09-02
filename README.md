@@ -19,6 +19,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * StockPricePersister needs test for constructor parameters
 
 #### Longer Term TODO
+* Need SQL Create and Drop template file containing the columns that are depended on by PowerGrid.Persistence.SqlServer.PersisterBase
 * 2x grid params.. upsert only + full sync
 * Make the persister inner DataBaseOperationEmitter class into a buffer with configurable size (on persister constructor).  Can set to 1 to minimize memory usage and stream things through... OR set huge to effectively write once (or close to once) to DB.  If coupled with option to write in bulk via a temp table or TVP, you would then have the option of high performance/throughput at the cost of memory usage.
 * Have an option to 'delete' (via setting TransactionTo) all current rows, before doing the compare... then it basically will insert everything new every time, and performance becomes similar to a straight insert/overwrite with no compare (since comparer will retrieve 0 existing rows).

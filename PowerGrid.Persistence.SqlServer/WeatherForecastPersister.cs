@@ -37,6 +37,67 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class WeatherForecastPersister : PersisterBase<WeatherForecast, GridCommonKeyProperties, WeatherForecastGridOuterKeyProperties, WeatherForecastGridItem, WeatherForecastGridItemPTO>
     {
+        #region TEMP Refactoring -> need to move to proper position in class
+
+        const String tagParameterName = "@Tag";
+        const String dateParameterName = "@Date";
+        const String timeParameterName = "@Time";
+
+        /// <inheritdoc/>
+        protected override String GridItemEntityName
+        {
+            get { return "weather forecast"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String MaxVersionQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  MAX([Version]) AS {maxVersionColumnAlias} 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = {tagParameterName}
+                  AND   [Date] = CONVERT(date, {dateParameterName}, 23)
+                  AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridInsertStatementSqlText
+        {
+            get
+            {
+                return $@"
+                INSERT 
+                INTO    WeatherForecastGrids 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            CONVERT(time, {timeParameterName}, 24), 
+                            {versionParameterName}, 
+                            CONVERT(datetime2, {createDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
+        {
+            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
+            sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+            sqlCommandShim.AddParameter(command, timeParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Time.ToString(transactSql24TimeStyle));
+        }
+
+        #endregion
+
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
         /// </summary>
@@ -150,20 +211,6 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #region Private/Protected Methods
-
-        /// <summary>
-        /// Creates a new grid.
-        /// </summary>
-        /// <param name="readConnection">The connection to use to read existing data.</param>
-        /// <param name="writeConnection">The connection to use to write the grid.</param>
-        /// <param name="transaction">The transaction to execute the write operation in.</param>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to create.</param>
-        /// <param name="createDateTime">The timestamp when the grid was created.</param>
-        /// <returns>The version number of the new grid.</returns>
-        protected override Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
-        {
-            throw new NotImplementedException();
-        }
 
         #endregion
     }

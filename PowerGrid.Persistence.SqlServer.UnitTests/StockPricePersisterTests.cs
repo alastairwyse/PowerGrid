@@ -337,30 +337,28 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             ORDER  BY Company COLLATE Latin1_General_BIN2;
             ";
             String expectedMaxIdQueryText = @$"
-            SELECT  MAX([Version]) AS MaxVersion 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag
-              AND   DataSource = @DataSource
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag
+                  AND   DataSource = @DataSource
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             String expectedGridInsertStatementText = @$"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Version, 
-                        CONVERT(datetime2, @CreateDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -1704,12 +1702,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
-            SELECT  MAX([Version]) AS MaxVersion 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag
-              AND   DataSource = @DataSource
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag
+                  AND   DataSource = @DataSource
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
 
@@ -1742,30 +1739,28 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
-            SELECT  MAX([Version]) AS MaxVersion 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag
-              AND   DataSource = @DataSource
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag
+                  AND   DataSource = @DataSource
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             String expectedInsertStatementText = @$"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Version, 
-                        CONVERT(datetime2, @CreateDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
@@ -1808,30 +1803,28 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
-            SELECT  MAX([Version]) AS MaxVersion 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag
-              AND   DataSource = @DataSource
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag
+                  AND   DataSource = @DataSource
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             String expectedInsertStatementText = @$"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Version, 
-                        CONVERT(datetime2, @CreateDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
@@ -1868,30 +1861,28 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedMaxIdQueryText = @$"
-            SELECT  MAX([Version]) AS MaxVersion 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag
-              AND   DataSource = @DataSource
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag
+                  AND   DataSource = @DataSource
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             String expectedInsertStatementText = @$"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Version, 
-                        CONVERT(datetime2, @CreateDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(false);
