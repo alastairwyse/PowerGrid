@@ -44,6 +44,12 @@ namespace PowerGrid.Persistence.SqlServer
         const String timeParameterName = "@Time";
 
         /// <inheritdoc/>
+        protected override String GridItemTableName
+        {
+            get { return "WeatherForecasts"; }
+        }
+
+        /// <inheritdoc/>
         protected override String GridItemEntityName
         {
             get { return "weather forecast"; }

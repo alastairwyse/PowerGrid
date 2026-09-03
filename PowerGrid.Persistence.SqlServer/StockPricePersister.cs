@@ -41,6 +41,12 @@ namespace PowerGrid.Persistence.SqlServer
         const String dateParameterName = "@Date";
 
         /// <inheritdoc/>
+        protected override String GridItemTableName
+        {
+            get { return "StockPrices"; }
+        }
+
+        /// <inheritdoc/>
         protected override String GridItemEntityName
         {
             get { return "stock price"; }
@@ -852,40 +858,6 @@ namespace PowerGrid.Persistence.SqlServer
             catch (Exception e)
             {
                 throw new Exception($"Failed to update stock price with id '{supersededItem.Id}' in SQL Server.", e);
-            }
-        }
-
-        /// <summary>
-        /// Deletes an existing item from the current/latest grid.
-        /// </summary>
-        /// <param name="connection">The connection to use to delete.</param>
-        /// <param name="transaction">The transaction to execute the delete operation in.</param>
-        /// <param name="item">The item to delete.</param>
-        /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
-        protected void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO item, DateTime deleteDateTime)
-        {
-            const String idParameterName = "@Id";
-            const String deleteDateTimeParameterName = "@DeleteDateTime";
-            String deleteStatement = @$"
-            UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
-            WHERE   Id = {idParameterName};
-            ";
-
-            try
-            {
-                using (var command = new SqlCommand())
-                {
-                    sqlCommandShim.SetCommandText(command, deleteStatement);
-                    PrepareCommand(connection, transaction, command);
-                    sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
-                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactSql126DateStyle));
-                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
-                }
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"Failed to delete stock price with id '{item.Id}' in SQL Server.", e);
             }
         }
 

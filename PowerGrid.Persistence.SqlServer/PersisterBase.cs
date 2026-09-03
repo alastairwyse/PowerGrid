@@ -41,8 +41,11 @@ namespace PowerGrid.Persistence.SqlServer
         where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         protected const String maxVersionColumnAlias = "MaxVersion";
+
         protected const String versionParameterName = "@Version";
         protected const String createDateTimeParameterName = "@CreateDateTime";
+        protected const String idParameterName = "@Id";
+        protected const String deleteDateTimeParameterName = "@DeleteDateTime";
 
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactSql23DateStyle = "yyyy-MM-dd";
@@ -204,6 +207,11 @@ namespace PowerGrid.Persistence.SqlServer
         #region Private/Protected Methods
 
         /// <summary>
+        /// The name of the table which stores the grid items.
+        /// </summary>
+        protected abstract String GridItemTableName { get; }
+
+        /// <summary>
         /// The human readable name of the type of data which is held in a grid item.
         /// </summary>
         /// <remarks>For use in exception messages.  All words should be lower case and singular, e.g. 'stock price'.</remarks>
@@ -226,6 +234,37 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
         /// <param name="gridOuterKeyProperties">The outer key properties to use in the parameters.</param>
         protected abstract void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TOuterKeyProperties gridOuterKeyProperties);
+
+        /// <summary>
+        /// Deletes an existing item from the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to delete.</param>
+        /// <param name="transaction">The transaction to execute the delete operation in.</param>
+        /// <param name="item">The item to delete.</param>
+        /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
+        protected void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO item, DateTime deleteDateTime)
+        {
+            String deleteStatement = @$"
+            UPDATE  {GridItemTableName} 
+            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
+            WHERE   Id = {idParameterName};";
+
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, deleteStatement);
+                    PrepareCommand(connection, transaction, command);
+                    sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
+                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to delete {GridItemEntityName} with id '{item.Id}' in SQL Server.", e);
+            }
+        }
 
         /// <summary>
         /// Creates a new grid.

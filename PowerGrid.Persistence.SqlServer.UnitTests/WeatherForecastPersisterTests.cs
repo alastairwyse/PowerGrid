@@ -42,6 +42,65 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void DeleteGridItem_ExceptionDeleting()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-03");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("23:00:00");
+            const String testCountry = "Japan";
+            const String testCity = "Tokyo";
+            WeatherForecastGridItemPTO testItem = new(123, testTag, testDate, testTime, testCountry, testCity, 24, utils.CreateDataTimeFromString("2026-09-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-09-03 22:56:57.0000008");
+            String expectedCommandText = @$"
+            UPDATE  WeatherForecasts 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to delete weather forecast with id '{testItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void DeleteGridItem()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-03");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("23:00:00");
+            const String testCountry = "Japan";
+            const String testCity = "Tokyo";
+            WeatherForecastGridItemPTO testItem = new(123, testTag, testDate, testTime, testCountry, testCity, 24, utils.CreateDataTimeFromString("2026-09-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-09-03 22:56:57.0000009");
+            String expectedCommandText = @$"
+            UPDATE  WeatherForecasts 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testWeatherForecastPersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-09-03 22:56:57.0000008").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            }
+        }
+
+        [Test]
         public void CreateGrid_ExceptionRetrievingLatestGridVersion()
         {
             const String testTag = "Apple";
@@ -311,7 +370,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
             public new void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, WeatherForecastGridItemPTO item, DateTime deleteDateTime)
             {
-                //base.DeleteGridItem(connection, transaction, item, deleteDateTime);
+                base.DeleteGridItem(connection, transaction, item, deleteDateTime);
             }
 
             public new Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, WeatherForecastGridOuterKeyProperties outerKeyProperties, DateTime createDateTime)

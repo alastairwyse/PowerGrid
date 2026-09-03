@@ -1646,8 +1646,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             String expectedCommandText = @$"
             UPDATE  StockPrices 
             SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Id = @Id;
-            ";
+            WHERE   Id = @Id;";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
@@ -1676,8 +1675,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             String expectedCommandText = @$"
             UPDATE  StockPrices 
             SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Id = @Id;
-            ";
+            WHERE   Id = @Id;";
 
             using (var connection = new SqlConnection(testConnectionString))
             {
