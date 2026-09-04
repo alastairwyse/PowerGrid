@@ -95,11 +95,32 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String GridItemsInsertStatementSqlText
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <inheritdoc/>
         protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
         {
             sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
             sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
             sqlCommandShim.AddParameter(command, timeParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Time.ToString(transactSql24TimeStyle));
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecast entity)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(WeatherForecastGridItem gridItem)
+        {
+            return new WeatherForecastGridOuterKeyProperties(gridItem.Tag, gridItem.Date, gridItem.Time);
         }
 
         #endregion

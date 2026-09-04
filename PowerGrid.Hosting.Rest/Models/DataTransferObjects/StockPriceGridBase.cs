@@ -14,20 +14,14 @@
  * limitations under the License.
  */
 
-using System.Collections.Generic;
-using PowerGrid.Grids;
-
 namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects
 {
     /// <summary>
-    /// DTO container class holding a grid of stock prices.
+    /// Base for DTO container classes holding a grid of stock prices.
     /// </summary>
-    public class StockPriceGrid
+    public abstract class StockPriceGridBase
     {
         /// <summary>The outer key properties of the items.</summary>
         public StockPriceGridOuterKeyProperties StockPriceGridOuterKeyProperties { get; set; }
-
-        /// <summary>The stock prices to persist.</summary>
-        public IList<StockPrice> Items { get; set; }
     }
 }

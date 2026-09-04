@@ -39,6 +39,8 @@ namespace PowerGrid.Persistence.SqlServer
         const String tagParameterName = "@Tag";
         const String dataSourceParameterName = "@DataSource";
         const String dateParameterName = "@Date";
+        const String companyParameterName = "@Company";
+        const String priceParameterName = "@Price";
 
         /// <inheritdoc/>
         protected override String GridItemTableName
@@ -92,11 +94,53 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String GridItemsInsertStatementSqlText
+        { 
+            get
+            {
+                return @$"
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            {dataSourceParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            {companyParameterName}, 
+                            {priceParameterName}, 
+                            CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
+                            CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
         protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
             sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
             sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
             sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPrice entity)
+        {
+            sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, entity.Company);
+            sqlCommandShim.AddParameter(command, priceParameterName, SqlDbType.Money, entity.Price);
+        }
+
+        /// <inheritdoc/>
+        protected override StockPriceGridOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(StockPriceGridItem gridItem)
+        {
+            return new StockPriceGridOuterKeyProperties(gridItem.Tag, gridItem.DataSource, gridItem.Date);
         }
 
         #endregion
@@ -776,88 +820,6 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 // Can't do below in a try/finally as it results in 'cannot yield a value in the body of a try block with a catch clause'
                 dataReader.Dispose();
-            }
-        }
-
-        /// <summary>
-        /// Adds an item to the current/latest grid.
-        /// </summary>
-        /// <param name="connection">The connection to use to insert.</param>
-        /// <param name="transaction">The transaction to execute the add operation in.</param>
-        /// <param name="item">The item to add.</param>
-        /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
-        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItem item, DateTime insertDateTime)
-        {
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            const String companyParameterName = "@Company";
-            const String priceParameterName = "@Price";
-            const String insertDateTimeParameterName = "@InsertDateTime";
-            const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
-            String insertStatement = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        {tagParameterName}, 
-                        {dataSourceParameterName}, 
-                        CONVERT(date, {dateParameterName}, 23), 
-                        {companyParameterName}, 
-                        {priceParameterName}, 
-                        CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
-                        CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
-                    );
-            ";
-
-            try
-            {
-                using (var command = new SqlCommand())
-                {
-                    sqlCommandShim.SetCommandText(command, insertStatement);
-                    PrepareCommand(connection, transaction, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, item.Tag);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, item.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, item.Date.ToString(transactSql23DateStyle));
-                    sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, item.Company);
-                    sqlCommandShim.AddParameter(command, priceParameterName, SqlDbType.Money, item.Price);
-                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactSql126DateStyle));
-                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactSql126DateStyle));
-                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
-                }
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"Failed to insert {item.ToString()} into SQL Server.", e);
-            }
-        }
-
-        /// <summary>
-        /// Updates an existing item in the current/latest grid.
-        /// </summary>
-        /// <param name="connection">The connection to use to update.</param>
-        /// <param name="transaction">The transaction to execute the update operation in.</param>
-        /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
-        /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
-        /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
-        protected void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO supersededItem, StockPriceGridItem newItem, DateTime udpateDateTime)
-        {
-            try
-            {
-                DeleteGridItem(connection, transaction, supersededItem, udpateDateTime);
-                InsertGridItem(connection, transaction, newItem, udpateDateTime);
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"Failed to update stock price with id '{supersededItem.Id}' in SQL Server.", e);
             }
         }
 

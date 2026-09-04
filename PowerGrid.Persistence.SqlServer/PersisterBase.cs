@@ -43,9 +43,11 @@ namespace PowerGrid.Persistence.SqlServer
         protected const String maxVersionColumnAlias = "MaxVersion";
 
         protected const String versionParameterName = "@Version";
-        protected const String createDateTimeParameterName = "@CreateDateTime";
         protected const String idParameterName = "@Id";
+        protected const String createDateTimeParameterName = "@CreateDateTime";
+        protected const String insertDateTimeParameterName = "@InsertDateTime";
         protected const String deleteDateTimeParameterName = "@DeleteDateTime";
+        protected const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
 
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactSql23DateStyle = "yyyy-MM-dd";
@@ -228,12 +230,81 @@ namespace PowerGrid.Persistence.SqlServer
         protected abstract String GridInsertStatementSqlText { get; }
 
         /// <summary>
+        /// The text for a SQL statement which inserts a set of grid items.
+        /// </summary>
+        protected abstract String GridItemsInsertStatementSqlText { get; }
+
+        /// <summary>
         /// Sets grid outer key property query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
         /// </summary>
         /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
         /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
         /// <param name="gridOuterKeyProperties">The outer key properties to use in the parameters.</param>
         protected abstract void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TOuterKeyProperties gridOuterKeyProperties);
+
+        /// <summary>
+        /// Sets entity query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
+        /// </summary>
+        /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
+        /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
+        /// <param name="entity">The entity to use in the parameters.</param>
+        protected abstract void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TEntity entity);
+
+        /// <summary>
+        /// Extracts and returns the outer key properties from the specified grid item.
+        /// </summary>
+        /// <param name="gridItem">The grid item to extract the outer key properties from.</param>
+        /// <returns>The outer key properties.</returns>
+        protected abstract TOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(TGridItem gridItem);
+
+        /// <summary>
+        /// Adds an item to the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to insert.</param>
+        /// <param name="transaction">The transaction to execute the add operation in.</param>
+        /// <param name="item">The item to add.</param>
+        /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
+        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, TGridItem item, DateTime insertDateTime)
+        {
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, GridItemsInsertStatementSqlText);
+                    PrepareCommand(connection, transaction, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, ExtractOuterKeyPropertiesFromGridItem(item));
+                    AddGridItemQueryParameters(sqlCommandShim, command, item);
+                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to insert {item.ToString()} into SQL Server.", e);
+            }
+        }
+
+        /// <summary>
+        /// Updates an existing item in the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to update.</param>
+        /// <param name="transaction">The transaction to execute the update operation in.</param>
+        /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
+        /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
+        /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
+        protected void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO supersededItem, TGridItem newItem, DateTime udpateDateTime)
+        {
+            try
+            {
+                DeleteGridItem(connection, transaction, supersededItem, udpateDateTime);
+                InsertGridItem(connection, transaction, newItem, udpateDateTime);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"Failed to update {GridItemEntityName} with id '{supersededItem.Id}' in SQL Server.", e);
+            }
+        }
 
         /// <summary>
         /// Deletes an existing item from the current/latest grid.

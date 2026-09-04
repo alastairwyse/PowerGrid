@@ -56,7 +56,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
         [ApiExplorerSettings(GroupName = "StockPrices")]
         [Route("stockPrices")]
         [ProducesResponseType(StatusCodes.Status201Created)]
-        public ActionResult<PersistGridResponse> PersistGrid([FromBody] StockPriceGrid stockPriceGrid)
+        public ActionResult<PersistGridResponse> PersistGrid([FromBody] InputStockPriceGrid stockPriceGrid)
         {
             Grids.StockPriceGridOuterKeyProperties stockPriceGridOuterKeyProperties = new
             (
@@ -93,7 +93,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
         [ApiExplorerSettings(GroupName = "StockPrices")]
         [Route("stockPrices/tag/{tag}/dataSource/{dataSource}/date/{date}/gridVersion/{gridVersion}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<StockPriceGrid> GetGrid([FromRoute] String tag, [FromRoute] String dataSource, [FromRoute] String date, [FromRoute] String gridVersion)
+        public ActionResult<OutputStockPriceGrid> GetGrid([FromRoute] String tag, [FromRoute] String dataSource, [FromRoute] String date, [FromRoute] String gridVersion)
         {
             (String decodedTag, String decodedDataSource, DateOnly parsedDate) = ValidateAndConvertStockPriceGridOuterKeyProperties(tag, dataSource, date);
             Boolean versionParseResult = Int32.TryParse(gridVersion, out Int32 parsedVersion);
@@ -108,21 +108,16 @@ namespace PowerGrid.Hosting.Rest.Controllers
                 parsedDate
             );
             IEnumerable<StockPriceGridItemPTO> gridItems = persisterHost.GetGrid(stockPriceGridOuterKeyProperties, parsedVersion);
-            StockPriceGrid returnGrid = new()
+            OutputStockPriceGrid returnGrid = new()
             {
                 StockPriceGridOuterKeyProperties = new StockPriceGridOuterKeyProperties()
                 {
                     Tag = decodedTag,
                     DataSource = decodedDataSource,
                     Date = parsedDate
-                }, 
+                },
+                Items = new List<StockPriceGridItemPTO>(gridItems)
             };
-            List<Grids.StockPrice> items = new();
-            foreach (StockPriceGridItemPTO currentPTO in gridItems)
-            {
-                items.Add(new Grids.StockPrice(currentPTO.Company, currentPTO.Price));
-            }
-            returnGrid.Items = items;
 
             return returnGrid;
         }
