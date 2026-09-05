@@ -1432,27 +1432,26 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridItem testItem = new(testTag, testDataSource, testDate, testCompany, 4732);
             DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
             String expectedCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
@@ -1479,27 +1478,26 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridItem testItem = new(testTag, testDataSource, testDate, testCompany, 4732);
             DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
             String expectedCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
 
             using (var connection = new SqlConnection(testConnectionString))
             {
@@ -1531,32 +1529,30 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridItemPTO testSupersededItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
             DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
             String expectedInsertCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
             String expectedDeleteCommandText = @$"
             UPDATE  StockPrices 
             SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Id = @Id;
-            ";
+            WHERE   Id = @Id;";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText)).Do((callInfo) => throw mockException);
 
@@ -1585,32 +1581,30 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridItemPTO testSupersededItemItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
             DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
             String expectedInsertCommandText = @$"
-            INSERT 
-            INTO    StockPrices 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        Company, 
-                        Price, 
-                        TransactionFrom, 
-                        TransactionTo 
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Company, 
-                        @Price, 
-                        CONVERT(datetime2, @InsertDateTime, 126), 
-                        CONVERT(datetime2, @TemporalMaximumDateTime, 126)
-                    );
-            ";
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
             String expectedDeleteCommandText = @$"
             UPDATE  StockPrices 
             SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Id = @Id;
-            ";
+            WHERE   Id = @Id;";
 
             using (var connection = new SqlConnection(testConnectionString))
             {

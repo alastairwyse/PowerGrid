@@ -42,6 +42,9 @@ namespace PowerGrid.Persistence.SqlServer
         const String tagParameterName = "@Tag";
         const String dateParameterName = "@Date";
         const String timeParameterName = "@Time";
+        const String countryParameterName = "@Country";
+        const String cityParameterName = "@City";
+        const String temperatureParameterName = "@Temperature";
 
         /// <inheritdoc/>
         protected override String GridItemTableName
@@ -99,7 +102,29 @@ namespace PowerGrid.Persistence.SqlServer
         {
             get
             {
-                throw new NotImplementedException();
+                return @$"
+                INSERT 
+                INTO    WeatherForecasts 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time],
+                            country, 
+                            City, 
+                            Temperature, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            {dateParameterName}, 
+                            {timeParameterName}, 
+                            {countryParameterName}, 
+                            {cityParameterName}, 
+                            {temperatureParameterName}, 
+                            CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
+                            CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
+                        );";
             }
         }
 
@@ -114,7 +139,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// <inheritdoc/>
         protected override void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecast entity)
         {
-            throw new NotImplementedException();
+            sqlCommandShim.AddParameter(command, countryParameterName, SqlDbType.NVarChar, entity.Country);
+            sqlCommandShim.AddParameter(command, cityParameterName, SqlDbType.NVarChar, entity.City);
+            sqlCommandShim.AddParameter(command, temperatureParameterName, SqlDbType.Int, entity.Temperature);
         }
 
         /// <inheritdoc/>
