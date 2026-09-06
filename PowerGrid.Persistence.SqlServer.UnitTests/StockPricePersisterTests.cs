@@ -1578,7 +1578,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
             const String testCompany = "Toyota";
             StockPriceGridItem testNewItem = new(testTag, testDataSource, testDate, testCompany, 3210);
-            StockPriceGridItemPTO testSupersededItemItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            StockPriceGridItemPTO testSupersededItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
             DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
             String expectedInsertCommandText = @$"
                 INSERT 
@@ -1608,13 +1608,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
             using (var connection = new SqlConnection(testConnectionString))
             {
-                testStockPricePersister.UpdateGridItem(connection, null, testSupersededItemItem, testNewItem, testUpdateDateTime);
+                testStockPricePersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
                 mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), connection);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
-                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItemItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItem.Id);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000010").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);

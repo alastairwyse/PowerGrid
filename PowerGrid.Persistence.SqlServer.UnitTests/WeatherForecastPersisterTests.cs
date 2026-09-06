@@ -42,6 +42,125 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void UpdateGridItem_ExceptionUpdating()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-06");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("10:00:00");
+            const String testCountry = "Australia";
+            const String testCity = "Sydney";
+            WeatherForecastGridItem testNewItem = new(testTag, testDate, testTime, testCountry, testCity, 22);
+            WeatherForecastGridItemPTO testSupersededItem = new(123, testTag, testDate, testTime, testCountry, testCity, 24, utils.CreateDataTimeFromString("2026-09-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-09-06 09:09:42.0000012");
+            String expectedInsertCommandText = @$"
+                INSERT 
+                INTO    WeatherForecasts 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time],
+                            country, 
+                            City, 
+                            Temperature, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @Date, 
+                            @Time, 
+                            @Country, 
+                            @City, 
+                            @Temperature, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
+            String expectedDeleteCommandText = @$"
+            UPDATE  WeatherForecasts 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to update weather forecast with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Failed to delete weather forecast with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void UpdateGridItem()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-06");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("10:00:00");
+            const String testCountry = "Australia";
+            const String testCity = "Sydney";
+            WeatherForecastGridItem testNewItem = new(testTag, testDate, testTime, testCountry, testCity, 22);
+            WeatherForecastGridItemPTO testSupersededItem = new(123, testTag, testDate, testTime, testCountry, testCity, 24, utils.CreateDataTimeFromString("2026-09-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-09-06 09:44:19.0000013");
+            String expectedInsertCommandText = @$"
+                INSERT 
+                INTO    WeatherForecasts 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time],
+                            country, 
+                            City, 
+                            Temperature, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @Date, 
+                            @Time, 
+                            @Country, 
+                            @City, 
+                            @Temperature, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
+            String expectedDeleteCommandText = @$"
+            UPDATE  WeatherForecasts 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testWeatherForecastPersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-09-06 09:44:19.0000012").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);
+
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Country", SqlDbType.NVarChar, testCompany);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@City", SqlDbType.NVarChar, testCompany)
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Temperature", SqlDbType.Money, testNewItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testUpdateDateTime.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactSql126DateStyle));
+            }
+        }
+
+        [Test]
         public void DeleteGridItem_ExceptionDeleting()
         {
             const String testTag = "Apple";
