@@ -46,6 +46,13 @@ namespace PowerGrid.Persistence.SqlServer
         const String cityParameterName = "@City";
         const String temperatureParameterName = "@Temperature";
 
+        const String tagColumnName = "Tag";
+        const String dateColumnName = "Date";
+        const String timeColumnName = "Time";
+        const String countryColumnName = "Country";
+        const String cityColumnName = "City";
+        const String temperatureColumnName = "Temperature";
+
         /// <inheritdoc/>
         protected override String GridItemTableName
         {
@@ -59,7 +66,7 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        protected override String MaxVersionQuery
+        protected override String GridMaxVersionQuery
         {
             get
             {
@@ -69,6 +76,30 @@ namespace PowerGrid.Persistence.SqlServer
                 WHERE   Tag = {tagParameterName}
                   AND   [Date] = CONVERT(date, {dateParameterName}, 23)
                   AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridContentsQuery
+        {
+            get
+            {
+                return @$"
+                SELECT Id, 
+                       {tagColumnName}, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [{dateColumnName}], 
+                       CONVERT(nvarchar(30), [Time], 24) AS [{timeColumnName}], 
+                       {countryColumnName}, 
+                       {cityColumnName},
+                       {temperatureColumnName}, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   WeatherForecasts 
+                WHERE  Tag = {tagParameterName}
+                  AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
+                  AND  [Time] = CONVERT(time, {timeColumnName}, 24) 
+                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
+                ORDER  BY Company COLLATE {transactSqlCollation};";
             }
         }
 
@@ -109,7 +140,7 @@ namespace PowerGrid.Persistence.SqlServer
                             Tag, 
                             [Date], 
                             [Time],
-                            country, 
+                            Country, 
                             City, 
                             Temperature, 
                             TransactionFrom, 
@@ -117,8 +148,8 @@ namespace PowerGrid.Persistence.SqlServer
                         )
                 VALUES  (
                             {tagParameterName}, 
-                            {dateParameterName}, 
-                            {timeParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            CONVERT(time, {timeParameterName}, 24), 
                             {countryParameterName}, 
                             {cityParameterName}, 
                             {temperatureParameterName}, 
@@ -126,6 +157,21 @@ namespace PowerGrid.Persistence.SqlServer
                             CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
                         );";
             }
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader)
+        {
+            Int64 id = (Int64)dataReader[idColumnName];
+            String tag = (String)dataReader[tagColumnName];
+            DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+            TimeOnly time = TimeOnly.ParseExact((String)dataReader[timeColumnName], transactSql24TimeStyle, DateTimeFormatInfo.InvariantInfo);
+            String country = (String)dataReader[countryColumnName];
+            String city = (String)dataReader[cityColumnName];
+            Int32 temperature = (Int32)dataReader[temperatureColumnName];
+            (DateTime transactionFrom, DateTime transactionTo) = GetTransactionFromAndToDateTimesFromDataReader(dataReader);
+
+            return new WeatherForecastGridItemPTO(id, tag, date, time, country, city, temperature, transactionFrom, transactionTo);
         }
 
         /// <inheritdoc/>

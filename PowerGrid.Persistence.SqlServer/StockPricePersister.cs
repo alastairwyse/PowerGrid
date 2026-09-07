@@ -42,6 +42,12 @@ namespace PowerGrid.Persistence.SqlServer
         const String companyParameterName = "@Company";
         const String priceParameterName = "@Price";
 
+        const String tagColumnName = "Tag";
+        const String dataSourceColumnName = "DataSource";
+        const String dateColumnName = "Date";
+        const String companyColumnName = "Company";
+        const String priceColumnName = "Price";
+
         /// <inheritdoc/>
         protected override String GridItemTableName
         {
@@ -55,7 +61,7 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        protected override String MaxVersionQuery 
+        protected override String GridMaxVersionQuery 
         {
             get
             {
@@ -66,6 +72,29 @@ namespace PowerGrid.Persistence.SqlServer
                   AND   DataSource = {dataSourceParameterName}
                   AND   [Date] = CONVERT(date, {dateParameterName}, 23);";
             } 
+        }
+
+        /// <inheritdoc/>
+        protected override String GridContentsQuery 
+        { 
+            get
+            {
+                return @$"
+                SELECT Id, 
+                       {tagColumnName}, 
+                       {dataSourceColumnName}, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [{dateColumnName}], 
+                       {companyColumnName}, 
+                       {priceColumnName}, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = {tagParameterName}
+                  AND  DataSource = {dataSourceParameterName}
+                  AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
+                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
+                ORDER  BY Company COLLATE {transactSqlCollation};";
+            }
         }
 
         /// <inheritdoc/>
@@ -120,6 +149,20 @@ namespace PowerGrid.Persistence.SqlServer
                             CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
                         );";
             }
+        }
+
+        /// <inheritdoc/>
+        protected override StockPriceGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader)
+        {
+            Int64 id = (Int64)dataReader[idColumnName];
+            String tag = (String)dataReader[tagColumnName];
+            String dataSource = (String)dataReader[dataSourceColumnName];
+            DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+            String company = (String)dataReader[companyColumnName];
+            Decimal price = (Decimal)dataReader[priceColumnName];
+            (DateTime transactionFrom, DateTime transactionTo) = GetTransactionFromAndToDateTimesFromDataReader(dataReader);
+
+            return new StockPriceGridItemPTO(id, tag, dataSource, date, company, price, transactionFrom, transactionTo);
         }
 
         /// <inheritdoc/>
@@ -749,77 +792,6 @@ namespace PowerGrid.Persistence.SqlServer
                 }
 
                 return transactionTimestamp;
-            }
-        }
-
-        /// <summary>
-        /// Gets the contents of a stock price grid.
-        /// </summary>
-        /// <param name="connection">The connection to use to retrieve the grid.</param>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
-        /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
-        /// <returns>The items in the grid.</returns>
-        protected IEnumerable<StockPriceGridItemPTO> GetGrid(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties, DateTime transactionTimestamp)
-        {
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            const String transactionTimestampParameterName = "@TransactionTimestamp";
-            String query = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = {tagParameterName}
-              AND  DataSource = {dataSourceParameterName}
-              AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
-              AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE {transactSqlCollation};
-            ";
-
-            using (var command = new SqlCommand())
-            {
-                IDataReader dataReader = null;
-                try
-                {
-                    sqlCommandShim.SetCommandText(command, query);
-                    PrepareCommand(connection, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
-                    sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactSql126DateStyle));
-                    dataReader = sqlCommandShim.ExecuteReader(command);
-                }
-                catch (Exception e)
-                {
-                    if (dataReader != null)
-                    {
-                        dataReader.Dispose();
-                    }
-                    throw new Exception($"Failed to read stock price grid for {gridOuterKeyProperties.ToString()}, and transaction timestamp '{transactionTimestamp.ToString("yyyy-MM-dd HH:mm:ss.fffffff")}' from SQL Server.", e);
-                }
-                while (dataReader.Read())
-                {
-                    Int64 currentId = (Int64)dataReader["Id"];
-                    String currentTag = (String)dataReader["Tag"];
-                    String currentDataSource = (String)dataReader["DataSource"];
-                    DateOnly currentDate = DateOnly.ParseExact((String)dataReader["Date"], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
-                    String currentCompany = (String)dataReader["Company"];
-                    Decimal currentPrice = (Decimal)dataReader["Price"];
-                    DateTime currentTransactionFrom = DateTime.ParseExact((String)dataReader["TransactionFrom"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
-                    currentTransactionFrom = DateTime.SpecifyKind(currentTransactionFrom, DateTimeKind.Utc);
-                    DateTime currentTransactionTo = DateTime.ParseExact((String)dataReader["TransactionTo"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
-                    currentTransactionTo = DateTime.SpecifyKind(currentTransactionTo, DateTimeKind.Utc);
-
-                    yield return new StockPriceGridItemPTO(currentId, currentTag, currentDataSource, currentDate, currentCompany, currentPrice, currentTransactionFrom, currentTransactionTo);
-                }
-                // Can't do below in a try/finally as it results in 'cannot yield a value in the body of a try block with a catch clause'
-                dataReader.Dispose();
             }
         }
 

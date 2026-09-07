@@ -18,6 +18,7 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Persistence.SqlServer.Metrics;
@@ -48,6 +49,11 @@ namespace PowerGrid.Persistence.SqlServer
         protected const String insertDateTimeParameterName = "@InsertDateTime";
         protected const String deleteDateTimeParameterName = "@DeleteDateTime";
         protected const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
+        protected const String transactionTimestampParameterName = "@TransactionTimestamp";
+
+        protected const String idColumnName = "Id";
+        protected const String transactionFromColumnName = "TransactionFrom";
+        protected const String transactionToColumnName = "TransactionTo";
 
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactSql23DateStyle = "yyyy-MM-dd";
@@ -222,7 +228,12 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// The text for a SQL query which returns the maximum version of a grid, given the outer key properties.
         /// </summary>
-        protected abstract String MaxVersionQuery { get; }
+        protected abstract String GridMaxVersionQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the contents (items) from a single grid.
+        /// </summary>
+        protected abstract String GridContentsQuery { get; }
 
         /// <summary>
         /// The text for a SQL statement which inserts a grid.
@@ -233,6 +244,14 @@ namespace PowerGrid.Persistence.SqlServer
         /// The text for a SQL statement which inserts a set of grid items.
         /// </summary>
         protected abstract String GridItemsInsertStatementSqlText { get; }
+
+        /// <summary>
+        /// Reads and populates all properties of a <see cref="TGridItemPTO"/> object from the specified <see cref="IDataReader"/>.
+        /// </summary>
+        /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
+        /// <returns>The <see cref="TGridItemPTO"/>.</returns>
+        /// <remarks>Columns names in the <see cref="IDataReader"/> are expected to match the results produced by the query in property <see cref="GridContentsQuery"/>.</remarks>
+        protected abstract TGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader);
 
         /// <summary>
         /// Sets grid outer key property query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
@@ -256,6 +275,43 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="gridItem">The grid item to extract the outer key properties from.</param>
         /// <returns>The outer key properties.</returns>
         protected abstract TOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(TGridItem gridItem);
+
+        /// <summary>
+        /// Gets the contents of a grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to retrieve the grid.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
+        /// <returns>The items in the grid.</returns>
+        protected IEnumerable<TGridItemPTO> GetGrid(SqlConnection connection, TOuterKeyProperties gridOuterKeyProperties, DateTime transactionTimestamp)
+        {
+            using (var command = new SqlCommand())
+            {
+                IDataReader dataReader = null;
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, GridContentsQuery);
+                    PrepareCommand(connection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactSql126DateStyle));
+                    dataReader = sqlCommandShim.ExecuteReader(command);
+                }
+                catch (Exception e)
+                {
+                    if (dataReader != null)
+                    {
+                        dataReader.Dispose();
+                    }
+                    throw new Exception($"Failed to read {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()}, and transaction timestamp '{transactionTimestamp.ToString("yyyy-MM-dd HH:mm:ss.fffffff")}' from SQL Server.", e);
+                }
+                while (dataReader.Read())
+                {
+                    yield return GetGridItemPTOFromDataReader(dataReader);
+                }
+                // Can't do below in a try/finally as it results in 'cannot yield a value in the body of a try block with a catch clause'
+                dataReader.Dispose();
+            }
+        }
 
         /// <summary>
         /// Adds an item to the current/latest grid.
@@ -353,7 +409,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 try
                 {
-                    sqlCommandShim.SetCommandText(command, MaxVersionQuery);
+                    sqlCommandShim.SetCommandText(command, GridMaxVersionQuery);
                     PrepareCommand(readConnection, command);
                     AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
@@ -391,6 +447,21 @@ namespace PowerGrid.Persistence.SqlServer
             }
 
             return gridVersionNumber;
+        }
+
+        /// <summary>
+        /// Reads and returns transaction 'from' and 'to' properties from the specified <see cref="IDataReader"/>.
+        /// </summary>
+        /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
+        /// <returns>The transaction 'from' and transaction 'to' values.</returns>
+        protected (DateTime TransactionFrom, DateTime TransactionTo) GetTransactionFromAndToDateTimesFromDataReader(IDataReader dataReader)
+        {
+            DateTime transactionFrom = DateTime.ParseExact((String)dataReader[transactionFromColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+            transactionFrom = DateTime.SpecifyKind(transactionFrom, DateTimeKind.Utc);
+            DateTime transactionTo = DateTime.ParseExact((String)dataReader[transactionToColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+            transactionTo = DateTime.SpecifyKind(transactionTo, DateTimeKind.Utc);
+
+            return (transactionFrom, transactionTo);
         }
 
         /// <summary>
@@ -543,8 +614,6 @@ namespace PowerGrid.Persistence.SqlServer
         /// <typeparam name="T">The type of object emitted and used in the database operation.</typeparam>
         protected class DataBaseOperationEmitter<T> : IEmitter<T>
         {
-            // REFACTORING: Can we put this into a base class?  SqlConnection would have to become a generic type.
-
             /// <summary>The connection to use to perform the operation.</summary>
             protected SqlConnection connection;
             /// <summary>The transaction to perform the operation under.</summary>

@@ -465,21 +465,20 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND   [Version] = @Version;
             ";
             String expectedGridQueryCommandText = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = @Tag
-              AND  DataSource = @DataSource
-              AND  [Date] = CONVERT(date, @Date, 23) 
-              AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE Latin1_General_BIN2;
-            ";
+                SELECT Id, 
+                       Tag, 
+                       DataSource, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       Company, 
+                       Price, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = @Tag
+                  AND  DataSource = @DataSource
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
+                ORDER  BY Company COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false, true, false);
@@ -1329,21 +1328,20 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-05-16 11:45:40.0000012");
             String expectedCommandText = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = @Tag
-              AND  DataSource = @DataSource
-              AND  [Date] = CONVERT(date, @Date, 23) 
-              AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE Latin1_General_BIN2;
-            ";
+                SELECT Id, 
+                       Tag, 
+                       DataSource, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       Company, 
+                       Price, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = @Tag
+                  AND  DataSource = @DataSource
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
+                ORDER  BY Company COLLATE Latin1_General_BIN2;";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
@@ -1369,21 +1367,20 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-05-16 11:45:40.0000012");
             String expectedCommandText = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = @Tag
-              AND  DataSource = @DataSource
-              AND  [Date] = CONVERT(date, @Date, 23) 
-              AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE Latin1_General_BIN2;
-            ";
+                SELECT Id, 
+                       Tag, 
+                       DataSource, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       Company, 
+                       Price, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = @Tag
+                  AND  DataSource = @DataSource
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
+                ORDER  BY Company COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);

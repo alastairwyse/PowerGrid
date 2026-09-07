@@ -56,7 +56,7 @@ namespace PowerGrid.Persistence.UnitTests
         }
 
         [Test]
-        public void AcquireLockAndInvokeActionCommonKeyPropertiesLockOverload()
+        public void AcquireLockAndInvokeAction_CommonKeyPropertiesLockOverload()
         {
             GridCommonKeyProperties commonKeyProperties1 = new(marketTag);
             GridCommonKeyProperties commonKeyProperties2 = new(calibratedTag);
@@ -137,7 +137,7 @@ namespace PowerGrid.Persistence.UnitTests
         }
 
         [Test]
-        public void AcquireLockAndInvokeActionOuterKeyPropertiesLockOverload()
+        public void AcquireLockAndInvokeAction_OuterKeyPropertiesLockOverload()
         {
             GridCommonKeyProperties commonKeyProperties1 = new(marketTag);
             GridCommonKeyProperties commonKeyProperties2 = new(calibratedTag);
