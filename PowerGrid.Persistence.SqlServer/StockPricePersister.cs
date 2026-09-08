@@ -93,7 +93,8 @@ namespace PowerGrid.Persistence.SqlServer
                   AND  DataSource = {dataSourceParameterName}
                   AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
                   AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
-                ORDER  BY Company COLLATE {transactSqlCollation};";
+                ORDER  BY Company 
+                COLLATE {transactSqlCollation};";
             }
         }
 
@@ -744,10 +745,6 @@ namespace PowerGrid.Persistence.SqlServer
         /// <exception cref="Exception">A grid with the specified parameters does not exist.</exception>
         protected DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties, Int32 version)
         {
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            const String versionParameterName = "@Version";
             String query = @$"
             SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
             FROM    StockPriceGrids 

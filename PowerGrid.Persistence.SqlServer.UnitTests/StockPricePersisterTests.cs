@@ -135,8 +135,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE Latin1_General_BIN2;
-            ";
+            ORDER  BY Company 
+            COLLATE Latin1_General_BIN2;";
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -235,8 +235,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE Latin1_General_BIN2;
-            ";
+            ORDER  BY Company 
+            COLLATE Latin1_General_BIN2;";
             String expectedMaxIdQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -334,8 +334,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  DataSource = @DataSource
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company COLLATE Latin1_General_BIN2;
-            ";
+            ORDER  BY Company 
+            COLLATE Latin1_General_BIN2;";
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
@@ -478,7 +478,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND  DataSource = @DataSource
                   AND  [Date] = CONVERT(date, @Date, 23) 
                   AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-                ORDER  BY Company COLLATE Latin1_General_BIN2;";
+                ORDER  BY Company 
+                COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false, true, false);
@@ -1341,7 +1342,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND  DataSource = @DataSource
                   AND  [Date] = CONVERT(date, @Date, 23) 
                   AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-                ORDER  BY Company COLLATE Latin1_General_BIN2;";
+                ORDER  BY Company 
+                COLLATE Latin1_General_BIN2;";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
@@ -1380,7 +1382,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND  DataSource = @DataSource
                   AND  [Date] = CONVERT(date, @Date, 23) 
                   AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-                ORDER  BY Company COLLATE Latin1_General_BIN2;";
+                ORDER  BY Company 
+                COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);

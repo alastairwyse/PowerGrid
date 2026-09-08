@@ -90,16 +90,18 @@ namespace PowerGrid.Persistence.SqlServer
                        CONVERT(nvarchar(30), [Date], 23) AS [{dateColumnName}], 
                        CONVERT(nvarchar(30), [Time], 24) AS [{timeColumnName}], 
                        {countryColumnName}, 
-                       {cityColumnName},
+                       {cityColumnName}, 
                        {temperatureColumnName}, 
                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
                 FROM   WeatherForecasts 
-                WHERE  Tag = {tagParameterName}
+                WHERE  Tag = {tagParameterName} 
                   AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
-                  AND  [Time] = CONVERT(time, {timeColumnName}, 24) 
-                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
-                ORDER  BY Company COLLATE {transactSqlCollation};";
+                  AND  [Time] = CONVERT(time, {timeParameterName}, 24) 
+                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER  BY {countryColumnName}, 
+                          {cityColumnName} 
+                COLLATE {transactSqlCollation};";
             }
         }
 

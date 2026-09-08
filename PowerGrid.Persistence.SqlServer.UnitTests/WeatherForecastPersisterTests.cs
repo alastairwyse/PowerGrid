@@ -22,8 +22,9 @@ using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using ApplicationLogging;
 using ApplicationMetrics;
-using NSubstitute;
 using NUnit.Framework;
+using NUnit.Framework.Internal;
+using NSubstitute;
 
 namespace PowerGrid.Persistence.SqlServer.UnitTests
 {
@@ -42,9 +43,69 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void GetGrid()
+        public void GetGridTransactionTimestampOverload()
         {
-            throw new NotImplementedException();
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-08");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-09-08 22:04:51.0000030");
+            String expectedCommandText = @$"
+                SELECT Id, 
+                       Tag, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                       Country, 
+                       City, 
+                       Temperature, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   WeatherForecasts 
+                WHERE  Tag = @Tag 
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  [Time] = CONVERT(time, @Time, 24) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER  BY Country, 
+                          City 
+                COLLATE Latin1_General_BIN2;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Id"].Returns<Object>(1L);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Time"].Returns<Object>(testTime.ToString(transactSql24TimeStyle));
+            mockDataReader["Country"].Returns<Object>("Japan");
+            mockDataReader["City"].Returns<Object>("Tokyo");
+            mockDataReader["Temperature"].Returns<Object>(27);
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-09-08T22:04:51.0000030");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                List<WeatherForecastGridItemPTO> results = new(testWeatherForecastPersister.GetGrid(connection, testOuterKeyProperties, testTransactionTimestamp));
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                Assert.That(results.Count == 1);
+                Assert.That(results[0].Id == 1);
+                Assert.That(results[0].Tag == testTag);
+                Assert.That(results[0].Date == testDate);
+                Assert.That(results[0].Time == testTime);
+                Assert.That(results[0].Country == "Japan");
+                Assert.That(results[0].City == "Tokyo");
+                Assert.That(results[0].Temperature == 27);
+                Assert.That(results[0].TransactionFrom == testTransactionTimestamp);
+                Assert.That(results[0].TransactionFrom.Kind == DateTimeKind.Utc);
+                Assert.That(results[0].TransactionTo == utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+                Assert.That(results[0].TransactionTo.Kind == DateTimeKind.Utc);
+            }
         }
 
         [Test]
@@ -578,10 +639,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 throw new NotImplementedException();
             }
 
-            public new IEnumerable<StockPriceGridItemPTO> GetGrid(SqlConnection connection, WeatherForecastGridOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)
+            public new IEnumerable<WeatherForecastGridItemPTO> GetGrid(SqlConnection connection, WeatherForecastGridOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)
             {
-                //return base.GetGrid(connection, outerKeyProperties, transactionTimestamp);
-                throw new NotImplementedException();
+                return base.GetGrid(connection, outerKeyProperties, transactionTimestamp);
             }
 
             public new void InsertGridItem(SqlConnection connection, SqlTransaction transaction, WeatherForecastGridItem item, DateTime insertDateTime)

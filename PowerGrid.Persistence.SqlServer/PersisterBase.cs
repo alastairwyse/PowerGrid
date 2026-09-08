@@ -230,6 +230,8 @@ namespace PowerGrid.Persistence.SqlServer
         /// </summary>
         protected abstract String GridMaxVersionQuery { get; }
 
+        protected abstract String GridTransactionTimestampQuery { get; }
+
         /// <summary>
         /// The text for a SQL query which returns the contents (items) from a single grid.
         /// </summary>
