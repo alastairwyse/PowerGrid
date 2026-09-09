@@ -66,12 +66,27 @@ namespace PowerGrid.Persistence.SqlServer
             get
             {
                 return @$"
-                SELECT  MAX([Version]) AS {maxVersionColumnAlias} 
+                SELECT  MAX([{versionColumnName}]) AS {maxVersionColumnAlias} 
                 FROM    StockPriceGrids 
-                WHERE   Tag = {tagParameterName}
-                  AND   DataSource = {dataSourceParameterName}
-                  AND   [Date] = CONVERT(date, {dateParameterName}, 23);";
+                WHERE   {tagColumnName} = {tagParameterName}
+                  AND   {dataSourceColumnName} = {dataSourceParameterName}
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
             } 
+        }
+
+        /// <inheritdoc/>
+        protected override String GridTransactionTimestampQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    StockPriceGrids 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{versionColumnName}] = {versionParameterName};";
+            }
         }
 
         /// <inheritdoc/>
@@ -89,11 +104,11 @@ namespace PowerGrid.Persistence.SqlServer
                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
                 FROM   StockPrices 
-                WHERE  Tag = {tagParameterName}
-                  AND  DataSource = {dataSourceParameterName}
-                  AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
+                WHERE  {tagColumnName} = {tagParameterName}
+                  AND  {dataSourceColumnName} = {dataSourceParameterName}
+                  AND  [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
                   AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
-                ORDER  BY Company 
+                ORDER  BY {companyColumnName} 
                 COLLATE {transactSqlCollation};";
             }
         }
@@ -107,11 +122,11 @@ namespace PowerGrid.Persistence.SqlServer
                 INSERT 
                 INTO    StockPriceGrids 
                         (
-                            Tag, 
-                            DataSource, 
-                            [Date], 
-                            [Version], 
-                            TransactionTimestamp
+                            {tagColumnName}, 
+                            {dataSourceColumnName}, 
+                            [{dateColumnName}], 
+                            [{versionColumnName}], 
+                            {transactionTimestampColumnName}
                         )
                 VALUES  (
                             {tagParameterName}, 
@@ -132,13 +147,13 @@ namespace PowerGrid.Persistence.SqlServer
                 INSERT 
                 INTO    StockPrices 
                         (
-                            Tag, 
-                            DataSource, 
-                            [Date], 
-                            Company, 
-                            Price, 
-                            TransactionFrom, 
-                            TransactionTo 
+                            {tagColumnName}, 
+                            {dataSourceColumnName}, 
+                            [{dateColumnName}], 
+                            {companyColumnName}, 
+                            {priceColumnName}, 
+                            {transactionFromColumnName}, 
+                            {transactionToColumnName} 
                         )
                 VALUES  (
                             {tagParameterName}, 
@@ -719,8 +734,8 @@ namespace PowerGrid.Persistence.SqlServer
                             {
                                 throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for {gridOuterKeyProperties.ToString()}.");
                             }
-                            latestGridVersionNumber = (Int32)dataReader["Version"];
-                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            latestGridVersionNumber = (Int32)dataReader[versionColumnName];
+                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader[transactionTimestampColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                             latestGridTransactionTimestamp = DateTime.SpecifyKind(latestGridTransactionTimestamp, DateTimeKind.Utc);
                             alreadyReadResult = true;
                         }
@@ -745,26 +760,15 @@ namespace PowerGrid.Persistence.SqlServer
         /// <exception cref="Exception">A grid with the specified parameters does not exist.</exception>
         protected DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties, Int32 version)
         {
-            String query = @$"
-            SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
-            FROM    StockPriceGrids 
-            WHERE   Tag = {tagParameterName} 
-              AND   DataSource = {dataSourceParameterName} 
-              AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-              AND   [Version] = {versionParameterName};
-            ";
-
             using (var command = new SqlCommand())
             {
                 DateTime transactionTimestamp = DateTime.MinValue;
                 Boolean alreadyReadResult = false;
                 try
                 {
-                    sqlCommandShim.SetCommandText(command, query);
+                    sqlCommandShim.SetCommandText(command, GridTransactionTimestampQuery);
                     PrepareCommand(connection, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
                     sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, version);
                     using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
                     {
@@ -772,7 +776,7 @@ namespace PowerGrid.Persistence.SqlServer
                         {
                             if (alreadyReadResult == true)
                             {
-                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve stock price grid version for {gridOuterKeyProperties.ToString()}, and version {version}.");
+                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve {GridItemEntityName} grid version for {gridOuterKeyProperties.ToString()}, and version {version}.");
                             }
                             transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
                             alreadyReadResult = true;
@@ -781,7 +785,7 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
-                    throw new Exception($"Failed to read stock price grid for {gridOuterKeyProperties.ToString()}, and version {version} from SQL Server.", e);
+                    throw new Exception($"Failed to read {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()}, and version {version} from SQL Server.", e);
                 }
                 if (alreadyReadResult == false)
                 {

@@ -54,6 +54,8 @@ namespace PowerGrid.Persistence.SqlServer
         protected const String idColumnName = "Id";
         protected const String transactionFromColumnName = "TransactionFrom";
         protected const String transactionToColumnName = "TransactionTo";
+        protected const String versionColumnName = "Version";
+        protected const String transactionTimestampColumnName = "TransactionTimestamp";
 
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
         protected const String transactSql23DateStyle = "yyyy-MM-dd";
@@ -230,6 +232,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// </summary>
         protected abstract String GridMaxVersionQuery { get; }
 
+        /// <summary>
+        /// The text for a SQL query which returns the transaction timestamp of a grid, given the outer key properties and a grid version.
+        /// </summary>
         protected abstract String GridTransactionTimestampQuery { get; }
 
         /// <summary>

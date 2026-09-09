@@ -80,6 +80,15 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String GridTransactionTimestampQuery
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <inheritdoc/>
         protected override String GridContentsQuery
         {
             get
