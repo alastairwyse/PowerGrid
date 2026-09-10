@@ -75,7 +75,16 @@ namespace PowerGrid.Persistence.SqlServer
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = {tagParameterName}
                   AND   [Date] = CONVERT(date, {dateParameterName}, 23)
-                  AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+                  AND   [Time] = CONVERT(time, {timeParameterName}, 24)";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridMaxVersionAndTransactionTimestampQuery
+        {
+            get
+            {
+                throw new NotImplementedException();
             }
         }
 
@@ -84,7 +93,13 @@ namespace PowerGrid.Persistence.SqlServer
         {
             get
             {
-                throw new NotImplementedException();
+                return @$"
+                SELECT  CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    WeatherForecastGrids 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   [{versionColumnName}] = {versionParameterName};";
             }
         }
 

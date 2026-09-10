@@ -43,6 +43,170 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void GetLatestGridVersion_ExceptionReading()
+        {
+            throw new NotImplementedException();
+
+            // TODO: Add other GetLatestGridVersion() tests
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp_MultipleRecordsReturned()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-10");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("23:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            Int32 testVersion = 9;
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = @Version;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-09-09T23:02:45.0000101");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                Assert.That(e.Message, Does.StartWith($"Failed to read weather forecast grid for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-10', Time = '23:00:00' }}, and version 9 from SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve weather forecast grid version for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-10', Time = '23:00:00' }}, and version 9."));
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp_GridDoesntExist()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-10");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("23:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            Int32 testVersion = 10;
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = @Version;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-09-09T23:02:45.0000101");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                Assert.That(e.Message, Does.StartWith($"Weather forecast grid for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-10', Time = '23:00:00' }}, and version 10 did not exist."));
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp_ExceptionReading()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-10");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("23:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            Int32 testVersion = 11;
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = @Version;";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                Assert.That(e.Message, Does.StartWith($"Failed to read weather forecast grid for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-10', Time = '23:00:00' }}, and version 11 from SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void GetExistingGrid_ExceptionReading()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-10");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("23:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-09-10 22:04:51.0000031");
+            String expectedCommandText = @$"
+                SELECT Id, 
+                       Tag, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                       Country, 
+                       City, 
+                       Temperature, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   WeatherForecasts 
+                WHERE  Tag = @Tag 
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  [Time] = CONVERT(time, @Time, 24) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER  BY Country, 
+                          City 
+                COLLATE Latin1_General_BIN2;";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    List<WeatherForecastGridItemPTO> results = new(testWeatherForecastPersister.GetGrid(connection, testOuterKeyProperties, testTransactionTimestamp));
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to read weather forecast grid for WeatherForecastGridOuterKeyProperties {{ Tag = 'Apple', Date = '2026-09-10', Time = '23:00:00' }}, and transaction timestamp '2026-09-10 22:04:51.0000031' from SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
         public void GetGridTransactionTimestampOverload()
         {
             const String testTag = "Apple";
@@ -635,8 +799,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
             public new DateTime GetGridTransactionTimestamp(SqlConnection connection, WeatherForecastGridOuterKeyProperties outerKeyProperties, Int32 version)
             {
-                //return base.GetGridTransactionTimestamp(connection, outerKeyProperties, version);
-                throw new NotImplementedException();
+                return base.GetGridTransactionTimestamp(connection, outerKeyProperties, version);
             }
 
             public new IEnumerable<WeatherForecastGridItemPTO> GetGrid(SqlConnection connection, WeatherForecastGridOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)

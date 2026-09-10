@@ -68,10 +68,29 @@ namespace PowerGrid.Persistence.SqlServer
                 return @$"
                 SELECT  MAX([{versionColumnName}]) AS {maxVersionColumnAlias} 
                 FROM    StockPriceGrids 
-                WHERE   {tagColumnName} = {tagParameterName}
-                  AND   {dataSourceColumnName} = {dataSourceParameterName}
-                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23)";
             } 
+        }
+
+        /// <inheritdoc/>
+        protected override String GridMaxVersionAndTransactionTimestampQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  [{versionColumnName}] AS [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    StockPriceGrids 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{versionColumnName}] = 
+                        (
+                          {GridMaxVersionQuery}
+                        );";
+            }
         }
 
         /// <inheritdoc/>
@@ -679,122 +698,6 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #region Private/Protected Methods
-
-        /// <summary>
-        /// Gets the latest stock price grid version for the specified parameters.
-        /// </summary>
-        /// <param name="connection">The connection to use to retrieve the grid version.</param>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid version to retrieve.</param>
-        /// <returns>A tuple containing: the version number of the latest grid (or 0 if no grids exist for the specified parameters), and the transaction (creation) timestamp of the grid (or <see cref="DateTime.MinValue"/> if no grids exist for the specified parameters).</returns>
-        protected (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
-        {
-            // REFACTORING: 
-            //   General steps here in base case
-            //   Query can be abstract (or tablename and parameters... other parts of the insertStatement should be common)
-            //   Use AppAccess SqlServerPersisterUtilities and ReadQueryGeneratorBase classes for influence in how to split platform-agnostic SQL into base classes
-
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            String query = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
-            FROM    StockPriceGrids 
-            WHERE   Tag = {tagParameterName} 
-              AND   DataSource = {dataSourceParameterName} 
-              AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-              AND   [Version] = 
-                    (
-                      SELECT  MAX([Version])
-                      FROM    StockPriceGrids 
-                      WHERE   Tag = {tagParameterName} 
-                        AND   DataSource = {dataSourceParameterName} 
-                        AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-                    );
-            ";
-
-            using (var command = new SqlCommand())
-            {
-                try
-                {
-                    sqlCommandShim.SetCommandText(command, query);
-                    PrepareCommand(connection, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                    sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                    sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
-                    Int32 latestGridVersionNumber = 0;
-                    DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
-
-                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
-                    {
-                        Boolean alreadyReadResult = false;
-                        while (dataReader.Read())
-                        {
-                            if (alreadyReadResult == true)
-                            {
-                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for {gridOuterKeyProperties.ToString()}.");
-                            }
-                            latestGridVersionNumber = (Int32)dataReader[versionColumnName];
-                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader[transactionTimestampColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
-                            latestGridTransactionTimestamp = DateTime.SpecifyKind(latestGridTransactionTimestamp, DateTimeKind.Utc);
-                            alreadyReadResult = true;
-                        }
-                    }
-
-                    return (latestGridVersionNumber, latestGridTransactionTimestamp);
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to read latest stock price grid version for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets the transaction (creation) timestamp for the stock price grid with the specified parameters and version.
-        /// </summary>
-        /// <param name="connection">The connection to use to retrieve the grid version.</param>
-        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
-        /// <param name="version">The version number of the grid.</param>
-        /// <returns>The transaction (creation) timestamp of the grid.</returns>
-        /// <exception cref="Exception">A grid with the specified parameters does not exist.</exception>
-        protected DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceGridOuterKeyProperties gridOuterKeyProperties, Int32 version)
-        {
-            using (var command = new SqlCommand())
-            {
-                DateTime transactionTimestamp = DateTime.MinValue;
-                Boolean alreadyReadResult = false;
-                try
-                {
-                    sqlCommandShim.SetCommandText(command, GridTransactionTimestampQuery);
-                    PrepareCommand(connection, command);
-                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
-                    sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, version);
-                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
-                    {
-                        while (dataReader.Read())
-                        {
-                            if (alreadyReadResult == true)
-                            {
-                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve {GridItemEntityName} grid version for {gridOuterKeyProperties.ToString()}, and version {version}.");
-                            }
-                            transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
-                            alreadyReadResult = true;
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to read {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()}, and version {version} from SQL Server.", e);
-                }
-                if (alreadyReadResult == false)
-                {
-                    throw new Exception($"Stock price grid for {gridOuterKeyProperties.ToString()}, and version {version} did not exist.");
-                }
-
-                return transactionTimestamp;
-            }
-        }
 
         #endregion
     }
