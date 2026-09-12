@@ -45,9 +45,175 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void GetLatestGridVersion_ExceptionReading()
         {
-            throw new NotImplementedException();
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-12");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("09:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedCommandText = @$"
+                SELECT  [Version] AS [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24)
+                        );";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
-            // TODO: Add other GetLatestGridVersion() tests
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                Assert.That(e.Message, Does.StartWith($"Failed to read latest weather forecast grid version for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-12', Time = '09:00:00' }} from SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void GetLatestGridVersion_NoVersionExists()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-12");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("09:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedCommandText = @$"
+                SELECT  [Version] AS [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                (Int32 versionNumberResult, DateTime transactionTimestampResult) = testWeatherForecastPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                Assert.That(versionNumberResult == 0);
+                Assert.That(transactionTimestampResult == DateTime.MinValue);
+                Assert.That(transactionTimestampResult.Kind == DateTimeKind.Utc);
+            }
+        }
+
+        [Test]
+        public void GetLatestGridVersion_MultipleRecordsReturned()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-12");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("09:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedCommandText = @$"
+                SELECT  [Version] AS [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, true);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-16T13:39:41.0000013");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testWeatherForecastPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                Assert.That(e.Message, Does.StartWith($"Failed to read latest weather forecast grid version for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-12', Time = '09:00:00' }} from SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve latest weather forecast grid version for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-12', Time = '09:00:00' }}."));
+            }
+        }
+
+        [Test]
+        public void GetLatestGridVersion()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-12");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("09:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedCommandText = @$"
+                SELECT  [Version] AS [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(4);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-09-12T09:49:52.0000060");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                (Int32 versionNumberResult, DateTime transactionTimestampResult) = testWeatherForecastPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+                Assert.That(versionNumberResult == 4);
+                Assert.That(transactionTimestampResult == utils.CreateDataTimeFromString("2026-09-12 09:49:52.0000060"));
+                Assert.That(transactionTimestampResult.Kind == DateTimeKind.Utc);
+            }
         }
 
         [Test]
@@ -562,8 +728,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
-                WHERE   Tag = @Tag
-                  AND   [Date] = CONVERT(date, @Date, 23)
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
                   AND   [Time] = CONVERT(time, @Time, 24);";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
@@ -599,8 +765,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
-                WHERE   Tag = @Tag
-                  AND   [Date] = CONVERT(date, @Date, 23)
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
                   AND   [Time] = CONVERT(time, @Time, 24);";
             String expectedInsertStatementText = @$"
                 INSERT 
@@ -663,8 +829,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
-                WHERE   Tag = @Tag
-                  AND   [Date] = CONVERT(date, @Date, 23)
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
                   AND   [Time] = CONVERT(time, @Time, 24);";
             String expectedInsertStatementText = @$"
                 INSERT 
@@ -721,8 +887,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
-                WHERE   Tag = @Tag
-                  AND   [Date] = CONVERT(date, @Date, 23)
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
                   AND   [Time] = CONVERT(time, @Time, 24);";
             String expectedInsertStatementText = @$"
                 INSERT 
@@ -793,8 +959,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
             public new (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, WeatherForecastGridOuterKeyProperties outerKeyProperties)
             {
-                //return base.GetLatestGridVersion(connection, outerKeyProperties);
-                throw new NotImplementedException();
+                return base.GetLatestGridVersion(connection, outerKeyProperties);
             }
 
             public new DateTime GetGridTransactionTimestamp(SqlConnection connection, WeatherForecastGridOuterKeyProperties outerKeyProperties, Int32 version)

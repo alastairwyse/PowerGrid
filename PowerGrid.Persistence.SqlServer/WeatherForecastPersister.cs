@@ -73,8 +73,8 @@ namespace PowerGrid.Persistence.SqlServer
                 return @$"
                 SELECT  MAX([Version]) AS {maxVersionColumnAlias} 
                 FROM    WeatherForecastGrids 
-                WHERE   Tag = {tagParameterName}
-                  AND   [Date] = CONVERT(date, {dateParameterName}, 23)
+                WHERE   Tag = {tagParameterName} 
+                  AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
                   AND   [Time] = CONVERT(time, {timeParameterName}, 24)";
             }
         }
@@ -84,7 +84,17 @@ namespace PowerGrid.Persistence.SqlServer
         {
             get
             {
-                throw new NotImplementedException();
+                return @$"
+                SELECT  [{versionColumnName}] AS [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    WeatherForecastGrids 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   [{versionColumnName}] = 
+                        (
+                          {GridMaxVersionQuery}
+                        );";
             }
         }
 
