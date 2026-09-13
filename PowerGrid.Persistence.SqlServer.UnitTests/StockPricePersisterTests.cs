@@ -841,19 +841,18 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void HardDeleteGridsStockPriceGridOuterKeyPropertiesOverload_ExceptionDeleting()
+        public void HardDeleteGridsGridOuterKeyPropertiesOverload_ExceptionDeleting()
         {
             const String testTag = "Calibration";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedStockPriceGridsDeleteCommandText = @$"
-            DELETE 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -876,31 +875,29 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-            Assert.That(e.Message, Does.StartWith($"Failed to delete grids for StockPriceGridOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
+            Assert.That(e.Message, Does.StartWith($"Failed to delete stock price grids for StockPriceGridOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
 
         [Test]
-        public void HardDeleteGridsStockPriceGridOuterKeyPropertiesOverload()
+        public void HardDeleteGridsGridOuterKeyPropertiesOverload()
         {
             const String testTag = "Calibration";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedStockPriceGridsDeleteCommandText = @$"
-            DELETE 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             String expectedStockPricesDeleteCommandText = @$"
-            DELETE 
-            FROM    StockPrices 
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                DELETE 
+                FROM    StockPrices 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -929,10 +926,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Calibration";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedStockPriceGridsDeleteCommandText = @$"
-            DELETE 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag;
-            ";
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -953,7 +949,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
-            Assert.That(e.Message, Does.StartWith($"Failed to delete grids for GridCommonKeyProperties {{ Tag = 'Calibration' }} in SQL Server."));
+            Assert.That(e.Message, Does.StartWith($"Failed to delete stock price grids for GridCommonKeyProperties {{ Tag = 'Calibration' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
 
@@ -963,15 +959,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Calibration";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedStockPriceGridsDeleteCommandText = @$"
-            DELETE 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag;
-            ";
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
             String expectedStockPricesDeleteCommandText = @$"
-            DELETE 
-            FROM    StockPrices 
-            WHERE   Tag = @Tag;
-            ";
+                DELETE 
+                FROM    StockPrices 
+                WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));

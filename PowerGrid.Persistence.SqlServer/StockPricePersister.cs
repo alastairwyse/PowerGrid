@@ -55,6 +55,12 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String GridTableName
+        {
+            get { return "StockPriceGrids"; }
+        }
+
+        /// <inheritdoc/>
         protected override String GridItemEntityName
         {
             get { return "stock price"; }
@@ -67,7 +73,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 return @$"
                 SELECT  MAX([{versionColumnName}]) AS {maxVersionColumnAlias} 
-                FROM    StockPriceGrids 
+                FROM    {GridTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
                   AND   {dataSourceColumnName} = {dataSourceParameterName} 
                   AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23)";
@@ -82,7 +88,7 @@ namespace PowerGrid.Persistence.SqlServer
                 return @$"
                 SELECT  [{versionColumnName}] AS [{versionColumnName}], 
                         CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
-                FROM    StockPriceGrids 
+                FROM    {GridTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
                   AND   {dataSourceColumnName} = {dataSourceParameterName} 
                   AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
@@ -100,7 +106,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 return @$"
                 SELECT  CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
-                FROM    StockPriceGrids 
+                FROM    {GridTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
                   AND   {dataSourceColumnName} = {dataSourceParameterName} 
                   AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
@@ -122,7 +128,7 @@ namespace PowerGrid.Persistence.SqlServer
                        {priceColumnName}, 
                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM   StockPrices 
+                FROM   {GridItemTableName} 
                 WHERE  {tagColumnName} = {tagParameterName}
                   AND  {dataSourceColumnName} = {dataSourceParameterName}
                   AND  [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
@@ -133,13 +139,65 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String HardDeleteGridsByCommonKeyPropertiesStatementSqlText 
+        { 
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridsByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
+            }
+        }
+
+        /// <inheritdoc/>
         protected override String GridInsertStatementSqlText 
         { 
             get
             {
                 return $@"
                 INSERT 
-                INTO    StockPriceGrids 
+                INTO    {GridTableName} 
                         (
                             {tagColumnName}, 
                             {dataSourceColumnName}, 
@@ -164,7 +222,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 return @$"
                 INSERT 
-                INTO    StockPrices 
+                INTO    {GridItemTableName} 
                         (
                             {tagColumnName}, 
                             {dataSourceColumnName}, 
@@ -201,9 +259,15 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override void AddGridCommonKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, GridCommonKeyProperties gridCommonKeyProperties)
+        {
+            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+        }
+
+        /// <inheritdoc/>
         protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
         {
-            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
+            AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, command, new GridCommonKeyProperties(gridOuterKeyProperties.Tag));
             sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
             sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
         }
@@ -593,106 +657,6 @@ namespace PowerGrid.Persistence.SqlServer
                     {
                         throw new Exception($"Failed to delete latest grid items for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
                     }
-                }
-            }
-        }
-
-        /// <inheritdoc/>
-        public override void HardDeleteGrids(StockPriceGridOuterKeyProperties gridOuterKeyProperties)
-        {
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            String stockPriceGridsDeleteStatement = @$"
-            DELETE 
-            FROM    StockPriceGrids 
-            WHERE   Tag = {tagParameterName} 
-              AND   DataSource = {dataSourceParameterName} 
-              AND   [Date] = CONVERT(date, {dateParameterName}, 23);
-            ";
-            String stockPricesDeleteStatement = @$"
-            DELETE 
-            FROM    StockPrices 
-            WHERE   Tag = {tagParameterName} 
-              AND   DataSource = {dataSourceParameterName} 
-              AND   [Date] = CONVERT(date, {dateParameterName}, 23);
-            ";
-
-            using (var connection = new SqlConnection(connectionString))
-            using (var stockPriceGridsDeleteCommand = new SqlCommand())
-            using (var stockPricesDeleteCommand = new SqlCommand())
-            {
-                try
-                {
-                    PrepareConnection(connection);
-                    sqlConnectionShim.Open(connection);
-                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
-                    {
-                        sqlCommandShim.SetCommandText(stockPriceGridsDeleteCommand, stockPriceGridsDeleteStatement);
-                        PrepareCommand(connection, transaction, stockPriceGridsDeleteCommand);
-                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPriceGridsDeleteCommand);
-                        sqlCommandShim.SetCommandText(stockPricesDeleteCommand, stockPricesDeleteStatement);
-                        PrepareCommand(connection, transaction, stockPricesDeleteCommand);
-                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPricesDeleteCommand);
-                        sqlTransactionShim.Commit(transaction);
-                        sqlConnectionShim.Close(connection);
-                    }
-
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to delete grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
-                }
-            }
-        }
-
-        /// <inheritdoc/>
-        public override void HardDeleteGrids(GridCommonKeyProperties gridCommonKeyProperties)
-        {
-            const String tagParameterName = "@Tag";
-            String stockPriceGridsDeleteStatement = @$"
-            DELETE 
-            FROM    StockPriceGrids 
-            WHERE   Tag = {tagParameterName};
-            ";
-            String stockPricesDeleteStatement = @$"
-            DELETE 
-            FROM    StockPrices 
-            WHERE   Tag = {tagParameterName};
-            ";
-
-            using (var connection = new SqlConnection(connectionString))
-            using (var stockPriceGridsDeleteCommand = new SqlCommand())
-            using (var stockPricesDeleteCommand = new SqlCommand())
-            {
-                try
-                {
-                    PrepareConnection(connection);
-                    sqlConnectionShim.Open(connection);
-                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
-                    {
-                        sqlCommandShim.SetCommandText(stockPriceGridsDeleteCommand, stockPriceGridsDeleteStatement);
-                        PrepareCommand(connection, transaction, stockPriceGridsDeleteCommand);
-                        sqlCommandShim.AddParameter(stockPriceGridsDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPriceGridsDeleteCommand);
-                        sqlCommandShim.SetCommandText(stockPricesDeleteCommand, stockPricesDeleteStatement);
-                        PrepareCommand(connection, transaction, stockPricesDeleteCommand);
-                        sqlCommandShim.AddParameter(stockPricesDeleteCommand, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, stockPricesDeleteCommand);
-                        sqlTransactionShim.Commit(transaction);
-                        sqlConnectionShim.Close(connection);
-                    }
-
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to delete grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
                 }
             }
         }

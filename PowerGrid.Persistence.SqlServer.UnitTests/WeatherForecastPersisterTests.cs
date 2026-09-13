@@ -43,6 +43,152 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void HardDeleteGridsOuterKeyPropertiesOverload_ExceptionDeleting()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-13");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("20:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedWeatherForecastGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.HardDeleteGrids(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedWeatherForecastGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete weather forecast grids for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-13', Time = '20:00:00' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void HardDeleteGridsGridOuterKeyPropertiesOverload()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-13");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("20:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedWeatherForecastGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            String expectedWeatherForecastsDeleteCommandText = @$"
+                DELETE 
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+
+            testWeatherForecastPersister.HardDeleteGrids(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedWeatherForecastGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedWeatherForecastsDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+        }
+
+        [Test]
+        public void HardDeleteGridsCommonKeyPropertiesOverload_ExceptionDeleting()
+        {
+            const String testTag = "Apple";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedWeatherForecastGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.HardDeleteGrids(testCommonKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedWeatherForecastGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete weather forecast grids for GridCommonKeyProperties {{ Tag = 'Apple' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void HardDeleteGridsCommonKeyPropertiesOverload()
+        {
+            const String testTag = "Calibration";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedWeatherForecastGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag;";
+            String expectedWeatherForecastsDeleteCommandText = @$"
+                DELETE 
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+
+            testWeatherForecastPersister.HardDeleteGrids(testCommonKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedWeatherForecastGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedWeatherForecastsDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+        }
+
+        [Test]
         public void GetLatestGridVersion_ExceptionReading()
         {
             const String testTag = "www.bom.gov.au";

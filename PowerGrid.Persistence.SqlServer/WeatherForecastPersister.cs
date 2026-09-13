@@ -60,6 +60,12 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String GridTableName
+        {
+            get { return "WeatherForecastGrids"; }
+        }
+
+        /// <inheritdoc/>
         protected override String GridItemEntityName
         {
             get { return "weather forecast"; }
@@ -72,7 +78,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 return @$"
                 SELECT  MAX([Version]) AS {maxVersionColumnAlias} 
-                FROM    WeatherForecastGrids 
+                FROM    {GridTableName} 
                 WHERE   Tag = {tagParameterName} 
                   AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
                   AND   [Time] = CONVERT(time, {timeParameterName}, 24)";
@@ -87,7 +93,7 @@ namespace PowerGrid.Persistence.SqlServer
                 return @$"
                 SELECT  [{versionColumnName}] AS [{versionColumnName}], 
                         CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
-                FROM    WeatherForecastGrids 
+                FROM    {GridTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
                   AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
                   AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
@@ -105,7 +111,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 return @$"
                 SELECT  CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
-                FROM    WeatherForecastGrids 
+                FROM    {GridTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
                   AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
                   AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
@@ -128,7 +134,7 @@ namespace PowerGrid.Persistence.SqlServer
                        {temperatureColumnName}, 
                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM   WeatherForecasts 
+                FROM   {GridItemTableName} 
                 WHERE  Tag = {tagParameterName} 
                   AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
                   AND  [Time] = CONVERT(time, {timeParameterName}, 24) 
@@ -140,13 +146,64 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String HardDeleteGridsByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   Tag = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   Tag = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridsByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText
+        {get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
         protected override String GridInsertStatementSqlText
         {
             get
             {
                 return $@"
                 INSERT 
-                INTO    WeatherForecastGrids 
+                INTO    {GridTableName} 
                         (
                             Tag, 
                             [Date], 
@@ -171,7 +228,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 return @$"
                 INSERT 
-                INTO    WeatherForecasts 
+                INTO    {GridItemTableName} 
                         (
                             Tag, 
                             [Date], 
@@ -211,9 +268,15 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override void AddGridCommonKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, GridCommonKeyProperties gridCommonKeyProperties)
+        {
+            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+        }
+
+        /// <inheritdoc/>
         protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
         {
-            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
+            AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, command, new GridCommonKeyProperties(gridOuterKeyProperties.Tag));
             sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
             sqlCommandShim.AddParameter(command, timeParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Time.ToString(transactSql24TimeStyle));
         }
@@ -237,7 +300,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
         /// </summary>
-        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="connectionString" >The string to use to connect to the SQL Server database.</param>
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
@@ -330,18 +393,6 @@ namespace PowerGrid.Persistence.SqlServer
 
         /// <inheritdoc/>
         public override void SoftDeleteLatestGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc/>
-        public override void HardDeleteGrids(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc/>
-        public override void HardDeleteGrids(GridCommonKeyProperties gridCommonKeyProperties)
         {
             throw new NotImplementedException();
         }
