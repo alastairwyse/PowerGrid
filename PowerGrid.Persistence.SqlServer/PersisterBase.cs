@@ -51,6 +51,7 @@ namespace PowerGrid.Persistence.SqlServer
         protected const String deleteDateTimeParameterName = "@DeleteDateTime";
         protected const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
         protected const String transactionTimestampParameterName = "@TransactionTimestamp";
+        protected const String currentDateTimeParameterName = "@CurrentDateTime";
 
         protected const String idColumnName = "Id";
         protected const String transactionFromColumnName = "TransactionFrom";
@@ -215,6 +216,50 @@ namespace PowerGrid.Persistence.SqlServer
             this.sqlCommandShim = sqlCommandShim;
         }
 
+
+        /// <inheritdoc/>
+        public override void SoftDeleteLatestGrid(TOuterKeyProperties gridOuterKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+                (Int32 version, DateTime transactionTimestamp) = GetLatestGridVersion(connection, gridOuterKeyProperties);
+                if (version == 0)
+                {
+                    throw new Exception($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()} does not exist.");
+                }
+
+                using (var command = new SqlCommand())
+                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                {
+                    try
+                    {
+                        DateTime deleteTimestamp = dateTimeProvider.UtcNow();
+                        sqlCommandShim.SetCommandText(command, SoftDeleteLatestGridStatementSqlText);
+                        PrepareCommand(connection, transaction, command);
+                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.ToString(transactSql126DateStyle));
+                        sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception($"Failed to delete latest grid items for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
+                    }
+                }
+            }
+        }
+
         #region Private/Protected Methods
 
         /// <summary>
@@ -252,6 +297,11 @@ namespace PowerGrid.Persistence.SqlServer
         /// The text for a SQL query which returns the contents (items) from a single grid.
         /// </summary>
         protected abstract String GridContentsQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which soft deletes the latest grid.
+        /// </summary>
+        protected abstract String SoftDeleteLatestGridStatementSqlText { get; }
 
         /// <summary>
         /// The text for a SQL statement which hard deletes all grids for specified common key properties.

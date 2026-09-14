@@ -132,9 +132,24 @@ namespace PowerGrid.Persistence.SqlServer
                 WHERE  {tagColumnName} = {tagParameterName}
                   AND  {dataSourceColumnName} = {dataSourceParameterName}
                   AND  [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
-                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo
+                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
                 ORDER  BY {companyColumnName} 
                 COLLATE {transactSqlCollation};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String SoftDeleteLatestGridStatementSqlText 
+        { 
+            get
+            {
+                return @$"
+                UPDATE  StockPrices 
+                SET     {transactionToColumnName} = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   CONVERT(datetime2, {currentDateTimeParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName};";
             }
         }
 
@@ -598,65 +613,6 @@ namespace PowerGrid.Persistence.SqlServer
                 catch (Exception e)
                 {
                     throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
-                }
-            }
-        }
-
-        /// <inheritdoc/>
-        public override void SoftDeleteLatestGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties)
-        {
-            const String tagParameterName = "@Tag";
-            const String dataSourceParameterName = "@DataSource";
-            const String dateParameterName = "@Date";
-            const String currentDateTimeParameterName = "@CurrentDateTime";
-            const String deleteDateTimeParameterName = "@DeleteDateTime";
-            String deleteStatement = @$"
-            UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
-            WHERE   Tag = {tagParameterName} 
-              AND   DataSource = {dataSourceParameterName} 
-              AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-              AND   CONVERT(datetime2, {currentDateTimeParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo;
-            ";
-
-            using (var connection = new SqlConnection(connectionString))
-            {
-                try
-                {
-                    PrepareConnection(connection);
-                    sqlConnectionShim.Open(connection);
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to connect to SQL Server.", e);
-                }
-                (Int32 version, DateTime transactionTimestamp) = GetLatestGridVersion(connection, gridOuterKeyProperties);
-                if (version == 0)
-                {
-                    throw new Exception($"Stock price grid for {gridOuterKeyProperties.ToString()} does not exist.");
-                }
-
-                using (var command = new SqlCommand())
-                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
-                {
-                    try
-                    {
-                        DateTime deleteTimestamp = dateTimeProvider.UtcNow();
-                        sqlCommandShim.SetCommandText(command, deleteStatement);
-                        PrepareCommand(connection, transaction, command);
-                        sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Tag);
-                        sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
-                        sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
-                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.ToString(transactSql126DateStyle));
-                        sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
-                        sqlTransactionShim.Commit(transaction);
-                        sqlConnectionShim.Close(connection);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new Exception($"Failed to delete latest grid items for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
-                    }
                 }
             }
         }

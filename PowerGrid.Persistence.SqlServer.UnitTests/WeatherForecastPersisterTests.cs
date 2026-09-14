@@ -43,6 +43,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void SoftDeleteLatestGrid()
+        {
+            throw new NotImplementedException();
+        }
+
+        [Test]
         public void HardDeleteGridsOuterKeyPropertiesOverload_ExceptionDeleting()
         {
             const String testTag = "www.bom.gov.au";
@@ -600,7 +606,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         (
                             Tag, 
                             [Date], 
-                            [Time],
+                            [Time], 
                             Country, 
                             City, 
                             Temperature, 
@@ -649,7 +655,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         (
                             Tag, 
                             [Date], 
-                            [Time],
+                            [Time], 
                             Country, 
                             City, 
                             Temperature, 
@@ -704,7 +710,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         (
                             Tag, 
                             [Date], 
-                            [Time],
+                            [Time], 
                             Country, 
                             City, 
                             Temperature, 
@@ -759,7 +765,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         (
                             Tag, 
                             [Date], 
-                            [Time],
+                            [Time], 
                             Country, 
                             City, 
                             Temperature, 

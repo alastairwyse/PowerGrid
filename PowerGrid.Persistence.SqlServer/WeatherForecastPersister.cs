@@ -138,10 +138,19 @@ namespace PowerGrid.Persistence.SqlServer
                 WHERE  Tag = {tagParameterName} 
                   AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
                   AND  [Time] = CONVERT(time, {timeParameterName}, 24) 
-                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN TransactionFrom AND TransactionTo 
+                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
                 ORDER  BY {countryColumnName}, 
                           {cityColumnName} 
                 COLLATE {transactSqlCollation};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String SoftDeleteLatestGridStatementSqlText
+        {
+            get
+            {
+                throw new NotImplementedException();
             }
         }
 
@@ -191,8 +200,8 @@ namespace PowerGrid.Persistence.SqlServer
                 DELETE 
                 FROM    {GridItemTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
-                  AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-                  AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24);";
             }
         }
 
@@ -205,11 +214,11 @@ namespace PowerGrid.Persistence.SqlServer
                 INSERT 
                 INTO    {GridTableName} 
                         (
-                            Tag, 
-                            [Date], 
-                            [Time], 
-                            [Version], 
-                            TransactionTimestamp
+                            {tagColumnName}, 
+                            [{dateColumnName}], 
+                            [{timeColumnName}], 
+                            [{versionColumnName}], 
+                            {transactionTimestampColumnName}
                         )
                 VALUES  (
                             {tagParameterName}, 
@@ -230,14 +239,14 @@ namespace PowerGrid.Persistence.SqlServer
                 INSERT 
                 INTO    {GridItemTableName} 
                         (
-                            Tag, 
-                            [Date], 
-                            [Time],
-                            Country, 
-                            City, 
-                            Temperature, 
-                            TransactionFrom, 
-                            TransactionTo 
+                            {tagColumnName}, 
+                            [{dateColumnName}], 
+                            [{timeColumnName}], 
+                            {countryColumnName}, 
+                            {cityColumnName}, 
+                            {temperatureColumnName}, 
+                            {transactionFromColumnName}, 
+                            {transactionToColumnName} 
                         )
                 VALUES  (
                             {tagParameterName}, 

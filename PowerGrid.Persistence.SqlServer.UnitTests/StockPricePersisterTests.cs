@@ -476,7 +476,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE  Tag = @Tag
                   AND  DataSource = @DataSource
                   AND  [Date] = CONVERT(date, @Date, 23) 
-                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER  BY Company 
                 COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
@@ -755,13 +755,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
             String expectedDeleteCommandText = @$"
-            UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23) 
-              AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;
-            ";
+                UPDATE  StockPrices 
+                SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
@@ -804,13 +803,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
             String expectedDeleteCommandText = @$"
-            UPDATE  StockPrices 
-            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23) 
-              AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;
-            ";
+                UPDATE  StockPrices 
+                SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
@@ -1330,7 +1328,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE  Tag = @Tag
                   AND  DataSource = @DataSource
                   AND  [Date] = CONVERT(date, @Date, 23) 
-                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER  BY Company 
                 COLLATE Latin1_General_BIN2;";
             var mockException = new Exception("Mock exception");
@@ -1370,7 +1368,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE  Tag = @Tag
                   AND  DataSource = @DataSource
                   AND  [Date] = CONVERT(date, @Date, 23) 
-                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER  BY Company 
                 COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
