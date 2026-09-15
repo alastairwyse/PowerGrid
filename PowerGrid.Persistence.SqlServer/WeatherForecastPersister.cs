@@ -77,11 +77,11 @@ namespace PowerGrid.Persistence.SqlServer
             get
             {
                 return @$"
-                SELECT  MAX([Version]) AS {maxVersionColumnAlias} 
+                SELECT  MAX([{versionColumnName}]) AS {maxVersionColumnAlias} 
                 FROM    {GridTableName} 
                 WHERE   Tag = {tagParameterName} 
-                  AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-                  AND   [Time] = CONVERT(time, {timeParameterName}, 24)";
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24)";
             }
         }
 
@@ -125,23 +125,39 @@ namespace PowerGrid.Persistence.SqlServer
             get
             {
                 return @$"
-                SELECT Id, 
-                       {tagColumnName}, 
-                       CONVERT(nvarchar(30), [Date], 23) AS [{dateColumnName}], 
-                       CONVERT(nvarchar(30), [Time], 24) AS [{timeColumnName}], 
-                       {countryColumnName}, 
-                       {cityColumnName}, 
-                       {temperatureColumnName}, 
-                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM   {GridItemTableName} 
-                WHERE  Tag = {tagParameterName} 
-                  AND  [Date] = CONVERT(date, {dateParameterName}, 23) 
-                  AND  [Time] = CONVERT(time, {timeParameterName}, 24) 
-                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
-                ORDER  BY {countryColumnName}, 
-                          {cityColumnName} 
+                SELECT  {idColumnName}, 
+                        {tagColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        CONVERT(nvarchar(30), [{timeColumnName}], 24) AS [{timeColumnName}], 
+                        {countryColumnName}, 
+                        {cityColumnName}, 
+                        {temperatureColumnName}, 
+                        CONVERT(nvarchar(30), {transactionFromColumnName}, 126) AS {transactionFromColumnName}, 
+                        CONVERT(nvarchar(30), {transactionToColumnName}, 126) AS {transactionToColumnName}
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
+                ORDER   BY {countryColumnName}, 
+                           {cityColumnName} 
                 COLLATE {transactSqlCollation};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridDetailsByCommonKeyPropertiesQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  {tagColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        CONVERT(nvarchar(30), [{timeColumnName}], 24) AS [{timeColumnName}], 
+                        [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName}, 126) AS {transactionTimestampColumnName} 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
             }
         }
 
@@ -150,7 +166,13 @@ namespace PowerGrid.Persistence.SqlServer
         {
             get
             {
-                throw new NotImplementedException();
+                return @$"
+                UPDATE  {GridItemTableName} 
+                SET     {transactionToColumnName} = CONVERT(datetime2, {deleteDateTimeParameterName}, 126) 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   CONVERT(datetime2, {currentDateTimeParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName};";
             }
         }
 
@@ -162,7 +184,7 @@ namespace PowerGrid.Persistence.SqlServer
                 return @$"
                 DELETE 
                 FROM    {GridTableName} 
-                WHERE   Tag = {tagParameterName};";
+                WHERE   {tagColumnName} = {tagParameterName};";
             }
         }
 
@@ -174,7 +196,7 @@ namespace PowerGrid.Persistence.SqlServer
                 return @$"
                 DELETE 
                 FROM    {GridItemTableName} 
-                WHERE   Tag = {tagParameterName};";
+                WHERE   {tagColumnName} = {tagParameterName};";
             }
         }
 
@@ -187,8 +209,8 @@ namespace PowerGrid.Persistence.SqlServer
                 DELETE 
                 FROM    {GridTableName} 
                 WHERE   {tagColumnName} = {tagParameterName} 
-                  AND   [Date] = CONVERT(date, {dateParameterName}, 23) 
-                  AND   [Time] = CONVERT(time, {timeParameterName}, 24);";
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24);";
             }
         }
 
@@ -259,6 +281,16 @@ namespace PowerGrid.Persistence.SqlServer
                             CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
                         );";
             }
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader)
+        {
+            String tag = (String)dataReader[tagColumnName];
+            DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+            TimeOnly time = TimeOnly.ParseExact((String)dataReader[timeColumnName], transactSql24TimeStyle, DateTimeFormatInfo.InvariantInfo);
+
+            return new WeatherForecastGridOuterKeyProperties(tag, date, time);
         }
 
         /// <inheritdoc/>
@@ -396,12 +428,6 @@ namespace PowerGrid.Persistence.SqlServer
 
         /// <inheritdoc/>
         public override IList<Tuple<WeatherForecastGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(GridCommonKeyProperties gridCommonKeyProperties)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc/>
-        public override void SoftDeleteLatestGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
         {
             throw new NotImplementedException();
         }

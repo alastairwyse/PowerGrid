@@ -43,9 +43,148 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
-        public void SoftDeleteLatestGrid()
+        public void GetGridDetailsGridCommonKeyPropertiesOverload()
         {
             throw new NotImplementedException();
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_ExceptionConnectingToSqlServer()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-15");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("21:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_GridDoesntExist()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-15");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("21:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Weather forecast grid for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-15', Time = '21:00:00' }} does not exist."));
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_ExceptionDeleting()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-15");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("21:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-09-15 20:49:13.0000033");
+            String expectedDeleteCommandText = @$"
+                UPDATE  WeatherForecasts 
+                SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126) 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-26T21:56:42.0000031");
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(testDeleteTimestamp);
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+            Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for WeatherForecastGridOuterKeyProperties {{ Tag = 'www.bom.gov.au', Date = '2026-09-15', Time = '21:00:00' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid()
+        {
+            const String testTag = "www.bom.gov.au";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-15");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("21:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-09-15 20:49:13.0000035");
+            String expectedDeleteCommandText = @$"
+                UPDATE  WeatherForecasts 
+                SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126) 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-09-15T21:52:07.0000036");
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(testDeleteTimestamp);
+
+            testWeatherForecastPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
         }
 
         [Test]
@@ -491,22 +630,22 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-09-10 22:04:51.0000031");
             String expectedCommandText = @$"
-                SELECT Id, 
-                       Tag, 
-                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                       CONVERT(nvarchar(30), [Time], 24) AS [Time], 
-                       Country, 
-                       City, 
-                       Temperature, 
-                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM   WeatherForecasts 
-                WHERE  Tag = @Tag 
-                  AND  [Date] = CONVERT(date, @Date, 23) 
-                  AND  [Time] = CONVERT(time, @Time, 24) 
-                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
-                ORDER  BY Country, 
-                          City 
+                SELECT  Id, 
+                        Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        Country, 
+                        City, 
+                        Temperature, 
+                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER   BY Country, 
+                           City 
                 COLLATE Latin1_General_BIN2;";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
@@ -533,22 +672,22 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
             DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-09-08 22:04:51.0000030");
             String expectedCommandText = @$"
-                SELECT Id, 
-                       Tag, 
-                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                       CONVERT(nvarchar(30), [Time], 24) AS [Time], 
-                       Country, 
-                       City, 
-                       Temperature, 
-                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM   WeatherForecasts 
-                WHERE  Tag = @Tag 
-                  AND  [Date] = CONVERT(date, @Date, 23) 
-                  AND  [Time] = CONVERT(time, @Time, 24) 
-                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
-                ORDER  BY Country, 
-                          City 
+                SELECT  Id, 
+                        Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        Country, 
+                        City, 
+                        Temperature, 
+                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER   BY Country, 
+                           City 
                 COLLATE Latin1_General_BIN2;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);

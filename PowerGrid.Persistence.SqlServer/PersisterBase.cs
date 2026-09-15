@@ -22,6 +22,7 @@ using System.Globalization;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
+using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.SqlServer.Metrics;
 using ApplicationLogging;
 using ApplicationMetrics;
@@ -216,6 +217,42 @@ namespace PowerGrid.Persistence.SqlServer
             this.sqlCommandShim = sqlCommandShim;
         }
 
+        /// <inheritdoc/>
+        public override IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    sqlCommandShim.SetCommandText(command, GridDetailsByCommonKeyPropertiesQuery);
+                    PrepareCommand(connection, command);
+                    AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, command, gridCommonKeyProperties);
+                    List<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> returnList = new();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            TOuterKeyProperties outerKeyProperties = GetOuterKeyPropertiesFromDataReader(dataReader);
+                            Int32 version = (Int32)dataReader["Version"];
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
+                            returnList.Add(Tuple.Create(outerKeyProperties, new GridVersionAndTransactionTimestamp(version, transactionTimestamp)));
+                        }
+                    }
+                    sqlConnectionShim.Close(connection);
+
+                    return returnList;
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
+        }
 
         /// <inheritdoc/>
         public override void SoftDeleteLatestGrid(TOuterKeyProperties gridOuterKeyProperties)
@@ -299,6 +336,11 @@ namespace PowerGrid.Persistence.SqlServer
         protected abstract String GridContentsQuery { get; }
 
         /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of common key properties.
+        /// </summary>
+        protected abstract String GridDetailsByCommonKeyPropertiesQuery { get; }
+
+        /// <summary>
         /// The text for a SQL statement which soft deletes the latest grid.
         /// </summary>
         protected abstract String SoftDeleteLatestGridStatementSqlText { get; }
@@ -332,6 +374,13 @@ namespace PowerGrid.Persistence.SqlServer
         /// The text for a SQL statement which inserts a set of grid items.
         /// </summary>
         protected abstract String GridItemsInsertStatementSqlText { get; }
+
+        /// <summary>
+        /// Reads and populates all properties of a <see cref="TOuterKeyProperties"/> object from the specified <see cref="IDataReader"/>.
+        /// </summary>
+        /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
+        /// <returns>The <see cref="TOuterKeyProperties"/>.</returns>
+        protected abstract TOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader);
 
         /// <summary>
         /// Reads and populates all properties of a <see cref="TGridItemPTO"/> object from the specified <see cref="IDataReader"/>.
@@ -439,7 +488,7 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Gets the latest stock price grid version for the specified parameters.
+        /// Gets the latest grid version for the specified parameters.
         /// </summary>
         /// <param name="connection">The connection to use to retrieve the grid version.</param>
         /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid version to retrieve.</param>
@@ -903,7 +952,7 @@ namespace PowerGrid.Persistence.SqlServer
             protected Action<SqlConnection, SqlTransaction, T, DateTime> operationAction;
 
             /// <summary>
-            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPricePersister+DataBaseOperationEmitter class.
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.PersisterBase+DataBaseOperationEmitter class.
             /// </summary>
             /// <param name="connection">The connection to use to perform the operation.</param>
             /// <param name="transaction">The transaction to perform the operation under.</param>

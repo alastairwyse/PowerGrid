@@ -126,8 +126,8 @@ namespace PowerGrid.Persistence.SqlServer
                        CONVERT(nvarchar(30), [Date], 23) AS [{dateColumnName}], 
                        {companyColumnName}, 
                        {priceColumnName}, 
-                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                       CONVERT(nvarchar(30), {transactionFromColumnName}, 126) AS {transactionFromColumnName}, 
+                       CONVERT(nvarchar(30), {transactionToColumnName}, 126) AS {transactionToColumnName}
                 FROM   {GridItemTableName} 
                 WHERE  {tagColumnName} = {tagParameterName}
                   AND  {dataSourceColumnName} = {dataSourceParameterName}
@@ -139,12 +139,28 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override String GridDetailsByCommonKeyPropertiesQuery
+        { 
+            get
+            {
+                return @$"
+                SELECT  {tagColumnName}, 
+                        {dataSourceColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName}, 126) AS {transactionTimestampColumnName} 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
         protected override String SoftDeleteLatestGridStatementSqlText 
         { 
             get
             {
                 return @$"
-                UPDATE  StockPrices 
+                UPDATE  {GridItemTableName} 
                 SET     {transactionToColumnName} = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
                 WHERE   {tagColumnName} = {tagParameterName} 
                   AND   {dataSourceColumnName} = {dataSourceParameterName} 
@@ -260,17 +276,25 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        protected override StockPriceGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader)
+        protected override StockPriceGridOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader)
         {
-            Int64 id = (Int64)dataReader[idColumnName];
             String tag = (String)dataReader[tagColumnName];
             String dataSource = (String)dataReader[dataSourceColumnName];
             DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+
+            return new StockPriceGridOuterKeyProperties(tag, dataSource, date);
+        }
+
+        /// <inheritdoc/>
+        protected override StockPriceGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader)
+        {
+            Int64 id = (Int64)dataReader[idColumnName];
+            StockPriceGridOuterKeyProperties outerKeyProperties = GetOuterKeyPropertiesFromDataReader(dataReader);
             String company = (String)dataReader[companyColumnName];
             Decimal price = (Decimal)dataReader[priceColumnName];
             (DateTime transactionFrom, DateTime transactionTo) = GetTransactionFromAndToDateTimesFromDataReader(dataReader);
 
-            return new StockPriceGridItemPTO(id, tag, dataSource, date, company, price, transactionFrom, transactionTo);
+            return new StockPriceGridItemPTO(id, outerKeyProperties.Tag, outerKeyProperties.DataSource, outerKeyProperties.Date, company, price, transactionFrom, transactionTo);
         }
 
         /// <inheritdoc/>
@@ -565,54 +589,6 @@ namespace PowerGrid.Persistence.SqlServer
                 catch (Exception e)
                 {
                     throw new Exception($"Failed to read grid details for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
-                }
-            }
-        }
-
-        /// <inheritdoc/>
-        public override IList<Tuple<StockPriceGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(GridCommonKeyProperties gridCommonKeyProperties)
-        {
-            const String tagParameterName = "@Tag";
-            String query = @$"
-            SELECT  DataSource, 
-                    CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                    [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp 
-            FROM    StockPriceGrids 
-            WHERE   Tag = {tagParameterName};
-            ";
-
-            using (var connection = new SqlConnection(connectionString))
-            using (var command = new SqlCommand())
-            {
-                try
-                {
-                    PrepareConnection(connection);
-                    sqlConnectionShim.Open(connection);
-                    sqlCommandShim.SetCommandText(command, query);
-                    PrepareCommand(connection, command);
-                    sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
-                    List<Tuple<StockPriceGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> returnList = new();
-
-                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
-                    {
-                        while (dataReader.Read())
-                        {
-                            String dataSource = (String)dataReader["DataSource"];
-                            DateOnly date = DateOnly.ParseExact((String)dataReader["Date"], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
-                            Int32 version = (Int32)dataReader["Version"];
-                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
-                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
-                            returnList.Add(Tuple.Create(new StockPriceGridOuterKeyProperties(gridCommonKeyProperties.Tag, dataSource, date), new GridVersionAndTransactionTimestamp(version, transactionTimestamp)));
-                        }
-                    }
-                    sqlConnectionShim.Close(connection);
-
-                    return returnList;
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
                 }
             }
         }

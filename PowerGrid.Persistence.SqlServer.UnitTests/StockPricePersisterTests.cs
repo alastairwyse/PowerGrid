@@ -613,13 +613,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Market";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedCommandText = @$"
-            SELECT  DataSource, 
-                    CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                    [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag;
-            ";
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -648,13 +648,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testTag = "Calibrated";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedCommandText = @$"
-            SELECT  DataSource, 
-                    CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                    [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp 
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag;
-            ";
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -664,6 +664,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             (
                 true, true, true, false
             );
+            mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>("Bloomberg", "Bloomberg", "Reuters");
             mockDataReader["Date"].Returns<Object>("2026-05-30", "2026-05-30", "2026-05-31");
             mockDataReader["Version"].Returns<Object>(1, 2, 1);
