@@ -218,6 +218,42 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        public override IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridOuterKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    sqlCommandShim.SetCommandText(command, GridDetailsByOuterKeyPropertiesQuery);
+                    PrepareCommand(connection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    List<GridVersionAndTransactionTimestamp> returnList = new();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            Int32 version = (Int32)dataReader["Version"];
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
+                            returnList.Add(new GridVersionAndTransactionTimestamp(version, transactionTimestamp));
+                        }
+                    }
+                    sqlConnectionShim.Close(connection);
+
+                    return returnList;
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read grid details for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
         public override IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties)
         {
             using (var connection = new SqlConnection(connectionString))
@@ -339,6 +375,11 @@ namespace PowerGrid.Persistence.SqlServer
         /// The text for a SQL query which returns the details of all grids for a set of common key properties.
         /// </summary>
         protected abstract String GridDetailsByCommonKeyPropertiesQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of outer key properties.
+        /// </summary>
+        protected abstract String GridDetailsByOuterKeyPropertiesQuery { get; }
 
         /// <summary>
         /// The text for a SQL statement which soft deletes the latest grid.

@@ -528,13 +528,15 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -567,13 +569,15 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-            SELECT  [Version] AS [Version], 
-                    CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
-            FROM    StockPriceGrids 
-            WHERE   Tag = @Tag 
-              AND   DataSource = @DataSource 
-              AND   [Date] = CONVERT(date, @Date, 23);
-            ";
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -993,7 +997,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-                SELECT  [Version] AS [Version], 
+                SELECT  [Version], 
                         CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1032,7 +1036,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-                SELECT  [Version] AS [Version], 
+                SELECT  [Version], 
                         CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1075,7 +1079,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-                SELECT  [Version] AS [Version], 
+                SELECT  [Version], 
                         CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1122,7 +1126,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             String expectedCommandText = @$"
-                SELECT  [Version] AS [Version], 
+                SELECT  [Version], 
                         CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 

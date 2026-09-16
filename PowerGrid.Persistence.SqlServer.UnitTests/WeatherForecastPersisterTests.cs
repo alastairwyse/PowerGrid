@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using ApplicationLogging;
 using ApplicationMetrics;
@@ -43,9 +44,187 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         }
 
         [Test]
+        public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload_ExceptionReading()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-16");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("10:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.GetGridDetails(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            Assert.That(e.Message, Does.StartWith($"Failed to read grid details for WeatherForecastGridOuterKeyProperties {{ Tag = 'Apple', Date = '2026-09-16', Time = '10:00:00' }} from SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-16");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("11:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                true, true, false
+            );
+            mockDataReader["Version"].Returns<Object>(1, 2);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-09-16T13:02:53.1837676", "2026-09-16T13:02:03.9134273");
+
+            IList<GridVersionAndTransactionTimestamp> result = testWeatherForecastPersister.GetGridDetails(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+            mockDataReader.Received(3).Read();
+            mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
+            Assert.That(result.Count == 2);
+            Assert.That(result[0].Version == 1);
+            Assert.That(result[0].TransactionTimestamp == utils.CreateDataTimeFromString("2026-09-16 13:02:53.1837676"));
+            Assert.That(result[1].Version == 2);
+            Assert.That(result[1].TransactionTimestamp == utils.CreateDataTimeFromString("2026-09-16 13:02:03.9134273"));
+        }
+
+        [Test]
+        public void GetGridDetailsGridCommonKeyPropertiesOverload_ExceptionReading()
+        {
+            const String testTag = "Apple";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.GetGridDetails(testCommonKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            Assert.That(e.Message, Does.StartWith($"Failed to read grid details for GridCommonKeyProperties {{ Tag = 'Apple' }} from SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
         public void GetGridDetailsGridCommonKeyPropertiesOverload()
         {
-            throw new NotImplementedException();
+            const String testTag = "www.bom.gov.au";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                true, true, true, false
+            );
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["Date"].Returns<Object>("2026-05-30", "2026-05-30", "2026-05-31");
+            mockDataReader["Time"].Returns<Object>("09:00:00", "09:00:00", "10:00:00");
+            mockDataReader["Version"].Returns<Object>(1, 2, 1);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-30T13:02:53.1837676", "2026-06-09T13:02:03.9134273", "2026-06-23T21:55:56.9750913");
+
+            IList<Tuple<WeatherForecastGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> result = testWeatherForecastPersister.GetGridDetails(testCommonKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+            mockDataReader.Received(4).Read();
+            mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
+            Assert.That(result.Count == 3);
+            Assert.That(result[0].Item1.Tag == testTag);
+            Assert.That(result[0].Item1.Date == utils.CreateDateOnlyFromString("2026-05-30"));
+            Assert.That(result[0].Item1.Time == utils.CreateTimeOnlyFromString("09:00:00"));
+            Assert.That(result[0].Item2.Version == 1);
+            Assert.That(result[0].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-05-30 13:02:53.1837676"));
+            Assert.That(result[1].Item1.Tag == testTag);
+            Assert.That(result[1].Item1.Date == utils.CreateDateOnlyFromString("2026-05-30"));
+            Assert.That(result[1].Item1.Time == utils.CreateTimeOnlyFromString("09:00:00"));
+            Assert.That(result[1].Item2.Version == 2);
+            Assert.That(result[1].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-06-09 13:02:03.9134273"));
+            Assert.That(result[2].Item1.Tag == testTag);
+            Assert.That(result[2].Item1.Date == utils.CreateDateOnlyFromString("2026-05-31"));
+            Assert.That(result[2].Item1.Time == utils.CreateTimeOnlyFromString("10:00:00"));
+            Assert.That(result[2].Item2.Version == 1);
+            Assert.That(result[2].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-06-23 21:55:56.9750913"));
         }
 
         [Test]

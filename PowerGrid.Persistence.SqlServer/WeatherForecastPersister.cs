@@ -150,14 +150,19 @@ namespace PowerGrid.Persistence.SqlServer
         {
             get
             {
-                return @$"
-                SELECT  {tagColumnName}, 
-                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
-                        CONVERT(nvarchar(30), [{timeColumnName}], 24) AS [{timeColumnName}], 
-                        [{versionColumnName}], 
-                        CONVERT(nvarchar(30), {transactionTimestampColumnName}, 126) AS {transactionTimestampColumnName} 
-                FROM    {GridTableName} 
+                return @$"{GridDetailsBaseQuery}
                 WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        protected override String GridDetailsByOuterKeyPropertiesQuery
+        {
+            get
+            {
+                return @$"{GridDetailsBaseQuery}
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24);";
             }
         }
 
@@ -420,19 +425,24 @@ namespace PowerGrid.Persistence.SqlServer
             throw new NotImplementedException();
         }
 
-        /// <inheritdoc/>
-        public override IList<GridVersionAndTransactionTimestamp> GetGridDetails(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc/>
-        public override IList<Tuple<WeatherForecastGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(GridCommonKeyProperties gridCommonKeyProperties)
-        {
-            throw new NotImplementedException();
-        }
-
         #region Private/Protected Methods
+
+        /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of outer key properties.
+        /// </summary>
+        protected String GridDetailsBaseQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  {tagColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        CONVERT(nvarchar(30), [{timeColumnName}], 24) AS [{timeColumnName}], 
+                        [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName}, 126) AS {transactionTimestampColumnName} 
+                FROM    {GridTableName} ";
+            }
+        }
 
         #endregion
     }
