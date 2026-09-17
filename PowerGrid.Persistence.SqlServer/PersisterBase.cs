@@ -218,6 +218,31 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        public override IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridOuterKeyProperties, Int32 version)
+        {
+            if (version < 1)
+                throw new ArgumentOutOfRangeException(nameof(version), $"Parameter '{nameof(version)}' with value {version} must be greater than 0.");
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                try
+                {
+                    sqlConnectionShim.Open(connection);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+                DateTime transactionTimestamp = GetGridTransactionTimestamp(connection, gridOuterKeyProperties, version);
+
+                foreach (TGridItemPTO currentItem in GetGrid(connection, gridOuterKeyProperties, transactionTimestamp))
+                {
+                    yield return currentItem;
+                }
+            }
+        }
+
+        /// <inheritdoc/>
         public override IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridOuterKeyProperties)
         {
             using (var connection = new SqlConnection(connectionString))

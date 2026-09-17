@@ -419,12 +419,6 @@ namespace PowerGrid.Persistence.SqlServer
             throw new NotImplementedException();
         }
 
-        /// <inheritdoc/>
-        public override IEnumerable<WeatherForecastGridItemPTO> GetGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, Int32 version)
-        {
-            throw new NotImplementedException();
-        }
-
         #region Private/Protected Methods
 
         /// <summary>
