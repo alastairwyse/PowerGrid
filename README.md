@@ -11,6 +11,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 #### Immediate TODO
 * Inconsistencies in [model class]GridItem and [model class] records... some are records with no param validation (e.g. for empty/null strings), some have param validation.  Validation is done in persister, so maybe that's why I left it off.  Need to decide approach and make consistent.
 * StockPricePersister (and any other persister classes) should have logging and metrics.
+  * Create generic 'basic' metrics in base class which can be overriden with specific instances (on a per grod-type basis)... i.e. if clients don't care about getting specific metrics for each grid type the leave as is... if they want distinct ones then create your own metrics in classes derived from PersisterBase.  Possibly these could be part of the generic signature.
 * Validation in persister should be an abstract method, or passed to constructor (probably abstract method or lambda, as I can't see that it would need to be different for different persister instances)
 * Use new .NET Lock class (https://learn.microsoft.com/en-us/dotnet/api/system.threading.lock?view=net-10.0&viewFallbackFrom=net-8.0) if implementing in .NET 9.0+
 * Should 'StockPriceGrids' table in database just be 'Grids' and have a column which denotes the grid type (e.g. 'StockPrice')?
@@ -19,7 +20,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * StockPricePersister needs test for constructor parameters
 
 #### Longer Term TODO
-* Make sure code documentation (XML comments) is consistent re grid items vs entities... ensure 'grid item' terminology is only used to refer to outer key properties.
+* Make sure code documentation (XML comments) is consistent re grid items vs entities... ensure 'grid item' terminology is only used to refer to outer key properties.  DOUBLE CHECK ON grid items vs entities... NNED TO MAKE SURE THIS IS CONSISTENT.
 * Need SQL Create and Drop template file containing the columns that are depended on by PowerGrid.Persistence.SqlServer.PersisterBase
   * Grid tables need to have id and transfrom/to colums in template
 * 2x grid params.. upsert only + full sync

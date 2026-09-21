@@ -252,6 +252,19 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override Action<StockPrice> NewEntityValidationAction
+        {
+            get
+            {
+                return (StockPrice stockPrice) =>
+                {
+                    if (stockPrice.Price < 0)
+                        throw new GridContentsValidationException<StockPrice>($"{stockPrice.ToString()} has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
+                };
+            }
+        }
+
+        /// <inheritdoc/>
         protected override String GridItemsInsertStatementSqlText
         { 
             get
@@ -329,6 +342,12 @@ namespace PowerGrid.Persistence.SqlServer
             return new StockPriceGridOuterKeyProperties(gridItem.Tag, gridItem.DataSource, gridItem.Date);
         }
 
+        /// <inheritdoc/>
+        protected override StockPriceGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(StockPriceGridOuterKeyProperties gridOuterKeyProperties, StockPrice entity)
+        {
+            return new StockPriceGridItem(gridOuterKeyProperties.Tag, gridOuterKeyProperties.DataSource, gridOuterKeyProperties.Date, entity.Company, entity.Price);
+        }
+
         #endregion
 
         /// <summary>
@@ -399,128 +418,6 @@ namespace PowerGrid.Persistence.SqlServer
             ISqlCommandShim sqlCommandShim
         ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
         {
-        }
-
-        /// <inheritdoc/>
-        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items)
-        {
-            if (items.Count == 0)
-                throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
-
-            using (var readConnection = new SqlConnection(connectionString))
-            using (var writeConnection = new SqlConnection(connectionString))
-            {
-                Int32 gridVersion;
-                GridComparisonStatistics comparisonStatistics;
-                try
-                {
-                    PrepareConnection(readConnection);
-                    sqlConnectionShim.Open(writeConnection);
-                    PrepareConnection(writeConnection, SessionDeadlockPriority.High);
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to connect to SQL Server.", e);
-                }
-
-                DateTime transactionTimestamp = dateTimeProvider.UtcNow();
-                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
-                {
-                    Action<SqlConnection, SqlTransaction, StockPriceGridItem, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPriceGridItem addedStockPrice, DateTime transactionDateTime) =>
-                    {
-                        InsertGridItem(connection, transaction, addedStockPrice, transactionDateTime);
-                    };
-                    DataBaseOperationEmitter<StockPriceGridItem> addedItemEmitter = new(writeConnection, transaction, transactionTimestamp, addedItemEmitterOperationAction);
-                    Action<SqlConnection, SqlTransaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem> updatedStockPrices, DateTime transactionDateTime) =>
-                    {
-                        UpdateGridItem(connection, transaction, updatedStockPrices.Item1, updatedStockPrices.Item2, transactionDateTime);
-                    };
-                    DataBaseOperationEmitter<Tuple<StockPriceGridItemPTO, StockPriceGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
-                    Action<SqlConnection, SqlTransaction, StockPriceGridItemPTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO deletedStockPrice, DateTime transactionDateTime) =>
-                    {
-                        DeleteGridItem(connection, transaction, deletedStockPrice, transactionDateTime);
-                    };
-                    DataBaseOperationEmitter<StockPriceGridItemPTO> deletedItemEmitter = new(writeConnection, transaction, transactionTimestamp, deletedItemEmitterOperationAction);
-                    GridComparer<StockPriceGridItemPTO, StockPriceGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
-
-                    // Setup IEnumerable 'chains' 
-                    //   Create a GridContentsValidator to check that the price is >= 0
-                    GridContentsValidator<StockPrice> newItemValidator = new();
-                    Action<StockPrice> newItemValidationAction = (StockPrice stockPrice) =>
-                    {
-                        if (stockPrice.Price < 0)
-                            throw new GridContentsValidationException<StockPrice>($"{typeof(StockPrice).Name} with {gridOuterKeyProperties.ToString()}, and {nameof(StockPrice.Company)} '{stockPrice.Company}' has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
-                    };
-                    GridContentsDuplicateChecker<StockPrice> newItemsDuplicateChecker = new();
-
-                    // Order of below chain is 1 validate, 2 order, 3 dup check
-                    IEnumerable<StockPrice> newGridContents = newItemsDuplicateChecker.CheckForDuplicates
-                    (
-                        newItemValidator.ValidateItems
-                        (
-                            items,
-                            newItemValidationAction
-                        ).Order(Comparer<StockPrice>.Create
-                        (
-                            (StockPrice first, StockPrice second) => { return first.KeyCompareTo(second); }
-                        ))
-                    );
-                    IEnumerable<StockPriceGridItem> ConvertStockPricesToStockPriceGridItems(IEnumerable<StockPrice> items)
-                    {
-                        foreach (StockPrice currentItem in items)
-                        {
-                            yield return new StockPriceGridItem(gridOuterKeyProperties.Tag, gridOuterKeyProperties.DataSource, gridOuterKeyProperties.Date, currentItem.Company, currentItem.Price);
-                        } 
-                    }
-
-                    try
-                    {
-                        sqlConnectionShim.Open(readConnection);
-                        IEnumerable<StockPriceGridItemPTO> existingGridContents;
-                        try
-                        {
-                            existingGridContents = GetGrid(readConnection, gridOuterKeyProperties, transactionTimestamp);
-                        }
-                        catch (Exception e)
-                        {
-                            throw new Exception($"Failed to read existing stock price grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
-                        }
-                        {
-                            try
-                            {
-                                comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertStockPricesToStockPriceGridItems(newGridContents));
-                            }
-                            catch (Exception e)
-                            {
-                                Exception compareException = new($"Failed to compare new stock price grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e); 
-                                try
-                                {
-                                    // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
-                                    sqlTransactionShim.Rollback(transaction);
-                                }
-                                catch (Exception rollbackException)
-                                {
-                                    throw new AggregateException("Failed to rollback transaction after exception comparing stock price grid to existing data.", rollbackException, compareException);
-                                }
-                                throw compareException;
-                            }
-                        }
-                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, gridOuterKeyProperties, transactionTimestamp);
-                        sqlTransactionShim.Commit(transaction);
-
-                        sqlConnectionShim.Close(writeConnection);
-                        sqlConnectionShim.Close(readConnection);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new Exception("Failed to persist grid to SQL Server.", e);
-                    }
-                }
-                TeardownConnection(readConnection);
-                TeardownConnection(writeConnection);
-
-                return (gridVersion, comparisonStatistics);
-            }
         }
 
         #region Private/Protected Methods

@@ -19,6 +19,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
@@ -41,7 +42,7 @@ namespace PowerGrid.Persistence.SqlServer
         where TCommonKeyProperties : Core.IGridCommonKeyProperties
         where TOuterKeyProperties : IGridOuterKeyProperties
         where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
-        where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
+        where TGridItemPTO : IGridOuterKeyProperties, TGridItem, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         protected const String maxVersionColumnAlias = "MaxVersion";
 
@@ -215,6 +216,121 @@ namespace PowerGrid.Persistence.SqlServer
             this.sqlConnectionShim = sqlConnectionShim;
             this.sqlTransactionShim = sqlTransactionShim;
             this.sqlCommandShim = sqlCommandShim;
+        }
+
+        /// <inheritdoc/>
+        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items)
+        {
+            if (items.Count == 0)
+                throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
+
+            using (var readConnection = new SqlConnection(connectionString))
+            using (var writeConnection = new SqlConnection(connectionString))
+            {
+                Int32 gridVersion;
+                GridComparisonStatistics comparisonStatistics;
+                try
+                {
+                    PrepareConnection(readConnection);
+                    sqlConnectionShim.Open(writeConnection);
+                    PrepareConnection(writeConnection, SessionDeadlockPriority.High);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+
+                DateTime transactionTimestamp = dateTimeProvider.UtcNow();
+                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
+                {
+                    Action<SqlConnection, SqlTransaction, TGridItem, DateTime> addedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, TGridItem addedGridItem, DateTime transactionDateTime) =>
+                    {
+                        InsertGridItem(connection, transaction, addedGridItem, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<TGridItem> addedItemEmitter = new(writeConnection, transaction, transactionTimestamp, addedItemEmitterOperationAction);
+                    Action<SqlConnection, SqlTransaction, Tuple<TGridItemPTO, TGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<TGridItemPTO, TGridItem> updatedGridItems, DateTime transactionDateTime) =>
+                    {
+                        UpdateGridItem(connection, transaction, updatedGridItems.Item1, updatedGridItems.Item2, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<Tuple<TGridItemPTO, TGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
+                    Action<SqlConnection, SqlTransaction, TGridItemPTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, TGridItemPTO deletedGridItem, DateTime transactionDateTime) =>
+                    {
+                        DeleteGridItem(connection, transaction, deletedGridItem, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<TGridItemPTO> deletedItemEmitter = new(writeConnection, transaction, transactionTimestamp, deletedItemEmitterOperationAction);
+                    GridComparer<TGridItemPTO, TGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+
+                    // Setup IEnumerable 'chains' 
+                    GridContentsValidator<TEntity> newItemValidator = new();
+                    GridContentsDuplicateChecker<TEntity> newItemsDuplicateChecker = new();
+                    // Order of below chain is 1 validate, 2 order, 3 dup check
+                    IEnumerable<TEntity> newGridContents = newItemsDuplicateChecker.CheckForDuplicates
+                    (
+                        newItemValidator.ValidateItems
+                        (
+                            items,
+                            NewEntityValidationAction
+                        ).Order(Comparer<TEntity>.Create
+                        (
+                            (TEntity first, TEntity second) => { return first.KeyCompareTo(second); }
+                        ))
+                    );
+                    IEnumerable<TGridItem> ConvertEntitiesToGridItems(IEnumerable<TEntity> items)
+                    {
+                        foreach (TEntity currentItem in items)
+                        {
+                            yield return ConvertEntityAndOuterKeyPropertiesToGridItem(gridOuterKeyProperties, currentItem);
+                        }
+                    }
+
+                    try
+                    {
+                        sqlConnectionShim.Open(readConnection);
+                        IEnumerable<TGridItemPTO> existingGridContents;
+                        try
+                        {
+                            existingGridContents = GetGrid(readConnection, gridOuterKeyProperties, transactionTimestamp);
+                        }
+                        catch (Exception e)
+                        {
+                            throw new Exception($"Failed to read existing {GridItemEntityName} grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
+                        }
+                        {
+                            try
+                            {
+                                comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertEntitiesToGridItems(newGridContents));
+                            }
+                            catch (Exception e)
+                            {
+                                Exception compareException = new($"Failed to compare new {GridItemEntityName} grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
+                                try
+                                {
+                                    // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
+                                    sqlTransactionShim.Rollback(transaction);
+                                }
+                                catch (Exception rollbackException)
+                                {
+                                    throw new AggregateException($"Failed to rollback transaction after exception comparing {GridItemEntityName} grid to existing data.", rollbackException, compareException);
+                                }
+                                throw compareException;
+                            }
+                        }
+                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, gridOuterKeyProperties, transactionTimestamp);
+                        sqlTransactionShim.Commit(transaction);
+
+                        sqlConnectionShim.Close(writeConnection);
+                        sqlConnectionShim.Close(readConnection);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception("Failed to persist grid to SQL Server.", e);
+                    }
+                }
+                TeardownConnection(readConnection);
+                TeardownConnection(writeConnection);
+
+                return (gridVersion, comparisonStatistics);
+            }
         }
 
         /// <inheritdoc/>
@@ -442,6 +558,12 @@ namespace PowerGrid.Persistence.SqlServer
         protected abstract String GridItemsInsertStatementSqlText { get; }
 
         /// <summary>
+        /// An action used to validate any persisted entities/items.  Accepts a single parameter which is the item to validate.
+        /// </summary>
+        /// <remarks>Is expected to throw a <see cref="GridContentsValidationException{T}"/> if the item fails validation.</remarks>
+        protected abstract Action<TEntity> NewEntityValidationAction { get; }
+
+        /// <summary>
         /// Reads and populates all properties of a <see cref="TOuterKeyProperties"/> object from the specified <see cref="IDataReader"/>.
         /// </summary>
         /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
@@ -486,6 +608,14 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="gridItem">The grid item to extract the outer key properties from.</param>
         /// <returns>The outer key properties.</returns>
         protected abstract TOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(TGridItem gridItem);
+
+        /// <summary>
+        /// Converts the specified <see cref="TOuterKeyProperties"/> and <see cref="TEntity"/> to a <see cref="TGridItem"/>.
+        /// </summary>
+        /// <param name="gridOuterKeyProperties">The <see cref="TOuterKeyProperties"/> to convert.</param>
+        /// <param name="entity">The <see cref="TEntity"/> to convert.</param>
+        /// <returns>The <see cref="TGridItem"/>.</returns>
+        protected abstract TGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(TOuterKeyProperties gridOuterKeyProperties, TEntity entity);
 
         /// <inheritdoc/>
         public override void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties)

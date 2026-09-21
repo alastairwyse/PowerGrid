@@ -38,7 +38,7 @@ namespace PowerGrid.Persistence
         where TCommonKeyProperties : Core.IGridCommonKeyProperties
         where TOuterKeyProperties : IGridOuterKeyProperties
         where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
-        where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
+        where TGridItemPTO : IGridOuterKeyProperties, TGridItem, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         /// <summary>The logger for general logging.</summary>
         protected IApplicationLogger logger;

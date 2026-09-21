@@ -33,7 +33,7 @@ namespace PowerGrid.Persistence
         where TCommonKeyProperties : IGridCommonKeyProperties
         where TOuterKeyProperties : IGridOuterKeyProperties
         where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
-        where TGridItemPTO : IGridOuterKeyProperties, IGridItem<TGridItem>, IPersistenceTransferObject
+        where TGridItemPTO : IGridOuterKeyProperties, TGridItem, IGridItem<TGridItem>, IPersistenceTransferObject
     {
         // TODO: Previously had granular CRUD methods here to deal with individual grid items, but realized that the whole comparison and all resulting updates need to be done in a transaction.
         //   In the future might want to add more granular methods... e.g. just to upsert a collection of grid items, or to delete a collection of grid items.
