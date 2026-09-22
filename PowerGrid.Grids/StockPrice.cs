@@ -15,6 +15,7 @@
  */
 
 using System;
+using System.Text;
 using PowerGrid.Core;
 
 namespace PowerGrid.Grids
@@ -54,5 +55,17 @@ namespace PowerGrid.Grids
         {
             return this.Price.Equals(other.Price);
         }
+
+        #region Private/Protected Methods
+
+        /// <inheritdoc/>
+        protected override bool PrintMembers(StringBuilder builder)
+        {
+            builder.Append($"{nameof(Company)} = '{Company}', {nameof(Price)} = {Price}");
+
+            return true;
+        }
+
+        #endregion
     }
 }

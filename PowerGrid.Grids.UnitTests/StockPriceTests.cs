@@ -48,5 +48,15 @@ namespace PowerGrid.Grids.UnitTests
             Assert.That(e.Message, Does.StartWith($"Parameter 'company' must contain a value."));
             Assert.That(e.ParamName == "company");
         }
+
+        [Test]
+        public void PrintMembers()
+        {
+            StockPrice testStockPrice = new("Canon", 4503);
+
+            String result = testStockPrice.ToString();
+
+            Assert.That(result == "StockPrice { Company = 'Canon', Price = 4503 }");
+        }
     }
 }

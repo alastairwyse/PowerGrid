@@ -252,19 +252,6 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        protected override Action<StockPrice> NewEntityValidationAction
-        {
-            get
-            {
-                return (StockPrice stockPrice) =>
-                {
-                    if (stockPrice.Price < 0)
-                        throw new GridContentsValidationException<StockPrice>($"{stockPrice.ToString()} has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
-                };
-            }
-        }
-
-        /// <inheritdoc/>
         protected override String GridItemsInsertStatementSqlText
         { 
             get
@@ -290,6 +277,19 @@ namespace PowerGrid.Persistence.SqlServer
                             CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
                             CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
                         );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override Action<StockPrice> NewEntityValidationAction
+        {
+            get
+            {
+                return (StockPrice stockPrice) =>
+                {
+                    if (stockPrice.Price < 0)
+                        throw new GridContentsValidationException<StockPrice>($"{stockPrice.ToString()} has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
+                };
             }
         }
 

@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using Microsoft.Data.SqlClient;
+using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
@@ -43,6 +44,278 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             testWeatherForecastPersister = new WeatherForecastPersisterWithProtectedMembers(testConnectionString, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
         }
 
+        [Test]
+        public void PersistGrid_NewGridItemTemperatureLessThanAbsoluteZero()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-22");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-09-22 01:23:45.0000040");
+            List<WeatherForecast> testGridItems = new()
+            {
+                new WeatherForecast("Japan", "Tokyo", -275),
+                new WeatherForecast("Japan", "Kobe", 24)
+            };
+            List<WeatherForecastGridItemPTO> existingGridItems = new()
+            {
+                new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Kobe", 22, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")), 
+                new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 23, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
+            };
+            String expectedReadExistingGridCommandText = @$"
+                SELECT  Id, 
+                        Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        Country, 
+                        City, 
+                        Temperature, 
+                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER   BY Country, 
+                           City 
+                COLLATE Latin1_General_BIN2;";
+            String expectedMaxIdQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
+            mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                // Call to get existing grid contents
+                true, true, false,
+                // Call to get existing grid max id
+                true, false
+            );
+            mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Time"].Returns<Object>(testTime.ToString(transactSql24TimeStyle));
+            mockDataReader["Country"].Returns<Object>(existingGridItems[0].Country);
+            mockDataReader["City"].Returns<Object>(existingGridItems[0].City);
+            mockDataReader["Temperature"].Returns<Object>(existingGridItems[0].Temperature);
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-09-22T01:00:02.0000041");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.PersistGrid(testOuterKeyProperties, testGridItems);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
+            Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new weather forecast grid to existing grid in SQL Server for WeatherForecastGridOuterKeyProperties {{ Tag = 'Apple', Date = '2026-09-22', Time = '22:00:00' }}, and transaction time '2026-09-22T01:23:45.0000040'"));
+            Assert.That(e.InnerException.InnerException is GridContentsValidationException<WeatherForecast>);
+            GridContentsValidationException<WeatherForecast> innerInnerException = (GridContentsValidationException<WeatherForecast>)e.InnerException.InnerException;
+            Assert.That(innerInnerException.Message, Does.StartWith($"Failed to validate item in grid."));
+            Assert.That(innerInnerException.GridItem == testGridItems[0]);
+            Assert.That(innerInnerException.InnerException.Message == $"WeatherForecast {{ Country = 'Japan', City = 'Tokyo', Temperature = -275 }} Temperature -275 cannot be less than -274.");
+        }
+        
+        [Test]
+        public void PersistGrid_DuplicateGridItems()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-22");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-09-22 01:23:45.0000040");
+            List<WeatherForecast> testGridItems = new()
+            {
+                new WeatherForecast("Japan", "Tokyo", 23),
+                new WeatherForecast("Japan", "Tokyo", 24)
+            };
+            List<WeatherForecastGridItemPTO> existingGridItems = new()
+            {
+                new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Kobe", 22, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")), 
+                new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 23, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
+            };
+            String expectedReadExistingGridCommandText = @$"
+                SELECT  Id, 
+                        Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        Country, 
+                        City, 
+                        Temperature, 
+                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER   BY Country, 
+                           City 
+                COLLATE Latin1_General_BIN2;";
+            String expectedMaxIdQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
+            mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                // Call to get existing grid contents
+                true, true, false,
+                // Call to get existing grid max id
+                true, false
+            );
+            mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Time"].Returns<Object>(testTime.ToString(transactSql24TimeStyle));
+            mockDataReader["Country"].Returns<Object>(existingGridItems[0].Country, existingGridItems[1].Country);
+            mockDataReader["City"].Returns<Object>(existingGridItems[0].City, existingGridItems[1].City);
+            mockDataReader["Temperature"].Returns<Object>(existingGridItems[0].Temperature, existingGridItems[1].Temperature);
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-09-22T01:00:02.0000041");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testWeatherForecastPersister.PersistGrid(testOuterKeyProperties, testGridItems);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
+            Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new weather forecast grid to existing grid in SQL Server for WeatherForecastGridOuterKeyProperties {{ Tag = 'Apple', Date = '2026-09-22', Time = '22:00:00' }}, and transaction time '2026-09-22T01:23:45.0000040'"));
+            Assert.That(e.InnerException.InnerException is GridContentsDuplicateItemsException<WeatherForecast>);
+            GridContentsDuplicateItemsException<WeatherForecast> innerInnerException = (GridContentsDuplicateItemsException<WeatherForecast>)e.InnerException.InnerException;
+            Assert.That(innerInnerException.Message, Does.StartWith($"Grid contains items with duplicate key values."));
+            Assert.That(innerInnerException.GridItem == testGridItems[1]);
+        }
+
+        [Test]
+        public void PersistGrid()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-22");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-09-22 01:23:45.0000040");
+            List<WeatherForecast> testGridItems = new()
+            {
+                new WeatherForecast("Japan", "Kobe", 24), 
+                new WeatherForecast("Japan", "Tokyo", 23)
+            };
+            List<WeatherForecastGridItemPTO> existingGridItems = new()
+            {
+                new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Himeji", 20, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
+                new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 21, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
+            };
+            String expectedReadExistingGridCommandText = @$"
+                SELECT  Id, 
+                        Tag, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
+                        Country, 
+                        City, 
+                        Temperature, 
+                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM    WeatherForecasts 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24) 
+                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER   BY Country, 
+                           City 
+                COLLATE Latin1_General_BIN2;";
+            String expectedMaxIdQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            String expectedGridInsertStatementText = @$"
+                INSERT 
+                INTO    WeatherForecastGrids 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            CONVERT(date, @Date, 23), 
+                            CONVERT(time, @Time, 24), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
+            mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                // Call to get existing grid contents
+                true, true, false,
+                // Call to get existing grid max id
+                true, false
+            );
+            mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Time"].Returns<Object>(testTime.ToString(transactSql24TimeStyle));
+            mockDataReader["Country"].Returns<Object>(existingGridItems[0].Country, existingGridItems[1].Country);
+            mockDataReader["City"].Returns<Object>(existingGridItems[0].City, existingGridItems[1].City);
+            mockDataReader["Temperature"].Returns<Object>(existingGridItems[0].Temperature, existingGridItems[1].Temperature);
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-09-22T01:00:02.0000041");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+
+            (Int32 resultVersion, GridComparisonStatistics resultStatistics) = testWeatherForecastPersister.PersistGrid(testOuterKeyProperties, testGridItems);
+
+            mockSqlConnectionShim.Received(2).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(4).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(2).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).ExecuteReader(Arg.Any<SqlCommand>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
+            mockSqlCommandShim.Received(8).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(8).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(6).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlConnectionShim.Received(1).BeginTransaction(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
+            mockSqlTransactionShim.Received(1).Commit(null);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+            mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), null);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
+            Assert.That(resultVersion == 2);
+            Assert.That(resultStatistics.ItemsAddedCount == 1);
+            Assert.That(resultStatistics.ItemsUpdatedCount == 1);
+            Assert.That(resultStatistics.ItemsDeletedCount == 1);
+        }
+        
         [Test]
         public void GetGrid_VersionParameterLessThan1()
         {

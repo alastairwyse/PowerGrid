@@ -15,6 +15,7 @@
  */
 
 using System;
+using System.Text;
 using PowerGrid.Core;
 
 namespace PowerGrid.Grids
@@ -67,5 +68,17 @@ namespace PowerGrid.Grids
         {
             return this.Temperature.Equals(other.Temperature);
         }
+
+        #region Private/Protected Methods
+
+        /// <inheritdoc/>
+        protected override bool PrintMembers(StringBuilder builder)
+        {
+            builder.Append($"{nameof(Country)} = '{Country}', {nameof(City)} = '{City}', {nameof(Temperature)} = {Temperature}");
+
+            return true;
+        }
+
+        #endregion
     }
 }

@@ -114,5 +114,15 @@ namespace PowerGrid.Grids.UnitTests
             Assert.That(testWeatherForecast1.ValuePropertiesEqual(testWeatherForecast2) == true);
             Assert.That(testWeatherForecast1.ValuePropertiesEqual(testWeatherForecast3) == false);
         }
+
+        [Test]
+        public void PrintMembers()
+        {
+            WeatherForecast testWeatherForecast = new("Australia", "Sydney", 16);
+
+            String result = testWeatherForecast.ToString();
+
+            Assert.That(result == "WeatherForecast { Country = 'Australia', City = 'Sydney', Temperature = 16 }");
+        }
     }
 }

@@ -289,6 +289,21 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
+        protected override Action<WeatherForecast> NewEntityValidationAction
+        {
+            get
+            {
+                return (WeatherForecast weatherForecast) =>
+                {
+                    // Test for less than absolute zero
+                    const Int32 absoluteZero = -274;
+                    if (weatherForecast.Temperature < absoluteZero)
+                        throw new GridContentsValidationException<WeatherForecast>($"{weatherForecast.ToString()} {nameof(WeatherForecast.Temperature)} {weatherForecast.Temperature} cannot be less than {absoluteZero}.", weatherForecast);
+                };
+            }
+        }
+
+        /// <inheritdoc/>
         protected override WeatherForecastGridOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader)
         {
             String tag = (String)dataReader[tagColumnName];
@@ -339,6 +354,12 @@ namespace PowerGrid.Persistence.SqlServer
         protected override WeatherForecastGridOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(WeatherForecastGridItem gridItem)
         {
             return new WeatherForecastGridOuterKeyProperties(gridItem.Tag, gridItem.Date, gridItem.Time);
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, WeatherForecast entity)
+        {
+            return new WeatherForecastGridItem(gridOuterKeyProperties.Tag, gridOuterKeyProperties.Date, gridOuterKeyProperties.Time, entity.Country, entity.City, entity.Temperature);
         }
 
         #endregion
@@ -411,12 +432,6 @@ namespace PowerGrid.Persistence.SqlServer
             ISqlCommandShim sqlCommandShim
         ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
         {
-        }
-
-        /// <inheritdoc/>
-        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, IList<WeatherForecast> items)
-        {
-            throw new NotImplementedException();
         }
 
         #region Private/Protected Methods

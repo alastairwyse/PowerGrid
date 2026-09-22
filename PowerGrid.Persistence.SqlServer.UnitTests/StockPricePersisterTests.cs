@@ -144,24 +144,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND   DataSource = @DataSource 
               AND   [Date] = CONVERT(date, @Date, 23);
             ";
-            String expectedGridInsertStatementText = @$"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Version, 
-                        CONVERT(datetime2, @CreateDateTime, 126)
-                    );
-            ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
@@ -197,7 +179,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             GridContentsValidationException<StockPrice> innerInnerException = (GridContentsValidationException<StockPrice>)e.InnerException.InnerException;
             Assert.That(innerInnerException.Message, Does.StartWith($"Failed to validate item in grid."));
             Assert.That(innerInnerException.GridItem == testGridItems[0]);
-            Assert.That(innerInnerException.InnerException.Message == $"StockPrice with StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and Company 'Canon' has negative Price -1.");
+            Assert.That(innerInnerException.InnerException.Message == $"StockPrice {{ Company = 'Canon', Price = -1 }} has negative Price -1.");
         }
 
         [Test]
@@ -243,24 +225,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             WHERE   Tag = @Tag 
               AND   DataSource = @DataSource
               AND   [Date] = CONVERT(date, @Date, 23);
-            ";
-            String expectedGridInsertStatementText = @$"
-            INSERT 
-            INTO    StockPriceGrids 
-                    (
-                        Tag, 
-                        DataSource, 
-                        [Date], 
-                        [Version], 
-                        TransactionTimestamp
-                    )
-            VALUES  (
-                        @Tag, 
-                        @DataSource, 
-                        CONVERT(date, @Date, 23), 
-                        @Version, 
-                        CONVERT(datetime2, @CreateDateTime, 126)
-                    );
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
