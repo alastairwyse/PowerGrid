@@ -50,6 +50,22 @@ namespace PowerGrid.Grids.UnitTests
         }
 
         [Test]
+        public void KeyCompareTo()
+        {
+            StockPrice testStockPrice1 = new("Canon", 4534);
+            StockPrice testStockPrice2 = new("Canon", 3754);
+
+            Assert.That(testStockPrice1.KeyCompareTo(testStockPrice2) == 0);
+
+
+            testStockPrice1 = new("Canon", 4534);
+            testStockPrice2 = new("Sony", 3754);
+
+            Assert.That(testStockPrice1.KeyCompareTo(testStockPrice2) <= -1);
+            Assert.That(testStockPrice2.KeyCompareTo(testStockPrice1) >= 1);
+        }
+
+        [Test]
         public void PrintMembers()
         {
             StockPrice testStockPrice = new("Canon", 4503);

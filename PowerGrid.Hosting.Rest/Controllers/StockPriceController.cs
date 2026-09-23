@@ -20,6 +20,7 @@ using System.Net.Mime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PowerGrid.Hosting.Rest.Models.DataTransferObjects;
+using PowerGrid.Hosting.Rest.Models.DataTransferObjects.StockPrice;
 using PowerGrid.Persistence;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;

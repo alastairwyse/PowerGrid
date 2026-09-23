@@ -47,7 +47,7 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         public Int32 KeyCompareTo(StockPrice other)
         {
-            return this.Company.CompareTo(other.Company);
+            return String.CompareOrdinal(this.Company, other.Company);
         }
 
         /// <inheritdoc/>

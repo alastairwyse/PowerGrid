@@ -80,36 +80,36 @@ namespace PowerGrid.Grids.UnitTests
             weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
             weatherForecast2 = new(preliminaryTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity,  26);
 
-            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
-            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
+            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) <= -1);
+            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) >= 1);
 
 
             weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
             weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-12"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
-            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
-            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
+            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) <= -1);
+            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) >= 1);
 
 
             weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
             weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("22:00:00"), japanCountry, tokyoCity, 26);
 
-            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
-            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
+            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) <= -1);
+            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) >= 1);
 
 
             weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), australiaCountry, tokyoCity, 26);
             weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
-            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
-            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
+            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) <= -1);
+            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) >= 1);
 
 
             weatherForecast1 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, osakaCity, 26);
             weatherForecast2 = new(officialTag, utils.CreateDateOnlyFromString("2026-07-11"), utils.CreateTimeOnlyFromString("21:00:00"), japanCountry, tokyoCity, 26);
 
-            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) == -1);
-            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) == 1);
+            Assert.That(weatherForecast1.KeyCompareTo(weatherForecast2) <= -1);
+            Assert.That(weatherForecast2.KeyCompareTo(weatherForecast1) >= 1);
         }
 
         [Test]

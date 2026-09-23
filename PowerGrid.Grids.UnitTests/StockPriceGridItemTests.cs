@@ -104,29 +104,29 @@ namespace PowerGrid.Grids.UnitTests
             stockPrice1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4440);
             stockPrice2 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), sonyCompany, 4441);
 
-            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) == -1);
-            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) == 1);
+            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) <= -1);
+            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) >= 1);
 
 
             stockPrice1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4440);
             stockPrice2 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-04"), canonCompany, 4441);
 
-            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) == -1);
-            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) == 1);
+            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) <= -1);
+            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) >= 1);
 
 
             stockPrice1 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4440);
             stockPrice2 = new(marketTag, refinitivDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4441);
 
-            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) == -1);
-            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) == 1);
+            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) <= -1);
+            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) >= 1);
 
 
             stockPrice1 = new(calibratedTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4440);
             stockPrice2 = new(marketTag, bloombergDataSource, utils.CreateDateOnlyFromString("2026-04-03"), canonCompany, 4441);
 
-            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) == -1);
-            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) == 1);
+            Assert.That(stockPrice1.KeyCompareTo(stockPrice2) <= -1);
+            Assert.That(stockPrice2.KeyCompareTo(stockPrice1) >= 1);
         }
 
         [Test]

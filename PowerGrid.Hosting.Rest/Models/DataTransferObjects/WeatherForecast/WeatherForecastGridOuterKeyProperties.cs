@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-using System.Collections.Generic;
-using PowerGrid.Grids;
-using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using System;
+using PowerGrid.Core;
 
-namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects
+namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects.WeatherForecast
 {
     /// <summary>
-    /// DTO container class holding a grid of stock prices which is passed as a parameter to REST methods
+    /// DTO container class holding <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of stock prices.
     /// </summary>
-    public class InputStockPriceGrid : StockPriceGridBase
+    public class WeatherForecastGridOuterKeyProperties
     {
-        /// <summary>The stock prices.</summary>
-        public IList<StockPrice> Items { get; set; }
+        public string Tag { get; init; }
+
+        public DateOnly Date { get; init; }
+
+        public TimeOnly Time { get; init; }
     }
 }

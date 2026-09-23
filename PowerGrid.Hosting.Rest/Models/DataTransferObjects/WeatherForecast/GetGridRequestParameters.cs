@@ -17,17 +17,14 @@
 using System;
 using PowerGrid.Grids;
 
-namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects
+namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects.WeatherForecast
 {
     /// <summary>
-    /// DTO container class holding the parameters to a <see cref="StockPricePersisterHost.GetGrid(Grids.StockPriceGridOuterKeyProperties, Int32)"/> method call.
+    /// DTO container class holding the parameters to a <see cref="WeatherForecastPersisterHost.GetGrid(Grids.WeatherForecastGridOuterKeyProperties, int)"/> method call.
     /// </summary>
-    public class GetGridRequestParameters
+    public class GetGridRequestParameters : GetGridRequestParametersBase
     {
         /// <summary>The outer key properties to retrieve the grid for.</summary>
-        public StockPriceGridOuterKeyProperties StockPriceGridOuterKeyProperties { get; set; }
-
-        /// <summary>The version of the grid.</summary>
-        public Int32 Version { get; set; }
+        public WeatherForecastGridOuterKeyProperties WeatherForecastGridOuterKeyProperties { get; set; }
     }
 }

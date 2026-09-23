@@ -15,19 +15,16 @@
  */
 
 using System;
-using PowerGrid.Core;
+using PowerGrid.Grids;
 
-namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects
+namespace PowerGrid.Hosting.Rest.Models.DataTransferObjects.StockPrice
 {
     /// <summary>
-    /// DTO container class holding <see cref="IGridOuterKeyProperties">outer key properties</see> for grids of stock prices.
+    /// DTO container class holding the parameters to a <see cref="StockPricePersisterHost.GetGrid(Grids.StockPriceGridOuterKeyProperties, int)"/> method call.
     /// </summary>
-    public class StockPriceGridOuterKeyProperties
+    public class GetGridRequestParameters : GetGridRequestParametersBase
     {
-        public String Tag { get; init; }
-
-        public String DataSource { get; init; }
-
-        public DateOnly Date { get; init; }
+        /// <summary>The outer key properties to retrieve the grid for.</summary>
+        public StockPriceGridOuterKeyProperties StockPriceGridOuterKeyProperties { get; set; }
     }
 }

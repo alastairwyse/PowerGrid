@@ -93,15 +93,15 @@ namespace PowerGrid.Grids.UnitTests
             testWeatherForecast1 = new("Japan", "Tokyo", 25);
             testWeatherForecast2 = new("Nihon", "Tokyo", 25);
 
-            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) == -1);
-            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) == 1);
+            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) <= -1);
+            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) >= 1);
 
 
             testWeatherForecast1 = new("Japan", "Osaka", 25);
             testWeatherForecast2 = new("Japan", "Tokyo", 25);
 
-            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) == -1);
-            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) == 1);
+            Assert.That(testWeatherForecast1.KeyCompareTo(testWeatherForecast2) <= -1);
+            Assert.That(testWeatherForecast2.KeyCompareTo(testWeatherForecast1) >= 1);
         }
 
         [Test]

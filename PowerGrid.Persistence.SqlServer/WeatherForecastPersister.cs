@@ -141,7 +141,7 @@ namespace PowerGrid.Persistence.SqlServer
                   AND   CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
                 ORDER   BY {countryColumnName}, 
                            {cityColumnName} 
-                COLLATE {transactSqlCollation};";
+                COLLATE {TransactSqlCollation};";
             }
         }
 

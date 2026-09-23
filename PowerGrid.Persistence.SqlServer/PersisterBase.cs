@@ -67,8 +67,6 @@ namespace PowerGrid.Persistence.SqlServer
         protected const String transactSql24TimeStyle = "HH:mm:ss";
         /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
         protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
-        /// <summary>The type of collation to use when ordering results returned from SQL Server.</summary>
-        protected const String transactSqlCollation = "Latin1_General_BIN2";
         /// <summary>The maximum possible <see cref="DateTime"/> value to use as the upper bound for validity period in the persisted temporal model.</summary>
         protected readonly DateTime temporalMaximumDateTime = DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
 
@@ -475,6 +473,15 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #region Private/Protected Methods
+
+        /// <summary>
+        /// The type of collation to use when ordering results returned from SQL Server.
+        /// </summary>
+        /// <remarks>The default 'Latin1_General_BIN2' collation matches the string comparison performed by the <see cref="String.CompareOrdinal(string?, string?)"/> method.  However it can be overridden for other use cases (e.g. non-English language, etc...) as required.</remarks>
+        protected virtual String TransactSqlCollation 
+        {
+            get { return "Latin1_General_BIN2"; }
+        }
 
         /// <summary>
         /// The name of the table which stores the grid items.

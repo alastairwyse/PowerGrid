@@ -134,7 +134,7 @@ namespace PowerGrid.Persistence.SqlServer
                   AND  [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
                   AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
                 ORDER  BY {companyColumnName} 
-                COLLATE {transactSqlCollation};";
+                COLLATE {TransactSqlCollation};";
             }
         }
 

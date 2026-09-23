@@ -63,9 +63,9 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         public int KeyCompareTo(StockPriceGridItem other)
         {
-            if (this.Tag.CompareTo(other.Tag) == 0)
+            if (String.CompareOrdinal(this.Tag, other.Tag) == 0)
             {
-                if (this.DataSource.CompareTo(other.DataSource) == 0)
+                if (String.CompareOrdinal(this.DataSource, other.DataSource) == 0)
                 {
                     if (this.Date.CompareTo(other.Date) == 0)
                     {
@@ -78,12 +78,12 @@ namespace PowerGrid.Grids
                 }
                 else
                 {
-                    return this.DataSource.CompareTo(other.DataSource);
+                    return String.CompareOrdinal(this.DataSource, other.DataSource);
                 }
             }
             else
             {
-                return this.Tag.CompareTo(other.Tag);
+                return String.CompareOrdinal(this.Tag, other.Tag);
             }
         }
 

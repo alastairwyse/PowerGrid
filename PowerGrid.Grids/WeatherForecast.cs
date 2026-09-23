@@ -53,13 +53,13 @@ namespace PowerGrid.Grids
         /// <inheritdoc/>
         public Int32 KeyCompareTo(WeatherForecast other)
         {
-            if (this.Country.CompareTo(other.Country) == 0)
+            if (String.CompareOrdinal(this.Country, other.Country) == 0)
             {
-                return this.City.CompareTo(other.City);
+                return String.CompareOrdinal(this.City, other.City);
             }
             else
             {
-                return this.Country.CompareTo(other.Country);
+                return String.CompareOrdinal(this.Country, other.Country);
             }
         }
 

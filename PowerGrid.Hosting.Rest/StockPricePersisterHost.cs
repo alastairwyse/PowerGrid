@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
+using System;
+using System.Collections.Generic;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer;
-using System;
-using System.Collections.Generic;
 
 namespace PowerGrid.Hosting.Rest
 {
