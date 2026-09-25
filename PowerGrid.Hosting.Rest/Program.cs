@@ -54,6 +54,11 @@ namespace PowerGrid.Hosting.Rest
             (
                 new StockPricePersister(connectionString, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
             );
+            ILogger weatherForecastPersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<WeatherForecastPersister>>();
+            builder.Services.AddSingleton<WeatherForecastPersister>
+            (
+                new WeatherForecastPersister(connectionString, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(weatherForecastPersisterLogger))
+            );
 
             builder.Services.AddControllers()
             // Override the default model-binding failure behaviour, to return a HttpErrorResponse object rather than the standard ProblemDetails
@@ -104,6 +109,10 @@ namespace PowerGrid.Hosting.Rest
                 // Add XML comments to swagger
                 var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 swaggerGenOptions.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+
+                // Customize schema ids to avoid 'the same schemaId is already used for type' errors for shared DTO classes
+                //   see https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/1607#issuecomment-607170559
+                swaggerGenOptions.CustomSchemaIds(i => i.FullName);
             });
 
             WebApplication app = builder.Build();

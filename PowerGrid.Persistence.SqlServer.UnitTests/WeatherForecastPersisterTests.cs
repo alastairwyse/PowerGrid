@@ -78,8 +78,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Time] = CONVERT(time, @Time, 24) 
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
-                           City 
-                COLLATE Latin1_General_BIN2;";
+                           City;";
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
@@ -159,8 +158,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Time] = CONVERT(time, @Time, 24) 
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
-                           City 
-                COLLATE Latin1_General_BIN2;";
+                           City;";
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
@@ -239,8 +237,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Time] = CONVERT(time, @Time, 24) 
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
-                           City 
-                COLLATE Latin1_General_BIN2;";
+                           City;";
             String expectedMaxIdQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
@@ -385,8 +382,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Time] = CONVERT(time, @Time, 24) 
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
-                           City 
-                COLLATE Latin1_General_BIN2;";
+                           City;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false, true, false);
@@ -1211,8 +1207,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Time] = CONVERT(time, @Time, 24) 
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
-                           City 
-                COLLATE Latin1_General_BIN2;";
+                           City;";
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
@@ -1253,8 +1248,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Time] = CONVERT(time, @Time, 24) 
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
-                           City 
-                COLLATE Latin1_General_BIN2;";
+                           City;";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);

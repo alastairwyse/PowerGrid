@@ -8,7 +8,7 @@
 
 :Setvar DatabaseName PowerGrid
 
-CREATE DATABASE $(DatabaseName);
+CREATE DATABASE $(DatabaseName) COLLATE Latin1_General_BIN2;
 GO
 
 USE $(DatabaseName);

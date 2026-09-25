@@ -475,15 +475,6 @@ namespace PowerGrid.Persistence.SqlServer
         #region Private/Protected Methods
 
         /// <summary>
-        /// The type of collation to use when ordering results returned from SQL Server.
-        /// </summary>
-        /// <remarks>The default 'Latin1_General_BIN2' collation matches the string comparison performed by the <see cref="String.CompareOrdinal(string?, string?)"/> method.  However it can be overridden for other use cases (e.g. non-English language, etc...) as required.</remarks>
-        protected virtual String TransactSqlCollation 
-        {
-            get { return "Latin1_General_BIN2"; }
-        }
-
-        /// <summary>
         /// The name of the table which stores the grid items.
         /// </summary>
         protected abstract String GridItemTableName { get; }
