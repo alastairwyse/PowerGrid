@@ -41,11 +41,28 @@ GO
 
 CREATE PROCEDURE dbo.BulkInsertStockPrices
 (
-    @GridItems  GridItemTableType  READONLY
-    -- Need to also pass TransactionFrom value
+    @Tag                   nvarchar(max), 
+    @Datasource            nvarchar(max), 
+    @Date                  date, 
+    @GridItems             GridItemTableType  READONLY, 
+    @TransactionTimestamp  datetime2
 )
 AS
 BEGIN
+
+    DECLARE @CurrentCompany        nvarchar(max);
+    DECLARE @CurrentPriceAsString  nvarchar(max);
+
+    DECLARE InputTableCursor CURSOR LOCAL FAST_FORWARD FOR
+    SELECT  GridItemData1,
+            GridItemData2
+    FROM    @GridItems;
+
+    OPEN InputTableCursor;
+    FETCH NEXT 
+    FROM        InputTableCursor
+    INTO        @CurrentCompany, 
+                @CurrentPriceAsString;
 
   -- Use https://github.com/alastairwyse/ApplicationAccess/blob/main/ApplicationAccess.Persistence.Sql.SqlServer/Resources/CreateDatabase.sql#L2053
   --   as a guide
