@@ -20,6 +20,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * StockPricePersister needs test for constructor parameters
 
 #### Longer Term TODO
+* Things in StockPriceBulkPersister could be put into a BulkPersisterBase class (maybe again implement bulk for WeatherForecasts first and then move commonality into base class)
 * Make sure code documentation (XML comments) is consistent re grid items vs entities... ensure 'grid item' terminology is only used to refer to outer key properties.  DOUBLE CHECK ON grid items vs entities... NNED TO MAKE SURE THIS IS CONSISTENT.
 * Need SQL Create and Drop template file containing the columns that are depended on by PowerGrid.Persistence.SqlServer.PersisterBase
   * Grid tables need to have id and transfrom/to colums in template

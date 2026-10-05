@@ -1,3 +1,4 @@
+﻿-- NOTE: If executing through SQL Server Management Studio, set 'SQKCMD Mode' via the 'Query' menu
 
 :Setvar DatabaseName PowerGrid
 
@@ -41,38 +42,78 @@ GO
 
 CREATE PROCEDURE dbo.BulkInsertStockPrices
 (
-    @Tag                   nvarchar(max), 
-    @Datasource            nvarchar(max), 
-    @Date                  date, 
     @GridItems             GridItemTableType  READONLY, 
     @TransactionTimestamp  datetime2
 )
 AS
 BEGIN
 
+    DECLARE @ErrorMessage  nvarchar(max);
+
+    DECLARE @CurrentTag            nvarchar(max);
+    DECLARE @CurrentDataSource     nvarchar(max);
+    DECLARE @CurrentDateAsString   nvarchar(max);
     DECLARE @CurrentCompany        nvarchar(max);
     DECLARE @CurrentPriceAsString  nvarchar(max);
 
     DECLARE InputTableCursor CURSOR LOCAL FAST_FORWARD FOR
     SELECT  GridItemData1,
-            GridItemData2
+            GridItemData2, 
+            GridItemData3, 
+            GridItemData4, 
+            GridItemData5
     FROM    @GridItems;
 
     OPEN InputTableCursor;
     FETCH NEXT 
     FROM        InputTableCursor
-    INTO        @CurrentCompany, 
+    INTO        @CurrentTag, 
+                @CurrentDataSource, 
+                @CurrentDateAsString, 
+                @CurrentCompany, 
                 @CurrentPriceAsString;
 
-  -- Use https://github.com/alastairwyse/ApplicationAccess/blob/main/ApplicationAccess.Persistence.Sql.SqlServer/Resources/CreateDatabase.sql#L2053
-  --   as a guide
-  -- Foreach TGridItem in @GridItems
-  --   Insert into the StockPrices table
-  --     Tag = tag;
-  --     DataSource = dataSource;
-  --     Date = date;
-  --     Company = company;
-  --     Price = price;
+    WHILE (@@FETCH_STATUS = 0)
+        BEGIN
+
+            BEGIN TRY
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @CurrentTag, 
+                            @CurrentDataSource, 
+                            CONVERT(date, @CurrentDateAsString, 23), 
+                            @CurrentCompany, 
+                            CONVERT(money, @CurrentPriceAsString), 
+                            CONVERT(datetime2, @TransactionTimestamp, 126), 
+                            CONVERT(datetime2, '9999-12-31T23:59:59.9999999', 126)
+                        );
+            END TRY
+            BEGIN CATCH
+                SET @ErrorMessage = N'Error occurred when inserting StockPrice for ''' + ISNULL(@CurrentTag, '(null)') + ''', ''' + ISNULL(@CurrentDataSource, '(null)') + ''', ''' + ISNULL(@CurrentDateAsString, '(null)') + ''', ''' + ISNULL(@CurrentCompany, '(null)') + ''' and ''' + ISNULL(@CurrentPriceAsString, '(null)') + '''; ' + ERROR_MESSAGE();
+                THROW 50001, @ErrorMessage, 1;
+            END CATCH
+
+            FETCH NEXT 
+            FROM        InputTableCursor
+            INTO        @CurrentTag, 
+                        @CurrentDataSource, 
+                        @CurrentDateAsString, 
+                        @CurrentCompany, 
+                        @CurrentPriceAsString;
+        END;
+
+    CLOSE InputTableCursor;
+    DEALLOCATE InputTableCursor;
 
 END
 GO
