@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using PowerGrid.Core;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 
 namespace PowerGrid.Persistence.SqlServer
 {
@@ -64,7 +65,7 @@ namespace PowerGrid.Persistence.SqlServer
             }
 
             /// <summary>
-            /// Flushes any buffered <see cref="StockPriceGridItem"/> by writing them to SQL Server.
+            /// Flushes any buffered <see cref="StockPriceGridItem"/> objects by writing them to SQL Server.
             /// </summary>
             public void Flush()
             {
@@ -82,13 +83,38 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
-        protected class BulkDeleteEmitter : IEmitter<StockPriceGridItem>
+        /// <summary>
+        /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="StockPriceGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(StockPriceGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
+        /// </summary>
+        protected class BulkDeleteEmitter : IEmitter<StockPriceGridItemPTO>
         {
+            /// <summary>The buffer for <see cref="StockPriceGridItem"/> objects.</summary>
+            protected Queue<StockPriceGridItem> stockPriceBuffer;
+            /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</summary>
+            protected Int32 bufferSizeLimit;
 
-            // TODO
+            /// <summary>
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkDeleteEmitter class.
+            /// </summary>
+            /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItemPTO"/> objects to hold in the buffer.</param>
+            public BulkDeleteEmitter(Int32 bufferSizeLimit)
+            {
+                stockPriceBuffer = new Queue<StockPriceGridItem>();
+                this.bufferSizeLimit = bufferSizeLimit;
+            }
+
+            /// <summary>
+            /// Flushes any buffered <see cref="StockPriceGridItemPTO"/> objects by deleting them from SQL Server.
+            /// </summary>
+            public void Flush()
+            {
+                // Call the Persist() method.
+
+                throw new NotImplementedException();
+            }
 
             /// <inheritdoc/>
-            public void Emit(StockPriceGridItem instance)
+            public void Emit(StockPriceGridItemPTO instance)
             {
                 throw new NotImplementedException();
             }
