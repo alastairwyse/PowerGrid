@@ -11,6 +11,7 @@ GO
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
+DROP PROCEDURE dbo.BulkDeleteStockPrices;
 DROP PROCEDURE dbo.BulkInsertStockPrices;
 
 
@@ -20,4 +21,5 @@ DROP PROCEDURE dbo.BulkInsertStockPrices;
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
+DROP TYPE dbo.GridIdTableType;
 DROP TYPE dbo.GridItemTableType;

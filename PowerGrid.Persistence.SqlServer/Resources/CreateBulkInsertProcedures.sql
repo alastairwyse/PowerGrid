@@ -31,6 +31,14 @@ AS TABLE
 GO
 
 
+CREATE TYPE dbo.GridIdTableType 
+AS TABLE
+(
+    Id  bigint  NOT NULL 
+);
+GO
+
+
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- Create Stored Procedures
@@ -38,7 +46,7 @@ GO
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- dbo.ProcessEvents
+-- dbo.BulkInsertStockPrices
 
 CREATE PROCEDURE dbo.BulkInsertStockPrices
 (
@@ -114,6 +122,37 @@ BEGIN
 
     CLOSE InputTableCursor;
     DEALLOCATE InputTableCursor;
+
+END
+GO
+
+
+--------------------------------------------------------------------------------
+-- dbo.BulkDeleteStockPrices
+
+CREATE PROCEDURE dbo.BulkDeleteStockPrices
+(
+    @GridItemIds           GridIdTableType  READONLY, 
+    @TransactionTimestamp  datetime2
+)
+AS
+BEGIN
+
+    DECLARE @ErrorMessage  nvarchar(max);
+
+    BEGIN TRY
+        UPDATE  StockPrices 
+        SET     TransactionTo = DATEADD(nanosecond, -100, @TransactionTimestamp)
+        WHERE   Id IN  
+                (
+                    SELECT  Id 
+                    FROM    @GridItemIds
+                );
+    END TRY
+    BEGIN CATCH
+        SET @ErrorMessage = N'Error occurred when deleting StockPrices; ' + ERROR_MESSAGE();
+        THROW 50001, @ErrorMessage, 1;
+    END CATCH
 
 END
 GO
