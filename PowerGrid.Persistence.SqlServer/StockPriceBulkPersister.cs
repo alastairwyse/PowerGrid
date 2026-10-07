@@ -47,77 +47,124 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which persists <see cref="StockPriceGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="BulkAddEmitter.Emit(StockPriceGridItem)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkAddEmitter : IEmitter<StockPriceGridItem>
+        protected class BulkAddEmitter : BulkPersistenceEmitterBase<StockPriceGridItem>
         {
-            /// <summary>The buffer for <see cref="StockPriceGridItem"/> objects.</summary>
-            protected Queue<StockPriceGridItem> stockPriceBuffer;
-            /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</summary>
-            protected Int32 bufferSizeLimit;
-
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkAddEmitter class.
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</param>
             public BulkAddEmitter(Int32 bufferSizeLimit)
+                : base(bufferSizeLimit)
             {
-                stockPriceBuffer = new Queue<StockPriceGridItem>();
-                this.bufferSizeLimit = bufferSizeLimit;
             }
+
+            #region Private/Protected Methods
 
             /// <summary>
-            /// Flushes any buffered <see cref="StockPriceGridItem"/> objects by writing them to SQL Server.
+            /// Persists all buffered items and then clears the buffer.
             /// </summary>
-            public void Flush()
+            protected override void Persist()
             {
-                // Call the Persist() method.
 
-                throw new NotImplementedException();
             }
 
-            /// <inheritdoc/>
-            public void Emit(StockPriceGridItem instance)
-            {
-                // Put in 'stockPriceBuffer' and then call Persist() method (calling DB SP) if 'bufferSizeLimit' is reached.
-
-                throw new NotImplementedException();
-            }
+            #endregion
         }
 
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="StockPriceGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(StockPriceGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkDeleteEmitter : IEmitter<StockPriceGridItemPTO>
+        protected class BulkDeleteEmitter : BulkPersistenceEmitterBase<StockPriceGridItemPTO>
         {
-            /// <summary>The buffer for <see cref="StockPriceGridItem"/> objects.</summary>
-            protected Queue<StockPriceGridItem> stockPriceBuffer;
-            /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</summary>
-            protected Int32 bufferSizeLimit;
-
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkDeleteEmitter class.
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItemPTO"/> objects to hold in the buffer.</param>
             public BulkDeleteEmitter(Int32 bufferSizeLimit)
+                : base(bufferSizeLimit)
             {
-                stockPriceBuffer = new Queue<StockPriceGridItem>();
+            }
+
+            #region Private/Protected Methods
+
+            /// <summary>
+            /// Deletes all buffered items and then clears the buffer.
+            /// </summary>
+            protected override void Persist()
+            {
+                // TODO: See https://github.com/alastairwyse/ApplicationAccess/blob/main/ApplicationAccess.Persistence.Sql.SqlServer/SqlServerAccessManagerTemporalBulkPersister.cs#L229
+            }
+
+            #endregion
+        }
+
+        /// <summary>
+        /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then persist objects to a SQL Server database in bulk.
+        /// </summary>
+        /// <typeparam name="T">The type of the object output in the <see cref="IEmitter{T}"/> implementation.</typeparam>
+        protected abstract class BulkPersistenceEmitterBase<T> : IEmitter<T>
+        {
+            #pragma warning disable 1591
+
+            // Names of columns in TVP tables used for bulk insert and delete
+            protected const String gridItemData1ColumnName = "GridItemData1";
+            protected const String gridItemData2ColumnName = "GridItemData2";
+            protected const String gridItemData3ColumnName = "GridItemData3";
+            protected const String gridItemData4ColumnName = "GridItemData4";
+            protected const String gridItemData5ColumnName = "GridItemData5";
+            protected const String gridItemData6ColumnName = "GridItemData6";
+            protected const String gridItemData7ColumnName = "GridItemData7";
+            protected const String gridItemData8ColumnName = "GridItemData8";
+            protected const String gridItemData9ColumnName = "GridItemData9";
+            protected const String gridItemData10ColumnName = "GridItemData10";
+            protected const String idColumnName = "Id";
+
+            #pragma warning restore 1591
+
+            // TODO: Add data table and columns for insert/delete TVP types/tables
+
+            /// <summary>The buffer for objects emitted objects.</summary>
+            protected Queue<T> buffer;
+            /// <summary>The maximum number of objects to hold in the buffer.</summary>
+            protected Int32 bufferSizeLimit;
+
+            /// <summary>
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkPersistenceEmitterBase class.
+            /// </summary>
+            /// <param name="bufferSizeLimit">The maximum number of objects to hold in the buffer.</param>
+            public BulkPersistenceEmitterBase(Int32 bufferSizeLimit)
+            {
+                buffer = new Queue<T>();
                 this.bufferSizeLimit = bufferSizeLimit;
             }
 
             /// <summary>
-            /// Flushes any buffered <see cref="StockPriceGridItemPTO"/> objects by deleting them from SQL Server.
+            /// Flushes any buffered objects by writing them to SQL Server.
             /// </summary>
             public void Flush()
             {
-                // Call the Persist() method.
-
-                throw new NotImplementedException();
+                Persist();
             }
 
             /// <inheritdoc/>
-            public void Emit(StockPriceGridItemPTO instance)
+            public void Emit(T instance)
             {
-                throw new NotImplementedException();
+                buffer.Enqueue(instance);
+                if (buffer.Count == bufferSizeLimit)
+                {
+                    Persist();
+                    buffer.Clear();
+                }
             }
+
+            #region Private/Protected Methods
+
+            /// <summary>
+            /// Persists/processes all buffered objects and then clears the buffer.
+            /// </summary>
+            protected abstract void Persist();
+
+            #endregion
         }
 
         #endregion
