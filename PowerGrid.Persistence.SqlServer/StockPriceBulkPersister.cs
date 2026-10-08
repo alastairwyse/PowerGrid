@@ -16,6 +16,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Data;
+using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
@@ -53,8 +55,10 @@ namespace PowerGrid.Persistence.SqlServer
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkAddEmitter class.
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</param>
-            public BulkAddEmitter(Int32 bufferSizeLimit)
-                : base(bufferSizeLimit)
+            /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
+            /// <param name="sqlConnection">The connection to use to insert or delete.</param>
+            public BulkAddEmitter(Int32 bufferSizeLimit, ISqlConnectionShim sqlConnectionShim, SqlConnection sqlConnection)
+                : base(bufferSizeLimit, sqlConnectionShim, sqlConnection)
             {
             }
 
@@ -80,8 +84,10 @@ namespace PowerGrid.Persistence.SqlServer
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkDeleteEmitter class.
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItemPTO"/> objects to hold in the buffer.</param>
-            public BulkDeleteEmitter(Int32 bufferSizeLimit)
-                : base(bufferSizeLimit)
+            /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
+            /// <param name="sqlConnection">The connection to use to insert or delete.</param>
+            public BulkDeleteEmitter(Int32 bufferSizeLimit, ISqlConnectionShim sqlConnectionShim, SqlConnection sqlConnection)
+                : base(bufferSizeLimit, sqlConnectionShim, sqlConnection)
             {
             }
 
@@ -99,10 +105,10 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then persist objects to a SQL Server database in bulk.
+        /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then either insert objects into or delete objects from a SQL Server database in bulk.
         /// </summary>
         /// <typeparam name="T">The type of the object output in the <see cref="IEmitter{T}"/> implementation.</typeparam>
-        protected abstract class BulkPersistenceEmitterBase<T> : IEmitter<T>
+        protected abstract class BulkPersistenceEmitterBase<T> : IEmitter<T>, IDisposable
         {
             #pragma warning disable 1591
 
@@ -119,23 +125,60 @@ namespace PowerGrid.Persistence.SqlServer
             protected const String gridItemData10ColumnName = "GridItemData10";
             protected const String idColumnName = "Id";
 
-            #pragma warning restore 1591
+            // TVP table and columns
+            protected DataTable bulkInsertStagingTable;
+            protected DataColumn gridItemData1Column;
+            protected DataColumn gridItemData2Column;
+            protected DataColumn gridItemData3Column;
+            protected DataColumn gridItemData4Column;
+            protected DataColumn gridItemData5Column;
+            protected DataColumn gridItemData6Column;
+            protected DataColumn gridItemData7Column;
+            protected DataColumn gridItemData8Column;
+            protected DataColumn gridItemData9Column;
+            protected DataColumn gridItemData10Column;
+            protected DataTable bulkDeleteStagingTable;
+            protected DataColumn idColumn;
 
-            // TODO: Add data table and columns for insert/delete TVP types/tables
+            #pragma warning restore 1591
 
             /// <summary>The buffer for objects emitted objects.</summary>
             protected Queue<T> buffer;
             /// <summary>The maximum number of objects to hold in the buffer.</summary>
             protected Int32 bufferSizeLimit;
+            /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</summary>
+            protected ISqlConnectionShim sqlConnectionShim;
+            /// <summary>The connection to use to insert or delete.</summary>
+            protected SqlConnection sqlConnection;
+            /// <summary>Indicates whether the object has been disposed.</summary>
+            protected Boolean disposed;
 
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkPersistenceEmitterBase class.
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of objects to hold in the buffer.</param>
-            public BulkPersistenceEmitterBase(Int32 bufferSizeLimit)
+            /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
+            /// <param name="sqlConnection">The connection to use to insert or delete.</param>
+            public BulkPersistenceEmitterBase(Int32 bufferSizeLimit, ISqlConnectionShim sqlConnectionShim, SqlConnection sqlConnection)
             {
+                bulkInsertStagingTable = new DataTable();
+                gridItemData1Column = new DataColumn();
+                gridItemData2Column = new DataColumn();
+                gridItemData3Column = new DataColumn();
+                gridItemData4Column = new DataColumn();
+                gridItemData5Column = new DataColumn();
+                gridItemData6Column = new DataColumn();
+                gridItemData7Column = new DataColumn();
+                gridItemData8Column = new DataColumn();
+                gridItemData9Column = new DataColumn();
+                gridItemData10Column = new DataColumn();
+                bulkDeleteStagingTable = new DataTable();
+                idColumn = new DataColumn();
                 buffer = new Queue<T>();
                 this.bufferSizeLimit = bufferSizeLimit;
+                this.sqlConnectionShim = sqlConnectionShim;
+                this.sqlConnection = sqlConnection;
+                disposed = false;
             }
 
             /// <summary>
@@ -163,6 +206,76 @@ namespace PowerGrid.Persistence.SqlServer
             /// Persists/processes all buffered objects and then clears the buffer.
             /// </summary>
             protected abstract void Persist();
+
+            /// <summary>
+            /// Creates a <see cref="SqlParameter" />.
+            /// </summary>
+            /// <param name="parameterName">The name of the parameter.</param>
+            /// <param name="parameterType">The type of the parameter.</param>
+            /// <param name="parameterValue">The value of the parameter.</param>
+            /// <returns>The created parameter.</returns>
+            protected SqlParameter CreateSqlParameterWithValue(String parameterName, SqlDbType parameterType, Object parameterValue)
+            {
+                var returnParameter = new SqlParameter(parameterName, parameterType);
+                returnParameter.Value = parameterValue;
+
+                return returnParameter;
+            }
+
+            #endregion
+
+            #region Finalize / Dispose Methods
+
+            /// <summary>
+            /// Releases the unmanaged resources used by the SqlServerAccessManagerTemporalBulkPersister.
+            /// </summary>
+            public void Dispose()
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+
+            #pragma warning disable 1591
+
+            ~BulkPersistenceEmitterBase()
+            {
+                Dispose(false);
+            }
+
+            #pragma warning restore 1591
+
+            /// <summary>
+            /// Provides a method to free unmanaged resources used by this class.
+            /// </summary>
+            /// <param name="disposing">Whether the method is being called as part of an explicit Dispose routine, and hence whether managed resources should also be freed.</param>
+            protected virtual void Dispose(bool disposing)
+            {
+                if (!disposed)
+                {
+                    if (disposing)
+                    {
+                        // Free other state (managed objects).
+                        gridItemData1Column.Dispose();
+                        gridItemData2Column.Dispose();
+                        gridItemData3Column.Dispose();
+                        gridItemData4Column.Dispose();
+                        gridItemData5Column.Dispose();
+                        gridItemData6Column.Dispose();
+                        gridItemData7Column.Dispose();
+                        gridItemData8Column.Dispose();
+                        gridItemData9Column.Dispose();
+                        gridItemData10Column.Dispose();
+                        bulkInsertStagingTable.Dispose();
+                        idColumn.Dispose();
+                        bulkDeleteStagingTable.Dispose();
+                    }
+                    // Free your own state (unmanaged objects).
+
+                    // Set large fields to null.
+
+                    disposed = true;
+                }
+            }
 
             #endregion
         }
