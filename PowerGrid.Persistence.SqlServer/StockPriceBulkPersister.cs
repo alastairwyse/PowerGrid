@@ -56,9 +56,20 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
+            /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
-            public BulkAddEmitter(Int32 bufferSizeLimit, ISqlConnectionShim sqlConnectionShim, SqlConnection sqlConnection)
-                : base(bufferSizeLimit, sqlConnectionShim, sqlConnection)
+            /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
+            /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
+            public BulkAddEmitter
+            (
+                Int32 bufferSizeLimit, 
+                ISqlConnectionShim sqlConnectionShim, 
+                ISqlCommandShim sqlCommandShim, 
+                SqlConnection sqlConnection, 
+                SqlRetryLogicOption sqlRetryLogicOption,
+                EventHandler<SqlRetryingEventArgs> connectionRetryAction
+            )
+                : base(bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
             {
             }
 
@@ -85,9 +96,20 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItemPTO"/> objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
+            /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
-            public BulkDeleteEmitter(Int32 bufferSizeLimit, ISqlConnectionShim sqlConnectionShim, SqlConnection sqlConnection)
-                : base(bufferSizeLimit, sqlConnectionShim, sqlConnection)
+            /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
+            /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
+            public BulkDeleteEmitter
+            (
+                Int32 bufferSizeLimit, 
+                ISqlConnectionShim sqlConnectionShim, 
+                ISqlCommandShim sqlCommandShim, 
+                SqlConnection sqlConnection, 
+                SqlRetryLogicOption sqlRetryLogicOption,
+                EventHandler<SqlRetryingEventArgs> connectionRetryAction
+            )
+                : base(bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
             {
             }
 
@@ -148,8 +170,14 @@ namespace PowerGrid.Persistence.SqlServer
             protected Int32 bufferSizeLimit;
             /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</summary>
             protected ISqlConnectionShim sqlConnectionShim;
+            /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</summary>
+            protected ISqlCommandShim sqlCommandShim;
             /// <summary>The connection to use to insert or delete.</summary>
             protected SqlConnection sqlConnection;
+            /// <summary>Parameters for retrying when transient errors occur.</summary>
+            protected SqlRetryLogicOption sqlRetryLogicOption;
+            /// <summary>The action to invoke if an action is retried due to a transient error.</summary>
+            protected EventHandler<SqlRetryingEventArgs> connectionRetryAction;
             /// <summary>Indicates whether the object has been disposed.</summary>
             protected Boolean disposed;
 
@@ -158,8 +186,19 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             /// <param name="bufferSizeLimit">The maximum number of objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
+            /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
-            public BulkPersistenceEmitterBase(Int32 bufferSizeLimit, ISqlConnectionShim sqlConnectionShim, SqlConnection sqlConnection)
+            /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
+            /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
+            public BulkPersistenceEmitterBase
+            (
+                Int32 bufferSizeLimit, 
+                ISqlConnectionShim sqlConnectionShim, 
+                ISqlCommandShim sqlCommandShim, 
+                SqlConnection sqlConnection, 
+                SqlRetryLogicOption sqlRetryLogicOption,
+                EventHandler<SqlRetryingEventArgs> connectionRetryAction
+            )
             {
                 bulkInsertStagingTable = new DataTable();
                 gridItemData1Column = new DataColumn();
@@ -178,6 +217,7 @@ namespace PowerGrid.Persistence.SqlServer
                 this.bufferSizeLimit = bufferSizeLimit;
                 this.sqlConnectionShim = sqlConnectionShim;
                 this.sqlConnection = sqlConnection;
+                this.sqlRetryLogicOption = sqlRetryLogicOption;
                 disposed = false;
             }
 
@@ -208,18 +248,55 @@ namespace PowerGrid.Persistence.SqlServer
             protected abstract void Persist();
 
             /// <summary>
-            /// Creates a <see cref="SqlParameter" />.
+            /// Attempts to execute a stored procedure which does not return a result set, catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the retry logic specified in member <see cref=""/>.
             /// </summary>
-            /// <param name="parameterName">The name of the parameter.</param>
-            /// <param name="parameterType">The type of the parameter.</param>
-            /// <param name="parameterValue">The value of the parameter.</param>
-            /// <returns>The created parameter.</returns>
-            protected SqlParameter CreateSqlParameterWithValue(String parameterName, SqlDbType parameterType, Object parameterValue)
+            /// <param name="procedureName">The name of the stored procedure.</param>
+            /// <param name="parameters">The parameters to pass to the stored procedure.</param>
+            protected void ExecuteStoredProcedureWithDeadlockRetry(String procedureName, IEnumerable<SqlParameter> parameters)
             {
-                var returnParameter = new SqlParameter(parameterName, parameterType);
-                returnParameter.Value = parameterValue;
+                const Int32 deadlockErrorNumber = 1205;
 
-                return returnParameter;
+                Int32 retryCount = sqlRetryLogicOption.NumberOfTries - 1;
+                var exceptions = new List<Exception>();
+                while (true)
+                {
+                    try
+                    {
+                        using (var command = new SqlCommand(procedureName))
+                        {
+                            sqlCommandShim.SetCommandType(command, CommandType.StoredProcedure);
+                            foreach (SqlParameter currentParameter in parameters)
+                            {
+                                sqlCommandShim.AddParameter(command, currentParameter.ParameterName, currentParameter.SqlDbType, currentParameter.Value);
+                            }
+                            sqlCommandShim.SetConnection(command, sqlConnection);
+                            sqlCommandShim.ExecuteNonQuery(command);
+                            break;
+                        }
+                    }
+                    catch (SqlException sqlException)
+                    {
+                        if (sqlException.Errors.Count > 0 && sqlException.Errors[0].Number == deadlockErrorNumber)
+                        {
+                            exceptions.Add(sqlException);
+                            if (retryCount > 0)
+                            {
+                                var retryEventArgs = new SqlRetryingEventArgs(sqlRetryLogicOption.NumberOfTries - retryCount, new TimeSpan(0), exceptions);
+                                connectionRetryAction.Invoke(this, retryEventArgs);
+                                retryCount--;
+                            }
+                            else
+                            {
+                                String exceptionMessage = $"The number of deadlock retries has exceeded the maximum of {sqlRetryLogicOption.NumberOfTries} attempt(s).";
+                                throw new AggregateException(exceptionMessage, exceptions);
+                            }
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
+                }
             }
 
             #endregion
