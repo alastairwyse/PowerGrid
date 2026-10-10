@@ -101,8 +101,8 @@ BEGIN
                             @CurrentDataSource, 
                             CONVERT(date, @CurrentDateAsString, 23), 
                             @CurrentCompany, 
-                            CONVERT(money, @CurrentPriceAsString), 
-                            CONVERT(datetime2, @TransactionTimestamp, 126), 
+                            CONVERT(money, @CurrentPriceAsString, 0), 
+                            @TransactionTimestamp, 
                             CONVERT(datetime2, '9999-12-31T23:59:59.9999999', 126)
                         );
             END TRY

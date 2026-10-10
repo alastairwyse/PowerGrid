@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
@@ -80,7 +81,25 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             protected override void Persist()
             {
+                bulkInsertStagingTable.Rows.Clear();
+                foreach (StockPriceGridItem currentGridItem in buffer)
+                {
+                    var row = bulkInsertStagingTable.NewRow();
+                    row[gridItemData1ColumnName] = currentGridItem.Tag;
+                    row[gridItemData2ColumnName] = currentGridItem.DataSource;
+                    row[gridItemData3ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
+                    row[gridItemData4ColumnName] = currentGridItem.Company;
+                    row[gridItemData5ColumnName] = currentGridItem.Price.ToString(CultureInfo.InvariantCulture);
+                    bulkInsertStagingTable.Rows.Add(row);
+                }
+                var parameters = new List<SqlParameter>()
+                {
+                    CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
+                    //CreateSqlParameterWithValue("@TransactionTimestamp", SqlDbType.DateTime2, buffer.Peek().)
 
+                    // TODO: Need to add 'DateTime transactionTimestamp' as a param to base class
+                    //   Might want to do subtraction from TransTo value in here rather than SP
+                };
             }
 
             #endregion
@@ -132,6 +151,13 @@ namespace PowerGrid.Persistence.SqlServer
         /// <typeparam name="T">The type of the object output in the <see cref="IEmitter{T}"/> implementation.</typeparam>
         protected abstract class BulkPersistenceEmitterBase<T> : IEmitter<T>, IDisposable
         {
+            /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
+            protected const String transactSql23DateStyle = "yyyy-MM-dd";
+            /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 24 time style</see>.</summary>
+            protected const String transactSql24TimeStyle = "HH:mm:ss";
+            /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
+            protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+
             #pragma warning disable 1591
 
             // Names of columns in TVP tables used for bulk insert and delete
@@ -246,6 +272,21 @@ namespace PowerGrid.Persistence.SqlServer
             /// Persists/processes all buffered objects and then clears the buffer.
             /// </summary>
             protected abstract void Persist();
+
+            /// <summary>
+            /// Creates a <see cref="SqlParameter" />.
+            /// </summary>
+            /// <param name="parameterName">The name of the parameter.</param>
+            /// <param name="parameterType">The type of the parameter.</param>
+            /// <param name="parameterValue">The value of the parameter.</param>
+            /// <returns>The created parameter.</returns>
+            protected SqlParameter CreateSqlParameterWithValue(String parameterName, SqlDbType parameterType, Object parameterValue)
+            {
+                var returnParameter = new SqlParameter(parameterName, parameterType);
+                returnParameter.Value = parameterValue;
+
+                return returnParameter;
+            }
 
             /// <summary>
             /// Attempts to execute a stored procedure which does not return a result set, catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the retry logic specified in member <see cref=""/>.
