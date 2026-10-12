@@ -22,39 +22,103 @@ using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using ApplicationLogging;
+using ApplicationMetrics;
 
 namespace PowerGrid.Persistence.SqlServer
 {
     /// <summary>
     /// Reads and bulk writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPriceBulkPersister
+    public class StockPriceBulkPersister : StockPricePersister
     {
-        /*
-            Need to override PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items)
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        public StockPriceBulkPersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger
+        )
+            : base(connectionString, retryCount, retryInterval, operationTimeout, logger)
+        {
+        }
 
-            2x lists holding InsertItems and DeleteItems
-            Emitters should just add to these two lists
-                AND should persist when some buffer limit gets hit
-                AND the implementation needs a Flush() or similar method which can be explicitly called when comparison is finished
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        /// <param name="metricLogger">The logger for metrics.</param>
+        public StockPriceBulkPersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger
+        )
+            : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
+        {
+        }
 
-            Emitter just defines
-                void Emit(T instance)
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="dateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
+        /// <param name="sqlConnectionShim">A mock <see cref="ISqlConnectionShim"/>.</param>
+        /// <param name="sqlTransactionShim">A mock <see cref="ISqlTransactionShim"/>.</param>
+        /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
+        /// <remarks>This constructor is included to facilitate unit testing.</remarks>
+        public StockPriceBulkPersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger,
+            IDateTimeProvider dateTimeProvider,
+            ISqlConnectionShim sqlConnectionShim,
+            ISqlTransactionShim sqlTransactionShim,
+            ISqlCommandShim sqlCommandShim
+        ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
+        {
+        }
 
-            Is IN clause a good choice for deleting rows?
-              https://learn.microsoft.com/en-us/sql/t-sql/language-elements/in-transact-sql?view=sql-server-ver17#remarks
-        */
+        /// <inheritdoc/>
+        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items)
+        {
+            throw new NotImplementedException();
+        }
 
         #region Nested Classes
 
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which persists <see cref="StockPriceGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="BulkAddEmitter.Emit(StockPriceGridItem)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkAddEmitter : BulkPersistenceEmitterBase<StockPriceGridItem>
+        protected class BulkAddEmitter : BulkPersistenceStoredProcedureEmitterBase<StockPriceGridItem>
         {
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkAddEmitter class.
             /// </summary>
+            /// <param name="transactionTimestamp">The timestamp representing when the objects emitted were either inserted or deleted.</param>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
             /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
@@ -63,6 +127,7 @@ namespace PowerGrid.Persistence.SqlServer
             /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
             public BulkAddEmitter
             (
+                DateTime transactionTimestamp,
                 Int32 bufferSizeLimit, 
                 ISqlConnectionShim sqlConnectionShim, 
                 ISqlCommandShim sqlCommandShim, 
@@ -70,7 +135,7 @@ namespace PowerGrid.Persistence.SqlServer
                 SqlRetryLogicOption sqlRetryLogicOption,
                 EventHandler<SqlRetryingEventArgs> connectionRetryAction
             )
-                : base(bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
+                : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
             {
             }
 
@@ -95,11 +160,11 @@ namespace PowerGrid.Persistence.SqlServer
                 var parameters = new List<SqlParameter>()
                 {
                     CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
-                    //CreateSqlParameterWithValue("@TransactionTimestamp", SqlDbType.DateTime2, buffer.Peek().)
-
-                    // TODO: Need to add 'DateTime transactionTimestamp' as a param to base class
-                    //   Might want to do subtraction from TransTo value in here rather than SP
+                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
                 };
+                ExecuteStoredProcedureWithDeadlockRetry("BulkInsertStockPrices", parameters);
+                bulkInsertStagingTable.Rows.Clear();
+                buffer.Clear();
             }
 
             #endregion
@@ -108,11 +173,12 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="StockPriceGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(StockPriceGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkDeleteEmitter : BulkPersistenceEmitterBase<StockPriceGridItemPTO>
+        protected class BulkDeleteEmitter : BulkPersistenceStoredProcedureEmitterBase<StockPriceGridItemPTO>
         {
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkDeleteEmitter class.
             /// </summary>
+            /// <param name="transactionTimestamp">The timestamp representing when the objects emitted were either inserted or deleted.</param>
             /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItemPTO"/> objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
             /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
@@ -121,6 +187,7 @@ namespace PowerGrid.Persistence.SqlServer
             /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
             public BulkDeleteEmitter
             (
+                DateTime transactionTimestamp,
                 Int32 bufferSizeLimit, 
                 ISqlConnectionShim sqlConnectionShim, 
                 ISqlCommandShim sqlCommandShim, 
@@ -128,7 +195,7 @@ namespace PowerGrid.Persistence.SqlServer
                 SqlRetryLogicOption sqlRetryLogicOption,
                 EventHandler<SqlRetryingEventArgs> connectionRetryAction
             )
-                : base(bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
+                : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
             {
             }
 
@@ -139,260 +206,20 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             protected override void Persist()
             {
-                // TODO: See https://github.com/alastairwyse/ApplicationAccess/blob/main/ApplicationAccess.Persistence.Sql.SqlServer/SqlServerAccessManagerTemporalBulkPersister.cs#L229
-            }
-
-            #endregion
-        }
-
-        /// <summary>
-        /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then either insert objects into or delete objects from a SQL Server database in bulk.
-        /// </summary>
-        /// <typeparam name="T">The type of the object output in the <see cref="IEmitter{T}"/> implementation.</typeparam>
-        protected abstract class BulkPersistenceEmitterBase<T> : IEmitter<T>, IDisposable
-        {
-            /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
-            protected const String transactSql23DateStyle = "yyyy-MM-dd";
-            /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 24 time style</see>.</summary>
-            protected const String transactSql24TimeStyle = "HH:mm:ss";
-            /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
-            protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
-
-            #pragma warning disable 1591
-
-            // Names of columns in TVP tables used for bulk insert and delete
-            protected const String gridItemData1ColumnName = "GridItemData1";
-            protected const String gridItemData2ColumnName = "GridItemData2";
-            protected const String gridItemData3ColumnName = "GridItemData3";
-            protected const String gridItemData4ColumnName = "GridItemData4";
-            protected const String gridItemData5ColumnName = "GridItemData5";
-            protected const String gridItemData6ColumnName = "GridItemData6";
-            protected const String gridItemData7ColumnName = "GridItemData7";
-            protected const String gridItemData8ColumnName = "GridItemData8";
-            protected const String gridItemData9ColumnName = "GridItemData9";
-            protected const String gridItemData10ColumnName = "GridItemData10";
-            protected const String idColumnName = "Id";
-
-            // TVP table and columns
-            protected DataTable bulkInsertStagingTable;
-            protected DataColumn gridItemData1Column;
-            protected DataColumn gridItemData2Column;
-            protected DataColumn gridItemData3Column;
-            protected DataColumn gridItemData4Column;
-            protected DataColumn gridItemData5Column;
-            protected DataColumn gridItemData6Column;
-            protected DataColumn gridItemData7Column;
-            protected DataColumn gridItemData8Column;
-            protected DataColumn gridItemData9Column;
-            protected DataColumn gridItemData10Column;
-            protected DataTable bulkDeleteStagingTable;
-            protected DataColumn idColumn;
-
-            #pragma warning restore 1591
-
-            /// <summary>The buffer for objects emitted objects.</summary>
-            protected Queue<T> buffer;
-            /// <summary>The maximum number of objects to hold in the buffer.</summary>
-            protected Int32 bufferSizeLimit;
-            /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</summary>
-            protected ISqlConnectionShim sqlConnectionShim;
-            /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</summary>
-            protected ISqlCommandShim sqlCommandShim;
-            /// <summary>The connection to use to insert or delete.</summary>
-            protected SqlConnection sqlConnection;
-            /// <summary>Parameters for retrying when transient errors occur.</summary>
-            protected SqlRetryLogicOption sqlRetryLogicOption;
-            /// <summary>The action to invoke if an action is retried due to a transient error.</summary>
-            protected EventHandler<SqlRetryingEventArgs> connectionRetryAction;
-            /// <summary>Indicates whether the object has been disposed.</summary>
-            protected Boolean disposed;
-
-            /// <summary>
-            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkPersistenceEmitterBase class.
-            /// </summary>
-            /// <param name="bufferSizeLimit">The maximum number of objects to hold in the buffer.</param>
-            /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
-            /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
-            /// <param name="sqlConnection">The connection to use to insert or delete.</param>
-            /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
-            /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
-            public BulkPersistenceEmitterBase
-            (
-                Int32 bufferSizeLimit, 
-                ISqlConnectionShim sqlConnectionShim, 
-                ISqlCommandShim sqlCommandShim, 
-                SqlConnection sqlConnection, 
-                SqlRetryLogicOption sqlRetryLogicOption,
-                EventHandler<SqlRetryingEventArgs> connectionRetryAction
-            )
-            {
-                bulkInsertStagingTable = new DataTable();
-                gridItemData1Column = new DataColumn();
-                gridItemData2Column = new DataColumn();
-                gridItemData3Column = new DataColumn();
-                gridItemData4Column = new DataColumn();
-                gridItemData5Column = new DataColumn();
-                gridItemData6Column = new DataColumn();
-                gridItemData7Column = new DataColumn();
-                gridItemData8Column = new DataColumn();
-                gridItemData9Column = new DataColumn();
-                gridItemData10Column = new DataColumn();
-                bulkDeleteStagingTable = new DataTable();
-                idColumn = new DataColumn();
-                buffer = new Queue<T>();
-                this.bufferSizeLimit = bufferSizeLimit;
-                this.sqlConnectionShim = sqlConnectionShim;
-                this.sqlConnection = sqlConnection;
-                this.sqlRetryLogicOption = sqlRetryLogicOption;
-                disposed = false;
-            }
-
-            /// <summary>
-            /// Flushes any buffered objects by writing them to SQL Server.
-            /// </summary>
-            public void Flush()
-            {
-                Persist();
-            }
-
-            /// <inheritdoc/>
-            public void Emit(T instance)
-            {
-                buffer.Enqueue(instance);
-                if (buffer.Count == bufferSizeLimit)
+                foreach (StockPriceGridItemPTO currentGridItem in buffer)
                 {
-                    Persist();
-                    buffer.Clear();
+                    var row = bulkDeleteStagingTable.NewRow();
+                    row[idColumnName] = currentGridItem.Id;
+                    bulkDeleteStagingTable.Rows.Add(row);
                 }
-            }
-
-            #region Private/Protected Methods
-
-            /// <summary>
-            /// Persists/processes all buffered objects and then clears the buffer.
-            /// </summary>
-            protected abstract void Persist();
-
-            /// <summary>
-            /// Creates a <see cref="SqlParameter" />.
-            /// </summary>
-            /// <param name="parameterName">The name of the parameter.</param>
-            /// <param name="parameterType">The type of the parameter.</param>
-            /// <param name="parameterValue">The value of the parameter.</param>
-            /// <returns>The created parameter.</returns>
-            protected SqlParameter CreateSqlParameterWithValue(String parameterName, SqlDbType parameterType, Object parameterValue)
-            {
-                var returnParameter = new SqlParameter(parameterName, parameterType);
-                returnParameter.Value = parameterValue;
-
-                return returnParameter;
-            }
-
-            /// <summary>
-            /// Attempts to execute a stored procedure which does not return a result set, catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the retry logic specified in member <see cref=""/>.
-            /// </summary>
-            /// <param name="procedureName">The name of the stored procedure.</param>
-            /// <param name="parameters">The parameters to pass to the stored procedure.</param>
-            protected void ExecuteStoredProcedureWithDeadlockRetry(String procedureName, IEnumerable<SqlParameter> parameters)
-            {
-                const Int32 deadlockErrorNumber = 1205;
-
-                Int32 retryCount = sqlRetryLogicOption.NumberOfTries - 1;
-                var exceptions = new List<Exception>();
-                while (true)
+                var parameters = new List<SqlParameter>()
                 {
-                    try
-                    {
-                        using (var command = new SqlCommand(procedureName))
-                        {
-                            sqlCommandShim.SetCommandType(command, CommandType.StoredProcedure);
-                            foreach (SqlParameter currentParameter in parameters)
-                            {
-                                sqlCommandShim.AddParameter(command, currentParameter.ParameterName, currentParameter.SqlDbType, currentParameter.Value);
-                            }
-                            sqlCommandShim.SetConnection(command, sqlConnection);
-                            sqlCommandShim.ExecuteNonQuery(command);
-                            break;
-                        }
-                    }
-                    catch (SqlException sqlException)
-                    {
-                        if (sqlException.Errors.Count > 0 && sqlException.Errors[0].Number == deadlockErrorNumber)
-                        {
-                            exceptions.Add(sqlException);
-                            if (retryCount > 0)
-                            {
-                                var retryEventArgs = new SqlRetryingEventArgs(sqlRetryLogicOption.NumberOfTries - retryCount, new TimeSpan(0), exceptions);
-                                connectionRetryAction.Invoke(this, retryEventArgs);
-                                retryCount--;
-                            }
-                            else
-                            {
-                                String exceptionMessage = $"The number of deadlock retries has exceeded the maximum of {sqlRetryLogicOption.NumberOfTries} attempt(s).";
-                                throw new AggregateException(exceptionMessage, exceptions);
-                            }
-                        }
-                        else
-                        {
-                            throw;
-                        }
-                    }
-                }
-            }
-
-            #endregion
-
-            #region Finalize / Dispose Methods
-
-            /// <summary>
-            /// Releases the unmanaged resources used by the SqlServerAccessManagerTemporalBulkPersister.
-            /// </summary>
-            public void Dispose()
-            {
-                Dispose(true);
-                GC.SuppressFinalize(this);
-            }
-
-            #pragma warning disable 1591
-
-            ~BulkPersistenceEmitterBase()
-            {
-                Dispose(false);
-            }
-
-            #pragma warning restore 1591
-
-            /// <summary>
-            /// Provides a method to free unmanaged resources used by this class.
-            /// </summary>
-            /// <param name="disposing">Whether the method is being called as part of an explicit Dispose routine, and hence whether managed resources should also be freed.</param>
-            protected virtual void Dispose(bool disposing)
-            {
-                if (!disposed)
-                {
-                    if (disposing)
-                    {
-                        // Free other state (managed objects).
-                        gridItemData1Column.Dispose();
-                        gridItemData2Column.Dispose();
-                        gridItemData3Column.Dispose();
-                        gridItemData4Column.Dispose();
-                        gridItemData5Column.Dispose();
-                        gridItemData6Column.Dispose();
-                        gridItemData7Column.Dispose();
-                        gridItemData8Column.Dispose();
-                        gridItemData9Column.Dispose();
-                        gridItemData10Column.Dispose();
-                        bulkInsertStagingTable.Dispose();
-                        idColumn.Dispose();
-                        bulkDeleteStagingTable.Dispose();
-                    }
-                    // Free your own state (unmanaged objects).
-
-                    // Set large fields to null.
-
-                    disposed = true;
-                }
+                    CreateSqlParameterWithValue("@GridItemIds", SqlDbType.Structured, bulkDeleteStagingTable),
+                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
+                };
+                ExecuteStoredProcedureWithDeadlockRetry("BulkDeleteStockPrices", parameters);
+                bulkDeleteStagingTable.Rows.Clear();
+                buffer.Clear();
             }
 
             #endregion
