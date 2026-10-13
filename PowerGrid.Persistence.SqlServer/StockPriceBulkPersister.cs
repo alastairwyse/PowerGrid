@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
+using System.Linq;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
@@ -32,10 +33,14 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class StockPriceBulkPersister : StockPricePersister
     {
+        /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</summary>
+        protected Int32 bufferSizeLimit;
+
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
         /// </summary>
         /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</param>
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
@@ -43,6 +48,7 @@ namespace PowerGrid.Persistence.SqlServer
         public StockPriceBulkPersister
         (
             String connectionString,
+            Int32 bufferSizeLimit,
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
@@ -50,12 +56,16 @@ namespace PowerGrid.Persistence.SqlServer
         )
             : base(connectionString, retryCount, retryInterval, operationTimeout, logger)
         {
+            ValidateBufferSizeLimitParameter(bufferSizeLimit);
+
+            this.bufferSizeLimit = bufferSizeLimit; 
         }
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
         /// </summary>
         /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</param>
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
@@ -64,6 +74,7 @@ namespace PowerGrid.Persistence.SqlServer
         public StockPriceBulkPersister
         (
             String connectionString,
+            Int32 bufferSizeLimit,
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
@@ -72,12 +83,16 @@ namespace PowerGrid.Persistence.SqlServer
         )
             : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
         {
+            ValidateBufferSizeLimitParameter(bufferSizeLimit);
+
+            this.bufferSizeLimit = bufferSizeLimit;
         }
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
         /// </summary>
         /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</param>
         /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
         /// <param name="retryInterval">">The time in seconds between operation retries.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
@@ -89,6 +104,7 @@ namespace PowerGrid.Persistence.SqlServer
         public StockPriceBulkPersister
         (
             String connectionString,
+            Int32 bufferSizeLimit,
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
@@ -100,13 +116,137 @@ namespace PowerGrid.Persistence.SqlServer
             ISqlCommandShim sqlCommandShim
         ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
         {
+            ValidateBufferSizeLimitParameter(bufferSizeLimit);
+
+            this.bufferSizeLimit = bufferSizeLimit;
         }
 
         /// <inheritdoc/>
         public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items)
         {
-            throw new NotImplementedException();
+            if (items.Count == 0)
+                throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
+
+            using (var readConnection = new SqlConnection(connectionString))
+            using (var writeConnection = new SqlConnection(connectionString))
+            {
+                Int32 gridVersion;
+                GridComparisonStatistics comparisonStatistics;
+                try
+                {
+                    PrepareConnection(readConnection);
+                    sqlConnectionShim.Open(writeConnection);
+                    PrepareConnection(writeConnection, SessionDeadlockPriority.High);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+
+                DateTime transactionTimestamp = dateTimeProvider.UtcNow();
+                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
+                {
+                    BulkAddEmitter addedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, sqlRetryLogicOption, connectionRetryAction);
+
+
+                    Action<SqlConnection, SqlTransaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem> updatedGridItems, DateTime transactionDateTime) =>
+                    {
+                        UpdateGridItem(connection, transaction, updatedGridItems.Item1, updatedGridItems.Item2, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<Tuple<StockPriceGridItemPTO, StockPriceGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
+                    Action<SqlConnection, SqlTransaction, StockPriceGridItemPTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO deletedGridItem, DateTime transactionDateTime) =>
+                    {
+                        DeleteGridItem(connection, transaction, deletedGridItem, transactionDateTime);
+                    };
+                    DataBaseOperationEmitter<StockPriceGridItemPTO> deletedItemEmitter = new(writeConnection, transaction, transactionTimestamp, deletedItemEmitterOperationAction);
+                    GridComparer<StockPriceGridItemPTO, StockPriceGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+
+                    // Setup IEnumerable 'chains' 
+                    GridContentsValidator<StockPrice> newItemValidator = new();
+                    GridContentsDuplicateChecker<StockPrice> newItemsDuplicateChecker = new();
+                    // Order of below chain is 1 validate, 2 order, 3 dup check
+                    IEnumerable<StockPrice> newGridContents = newItemsDuplicateChecker.CheckForDuplicates
+                    (
+                        newItemValidator.ValidateItems
+                        (
+                            items,
+                            NewEntityValidationAction
+                        ).Order(Comparer<StockPrice>.Create
+                        (
+                            (StockPrice first, StockPrice second) => { return first.KeyCompareTo(second); }
+                        ))
+                    );
+                    IEnumerable<StockPriceGridItem> ConvertEntitiesToGridItems(IEnumerable<StockPrice> items)
+                    {
+                        foreach (StockPrice currentItem in items)
+                        {
+                            yield return ConvertEntityAndOuterKeyPropertiesToGridItem(gridOuterKeyProperties, currentItem);
+                        }
+                    }
+
+                    try
+                    {
+                        sqlConnectionShim.Open(readConnection);
+                        IEnumerable<StockPriceGridItemPTO> existingGridContents;
+                        try
+                        {
+                            existingGridContents = GetGrid(readConnection, gridOuterKeyProperties, transactionTimestamp);
+                        }
+                        catch (Exception e)
+                        {
+                            throw new Exception($"Failed to read existing {GridItemEntityName} grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
+                        }
+                        {
+                            try
+                            {
+                                comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertEntitiesToGridItems(newGridContents));
+                            }
+                            catch (Exception e)
+                            {
+                                Exception compareException = new($"Failed to compare new {GridItemEntityName} grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
+                                try
+                                {
+                                    // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
+                                    sqlTransactionShim.Rollback(transaction);
+                                }
+                                catch (Exception rollbackException)
+                                {
+                                    throw new AggregateException($"Failed to rollback transaction after exception comparing {GridItemEntityName} grid to existing data.", rollbackException, compareException);
+                                }
+                                throw compareException;
+                            }
+                        }
+                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, gridOuterKeyProperties, transactionTimestamp);
+                        sqlTransactionShim.Commit(transaction);
+
+                        sqlConnectionShim.Close(writeConnection);
+                        sqlConnectionShim.Close(readConnection);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception("Failed to persist grid to SQL Server.", e);
+                    }
+                }
+                TeardownConnection(readConnection);
+                TeardownConnection(writeConnection);
+
+                return (gridVersion, comparisonStatistics);
+            }
         }
+
+        #region Private/Protected Methods
+
+        #pragma warning disable 1591
+
+        protected void ValidateBufferSizeLimitParameter(Int32 bufferSizeLimit)
+        {
+            if (bufferSizeLimit < 1)
+                throw new ArgumentOutOfRangeException(nameof(bufferSizeLimit), bufferSizeLimit, $"Parameter '{nameof(bufferSizeLimit)}' with value {bufferSizeLimit} must be greater than 0.");
+        }
+
+        #pragma warning restore 1591
+
+        #endregion
 
         #region Nested Classes
 
