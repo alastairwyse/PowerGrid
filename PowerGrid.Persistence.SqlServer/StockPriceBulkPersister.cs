@@ -147,18 +147,13 @@ namespace PowerGrid.Persistence.SqlServer
                 using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
                 {
                     BulkAddEmitter addedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, sqlRetryLogicOption, connectionRetryAction);
-
-
+                    BulkDeleteEmitter deletedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, sqlRetryLogicOption, connectionRetryAction);
                     Action<SqlConnection, SqlTransaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem> updatedGridItems, DateTime transactionDateTime) =>
                     {
-                        UpdateGridItem(connection, transaction, updatedGridItems.Item1, updatedGridItems.Item2, transactionDateTime);
+                        deletedItemEmitter.Emit(updatedGridItems.Item1);
+                        addedItemEmitter.Emit(updatedGridItems.Item2);
                     };
                     DataBaseOperationEmitter<Tuple<StockPriceGridItemPTO, StockPriceGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
-                    Action<SqlConnection, SqlTransaction, StockPriceGridItemPTO, DateTime> deletedItemEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO deletedGridItem, DateTime transactionDateTime) =>
-                    {
-                        DeleteGridItem(connection, transaction, deletedGridItem, transactionDateTime);
-                    };
-                    DataBaseOperationEmitter<StockPriceGridItemPTO> deletedItemEmitter = new(writeConnection, transaction, transactionTimestamp, deletedItemEmitterOperationAction);
                     GridComparer<StockPriceGridItemPTO, StockPriceGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
 
                     // Setup IEnumerable 'chains' 
@@ -200,6 +195,8 @@ namespace PowerGrid.Persistence.SqlServer
                             try
                             {
                                 comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertEntitiesToGridItems(newGridContents));
+                                deletedItemEmitter.Flush();
+                                addedItemEmitter.Flush();
                             }
                             catch (Exception e)
                             {
