@@ -146,8 +146,8 @@ namespace PowerGrid.Persistence.SqlServer
                 DateTime transactionTimestamp = dateTimeProvider.UtcNow();
                 using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
                 {
-                    BulkAddEmitter addedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, sqlRetryLogicOption, connectionRetryAction);
-                    BulkDeleteEmitter deletedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, sqlRetryLogicOption, connectionRetryAction);
+                    BulkAddEmitter addedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
+                    BulkDeleteEmitter deletedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
                     Action<SqlConnection, SqlTransaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<StockPriceGridItemPTO, StockPriceGridItem> updatedGridItems, DateTime transactionDateTime) =>
                     {
                         deletedItemEmitter.Emit(updatedGridItems.Item1);
@@ -260,7 +260,9 @@ namespace PowerGrid.Persistence.SqlServer
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
             /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
+            /// <param name="sqlTransaction">The transaction to use to insert or delete.</param>
             /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
+            /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
             /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
             public BulkAddEmitter
             (
@@ -268,11 +270,13 @@ namespace PowerGrid.Persistence.SqlServer
                 Int32 bufferSizeLimit, 
                 ISqlConnectionShim sqlConnectionShim, 
                 ISqlCommandShim sqlCommandShim, 
-                SqlConnection sqlConnection, 
+                SqlConnection sqlConnection,
+                SqlTransaction sqlTransaction,
                 SqlRetryLogicOption sqlRetryLogicOption,
+                Int32 operationTimeout,
                 EventHandler<SqlRetryingEventArgs> connectionRetryAction
             )
-                : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
+                : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlTransaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction)
             {
             }
 
@@ -320,7 +324,9 @@ namespace PowerGrid.Persistence.SqlServer
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
             /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
+            /// <param name="sqlTransaction">The transaction to use to insert or delete.</param>
             /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
+            /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
             /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
             public BulkDeleteEmitter
             (
@@ -328,11 +334,13 @@ namespace PowerGrid.Persistence.SqlServer
                 Int32 bufferSizeLimit, 
                 ISqlConnectionShim sqlConnectionShim, 
                 ISqlCommandShim sqlCommandShim, 
-                SqlConnection sqlConnection, 
+                SqlConnection sqlConnection,
+                SqlTransaction sqlTransaction,
                 SqlRetryLogicOption sqlRetryLogicOption,
+                Int32 operationTimeout,
                 EventHandler<SqlRetryingEventArgs> connectionRetryAction
             )
-                : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlRetryLogicOption, connectionRetryAction)
+                : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlTransaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction)
             {
             }
 

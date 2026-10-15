@@ -82,8 +82,12 @@ namespace PowerGrid.Persistence.SqlServer
         protected ISqlCommandShim sqlCommandShim;
         /// <summary>The connection to use to insert or delete.</summary>
         protected SqlConnection sqlConnection;
+        /// <summary>The transaction to use to insert or delete.</summary>
+        protected SqlTransaction sqlTransaction;
         /// <summary>Parameters for retrying when transient errors occur.</summary>
         protected SqlRetryLogicOption sqlRetryLogicOption;
+        /// <summary>The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</summary>
+        protected Int32 operationTimeout;
         /// <summary>The action to invoke if an action is retried due to a transient error.</summary>
         protected EventHandler<SqlRetryingEventArgs> connectionRetryAction;
         /// <summary>Indicates whether the object has been disposed.</summary>
@@ -97,7 +101,9 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
         /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
         /// <param name="sqlConnection">The connection to use to insert or delete.</param>
+        /// <param name="sqlTransaction">The transaction to use to insert or delete.</param>
         /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
         /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
         public BulkPersistenceStoredProcedureEmitterBase
         (
@@ -106,7 +112,9 @@ namespace PowerGrid.Persistence.SqlServer
             ISqlConnectionShim sqlConnectionShim,
             ISqlCommandShim sqlCommandShim,
             SqlConnection sqlConnection,
+            SqlTransaction sqlTransaction,
             SqlRetryLogicOption sqlRetryLogicOption,
+            Int32 operationTimeout,
             EventHandler<SqlRetryingEventArgs> connectionRetryAction
         )
         {
@@ -132,7 +140,7 @@ namespace PowerGrid.Persistence.SqlServer
             bulkInsertStagingTable.Columns.Add(gridItemData9Column);
             bulkInsertStagingTable.Columns.Add(gridItemData10Column);
             bulkDeleteStagingTable = new DataTable();
-            idColumn = new DataColumn(gridItemData1ColumnName, typeof(Int64));
+            idColumn = new DataColumn(idColumnName, typeof(Int64));
             bulkDeleteStagingTable.Columns.Add(idColumn);
             this.transactionTimestamp = transactionTimestamp;
             buffer = new Queue<T>();
@@ -140,7 +148,9 @@ namespace PowerGrid.Persistence.SqlServer
             this.sqlConnectionShim = sqlConnectionShim;
             this.sqlCommandShim = sqlCommandShim;
             this.sqlConnection = sqlConnection;
+            this.sqlTransaction = sqlTransaction;
             this.sqlRetryLogicOption = sqlRetryLogicOption;
+            this.operationTimeout = operationTimeout;
             disposed = false;
         }
 
@@ -210,6 +220,8 @@ namespace PowerGrid.Persistence.SqlServer
                             sqlCommandShim.AddParameter(command, currentParameter.ParameterName, currentParameter.SqlDbType, currentParameter.Value);
                         }
                         sqlCommandShim.SetConnection(command, sqlConnection);
+                        sqlCommandShim.SetTransaction(command, sqlTransaction);
+                        sqlCommandShim.SetCommandTimeout(command, operationTimeout);
                         sqlCommandShim.ExecuteNonQuery(command);
                         break;
                     }

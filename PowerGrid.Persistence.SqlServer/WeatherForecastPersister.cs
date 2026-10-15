@@ -37,8 +37,6 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class WeatherForecastPersister : PersisterBase<WeatherForecast, GridCommonKeyProperties, WeatherForecastGridOuterKeyProperties, WeatherForecastGridItem, WeatherForecastGridItemPTO>
     {
-        #region TEMP Refactoring -> need to move to proper position in class
-
         const String tagParameterName = "@Tag";
         const String dateParameterName = "@Date";
         const String timeParameterName = "@Time";
@@ -52,6 +50,8 @@ namespace PowerGrid.Persistence.SqlServer
         const String countryColumnName = "Country";
         const String cityColumnName = "City";
         const String temperatureColumnName = "Temperature";
+
+        #region Base Class Property Implementations
 
         /// <inheritdoc/>
         protected override String GridItemTableName
@@ -287,6 +287,82 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
+        #endregion
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
+        /// </summary>
+        /// <param name="connectionString" >The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        public WeatherForecastPersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger
+        )
+            : base(connectionString, retryCount, retryInterval, operationTimeout, logger)
+        {
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        /// <param name="metricLogger">The logger for metrics.</param>
+        public WeatherForecastPersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger
+        )
+            : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
+        {
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="dateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
+        /// <param name="sqlConnectionShim">A mock <see cref="ISqlConnectionShim"/>.</param>
+        /// <param name="sqlTransactionShim">A mock <see cref="ISqlTransactionShim"/>.</param>
+        /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
+        /// <remarks>This constructor is included to facilitate unit testing.</remarks>
+        public WeatherForecastPersister
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger,
+            IDateTimeProvider dateTimeProvider,
+            ISqlConnectionShim sqlConnectionShim,
+            ISqlTransactionShim sqlTransactionShim,
+            ISqlCommandShim sqlCommandShim
+        ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
+        {
+        }
+
+        #region Private/Protected Methods
+
+        #region Base Class Method Implementations
+
         /// <inheritdoc/>
         protected override Action<WeatherForecast> NewEntityValidationAction
         {
@@ -362,78 +438,6 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #endregion
-
-        /// <summary>
-        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
-        /// </summary>
-        /// <param name="connectionString" >The string to use to connect to the SQL Server database.</param>
-        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
-        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
-        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
-        /// <param name="logger">The logger for general logging.</param>
-        public WeatherForecastPersister
-        (
-            String connectionString,
-            Int32 retryCount,
-            Int32 retryInterval,
-            Int32 operationTimeout,
-            IApplicationLogger logger
-        )
-            : base(connectionString, retryCount, retryInterval, operationTimeout, logger)
-        {
-        }
-
-        /// <summary>
-        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
-        /// </summary>
-        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
-        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
-        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
-        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
-        /// <param name="logger">The logger for general logging.</param>
-        /// <param name="metricLogger">The logger for metrics.</param>
-        public WeatherForecastPersister
-        (
-            String connectionString,
-            Int32 retryCount,
-            Int32 retryInterval,
-            Int32 operationTimeout,
-            IApplicationLogger logger,
-            IMetricLogger metricLogger
-        )
-            : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
-        {
-        }
-
-        /// <summary>
-        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastPersister class.
-        /// </summary>
-        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
-        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
-        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
-        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
-        /// <param name="dateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
-        /// <param name="sqlConnectionShim">A mock <see cref="ISqlConnectionShim"/>.</param>
-        /// <param name="sqlTransactionShim">A mock <see cref="ISqlTransactionShim"/>.</param>
-        /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
-        /// <remarks>This constructor is included to facilitate unit testing.</remarks>
-        public WeatherForecastPersister
-        (
-            String connectionString,
-            Int32 retryCount,
-            Int32 retryInterval,
-            Int32 operationTimeout,
-            IApplicationLogger logger,
-            IMetricLogger metricLogger,
-            IDateTimeProvider dateTimeProvider,
-            ISqlConnectionShim sqlConnectionShim,
-            ISqlTransactionShim sqlTransactionShim,
-            ISqlCommandShim sqlCommandShim
-        ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
-        {
-        }
-
-        #region Private/Protected Methods
 
         /// <summary>
         /// The text for a SQL query which returns the details of all grids for a set of outer key properties.

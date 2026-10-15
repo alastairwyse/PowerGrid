@@ -474,6 +474,8 @@ namespace PowerGrid.Persistence.SqlServer
 
         #region Private/Protected Methods
 
+        #region Abstract Poperties and Methods
+
         /// <summary>
         /// The name of the table which stores the grid items.
         /// </summary>
@@ -614,6 +616,8 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="entity">The <see cref="TEntity"/> to convert.</param>
         /// <returns>The <see cref="TGridItem"/>.</returns>
         protected abstract TGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(TOuterKeyProperties gridOuterKeyProperties, TEntity entity);
+
+        #endregion
 
         /// <inheritdoc/>
         public override void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties)
