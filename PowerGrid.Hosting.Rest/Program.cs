@@ -52,7 +52,7 @@ namespace PowerGrid.Hosting.Rest
             ILogger stockPricePersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<StockPricePersister>>();
             builder.Services.AddSingleton<StockPricePersister>
             (
-                new StockPriceBulkPersister(connectionString, 5, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
+                new StockPriceBulkPersister(connectionString, 1000, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
             );
             ILogger weatherForecastPersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<WeatherForecastPersister>>();
             builder.Services.AddSingleton<WeatherForecastPersister>

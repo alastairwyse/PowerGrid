@@ -3,6 +3,8 @@ using PowerGrid.Grids;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using ApplicationLogging;
 
 namespace PowerGrid.TestHarness
@@ -11,7 +13,38 @@ namespace PowerGrid.TestHarness
     {
         static void Main(string[] args)
         {
-            TestPersistGrid();
+            TestBulkApi();
+        }
+
+        static void TestBulkApi()
+        {
+            const Int32 itemCount = 1_000_000;
+            const String gridOuterKeyPropertiesPropertyName = "stockPriceGridOuterKeyProperties";
+            const String itemsPropertyName = "items";
+            const String companyPropertyName = "company";
+            const String pricePropertyName = "price";
+            const String tag = "VolumeTest";
+            const String dataSource = "TestHarness";
+            DateOnly date = DateOnly.Parse("2026-10-16");
+
+            // Generate the payload / body
+            JObject requestBody = new();
+            requestBody[gridOuterKeyPropertiesPropertyName] = new JObject();
+            requestBody[gridOuterKeyPropertiesPropertyName]["tag"] = tag;
+            requestBody[gridOuterKeyPropertiesPropertyName]["dataSource"] = dataSource;
+            requestBody[gridOuterKeyPropertiesPropertyName]["date"] = date.ToString("yyyy-MM-dd");
+            JArray items = new();
+            Random randGen = new();
+            for (Int32 i = 0; i < itemCount; i++)
+            {
+                JObject currentItem = new();
+                currentItem[companyPropertyName] = Guid.NewGuid().ToString();
+                currentItem[pricePropertyName] = randGen.NextDouble();
+                items.Add(currentItem);
+            }
+            requestBody[itemsPropertyName] = items;
+
+            Console.WriteLine(requestBody.ToString(Formatting.Indented));
         }
 
         static void TestPersistGrid()
