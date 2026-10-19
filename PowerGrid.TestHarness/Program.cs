@@ -1,4 +1,5 @@
-﻿using PowerGrid.Core.UnitTests;
+﻿using System.Diagnostics;
+using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
@@ -18,7 +19,8 @@ namespace PowerGrid.TestHarness
 
         static void TestBulkApi()
         {
-            const Int32 itemCount = 1_000_000;
+            const Int32 itemCount = 500_000;
+            //const Int32 itemCount = 100;
             const String gridOuterKeyPropertiesPropertyName = "stockPriceGridOuterKeyProperties";
             const String itemsPropertyName = "items";
             const String companyPropertyName = "company";
@@ -26,6 +28,7 @@ namespace PowerGrid.TestHarness
             const String tag = "VolumeTest";
             const String dataSource = "TestHarness";
             DateOnly date = DateOnly.Parse("2026-10-16");
+            const String requestUrl = "http://localhost:5000/api/v1/stockPrices";
 
             // Generate the payload / body
             JObject requestBody = new();
@@ -44,7 +47,25 @@ namespace PowerGrid.TestHarness
             }
             requestBody[itemsPropertyName] = items;
 
-            Console.WriteLine(requestBody.ToString(Formatting.Indented));
+            // Setup to call API
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            using (HttpClient client = new())
+            using (HttpRequestMessage request = new(HttpMethod.Post, requestUrl))
+            using (StringContent content = new(requestBody.ToString(Formatting.None)))
+            {
+                client.Timeout = TimeSpan.FromSeconds(300);
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+                request.Content = content;
+                using (HttpResponseMessage response = client.Send(request))
+                {
+                    if (response.IsSuccessStatusCode == false)
+                    {
+                        throw new Exception($"Error calling Powergrid API.  Received status code {response.StatusCode}.");
+                    }
+                }
+            }
+            stopwatch.Stop();
+            Console.WriteLine($"Completed call to Powergrid in {stopwatch.ElapsedMilliseconds} milliseconds.");
         }
 
         static void TestPersistGrid()

@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
@@ -113,6 +114,12 @@ namespace PowerGrid.Hosting.Rest
                 // Customize schema ids to avoid 'the same schemaId is already used for type' errors for shared DTO classes
                 //   see https://github.com/domaindrivendev/Swashbuckle.AspNetCore/issues/1607#issuecomment-607170559
                 swaggerGenOptions.CustomSchemaIds(i => i.FullName);
+            });
+
+            // Increase the maximum request body size
+            builder.WebHost.ConfigureKestrel(serverOptions =>
+            {
+                serverOptions.Limits.MaxRequestBodySize = 100_000_000; // Size in bytes
             });
 
             WebApplication app = builder.Build();
