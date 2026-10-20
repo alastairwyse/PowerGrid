@@ -122,6 +122,9 @@ namespace PowerGrid.Hosting.Rest
                 serverOptions.Limits.MaxRequestBodySize = 100_000_000; // Size in bytes
             });
 
+            // Add request decompression
+            builder.Services.AddRequestDecompression();
+
             WebApplication app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -144,6 +147,9 @@ namespace PowerGrid.Hosting.Rest
             }
             var middlewareUtilities = new MiddlewareUtilities();
             middlewareUtilities.SetupExceptionHandler(app, errorHandlingOptions, exceptionToHttpStatusCodeConverter, exceptionToHttpErrorResponseConverter);
+
+            // Add request decompression
+            app.UseRequestDecompression();
 
             app.MapControllers();
 

@@ -1,11 +1,13 @@
 ﻿using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using ApplicationLogging;
 
 namespace PowerGrid.TestHarness
@@ -29,6 +31,7 @@ namespace PowerGrid.TestHarness
             const String dataSource = "TestHarness";
             DateOnly date = DateOnly.Parse("2026-10-16");
             const String requestUrl = "http://localhost:5000/api/v1/stockPrices";
+            const Boolean compressBody = true;
 
             // Generate the payload / body
             JObject requestBody = new();
@@ -51,8 +54,23 @@ namespace PowerGrid.TestHarness
             Stopwatch stopwatch = Stopwatch.StartNew();
             using (HttpClient client = new())
             using (HttpRequestMessage request = new(HttpMethod.Post, requestUrl))
-            using (StringContent content = new(requestBody.ToString(Formatting.None)))
+            using (ByteArrayContent content = new StringContent(requestBody.ToString(Formatting.None)))
             {
+                if (compressBody == true)
+                {
+                    content.Dispose();
+                    using (MemoryStream memoryStream = new())
+                    using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize))
+                    using (System.IO.StreamWriter streamWriter = new(gZipStream))
+                    using (System.IO.StreamReader streamReader = new(gZipStream))
+                    {
+                        streamWriter.Write(requestBody.ToString(Formatting.None));
+                        memoryStream.Position = 0;
+
+                        content = new ByteArrayContent()
+                    }
+                }
+
                 client.Timeout = TimeSpan.FromSeconds(300);
                 content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
                 request.Content = content;

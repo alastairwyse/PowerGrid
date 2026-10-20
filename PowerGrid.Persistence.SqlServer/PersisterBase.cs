@@ -472,6 +472,72 @@ namespace PowerGrid.Persistence.SqlServer
             }
         }
 
+        /// <inheritdoc/>
+        public override void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var gridsDeleteCommand = new SqlCommand())
+            using (var gridItemsDeleteCommand = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                    {
+                        sqlCommandShim.SetCommandText(gridsDeleteCommand, HardDeleteGridsByOuterKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridsDeleteCommand);
+                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, gridsDeleteCommand, gridOuterKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridsDeleteCommand);
+                        sqlCommandShim.SetCommandText(gridItemsDeleteCommand, HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridItemsDeleteCommand);
+                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, gridItemsDeleteCommand, gridOuterKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridItemsDeleteCommand);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void HardDeleteGrids(TCommonKeyProperties gridCommonKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var gridsDeleteCommand = new SqlCommand())
+            using (var gridItemsDeleteCommand = new SqlCommand())
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                    {
+                        sqlCommandShim.SetCommandText(gridsDeleteCommand, HardDeleteGridsByCommonKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridsDeleteCommand);
+                        AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, gridsDeleteCommand, gridCommonKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridsDeleteCommand);
+                        sqlCommandShim.SetCommandText(gridItemsDeleteCommand, HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridItemsDeleteCommand);
+                        AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, gridItemsDeleteCommand, gridCommonKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridItemsDeleteCommand);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
+                }
+            }
+        }
+
         #region Private/Protected Methods
 
         #region Abstract Poperties and Methods
@@ -618,72 +684,6 @@ namespace PowerGrid.Persistence.SqlServer
         protected abstract TGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(TOuterKeyProperties gridOuterKeyProperties, TEntity entity);
 
         #endregion
-
-        /// <inheritdoc/>
-        public override void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties)
-        {
-            using (var connection = new SqlConnection(connectionString))
-            using (var gridsDeleteCommand = new SqlCommand())
-            using (var gridItemsDeleteCommand = new SqlCommand())
-            {
-                try
-                {
-                    PrepareConnection(connection);
-                    sqlConnectionShim.Open(connection);
-                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
-                    {
-                        sqlCommandShim.SetCommandText(gridsDeleteCommand, HardDeleteGridsByOuterKeyPropertiesStatementSqlText);
-                        PrepareCommand(connection, transaction, gridsDeleteCommand);
-                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, gridsDeleteCommand, gridOuterKeyProperties);
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridsDeleteCommand);
-                        sqlCommandShim.SetCommandText(gridItemsDeleteCommand, HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText);
-                        PrepareCommand(connection, transaction, gridItemsDeleteCommand);
-                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, gridItemsDeleteCommand, gridOuterKeyProperties);
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridItemsDeleteCommand);
-                        sqlTransactionShim.Commit(transaction);
-                        sqlConnectionShim.Close(connection);
-                    }
-
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
-                }
-            }
-        }
-
-        /// <inheritdoc/>
-        public override void HardDeleteGrids(TCommonKeyProperties gridCommonKeyProperties)
-        {
-            using (var connection = new SqlConnection(connectionString))
-            using (var gridsDeleteCommand = new SqlCommand())
-            using (var gridItemsDeleteCommand = new SqlCommand())
-            {
-                try
-                {
-                    PrepareConnection(connection);
-                    sqlConnectionShim.Open(connection);
-                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
-                    {
-                        sqlCommandShim.SetCommandText(gridsDeleteCommand, HardDeleteGridsByCommonKeyPropertiesStatementSqlText);
-                        PrepareCommand(connection, transaction, gridsDeleteCommand);
-                        AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, gridsDeleteCommand, gridCommonKeyProperties);
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridsDeleteCommand);
-                        sqlCommandShim.SetCommandText(gridItemsDeleteCommand, HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText);
-                        PrepareCommand(connection, transaction, gridItemsDeleteCommand);
-                        AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, gridItemsDeleteCommand, gridCommonKeyProperties);
-                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridItemsDeleteCommand);
-                        sqlTransactionShim.Commit(transaction);
-                        sqlConnectionShim.Close(connection);
-                    }
-
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
-                }
-            }
-        }
 
         /// <summary>
         /// Gets the latest grid version for the specified parameters.
