@@ -54,25 +54,14 @@ namespace PowerGrid.TestHarness
             Stopwatch stopwatch = Stopwatch.StartNew();
             using (HttpClient client = new())
             using (HttpRequestMessage request = new(HttpMethod.Post, requestUrl))
-            using (ByteArrayContent content = new StringContent(requestBody.ToString(Formatting.None)))
+            using (ByteArrayContent content = CreateContent(requestBody, compressBody))
             {
-                if (compressBody == true)
-                {
-                    content.Dispose();
-                    using (MemoryStream memoryStream = new())
-                    using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize))
-                    using (System.IO.StreamWriter streamWriter = new(gZipStream))
-                    using (System.IO.StreamReader streamReader = new(gZipStream))
-                    {
-                        streamWriter.Write(requestBody.ToString(Formatting.None));
-                        memoryStream.Position = 0;
-
-                        content = new ByteArrayContent()
-                    }
-                }
-
                 client.Timeout = TimeSpan.FromSeconds(300);
                 content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+                if (compressBody == true)
+                {
+                    content.Headers.ContentEncoding.Add("gzip");
+                }
                 request.Content = content;
                 using (HttpResponseMessage response = client.Send(request))
                 {
@@ -135,6 +124,27 @@ namespace PowerGrid.TestHarness
             GridCommonKeyProperties commonKeyProps = new("Test");
             persister.HardDeleteGrids(commonKeyProps);
             */
+        }
+
+        protected static ByteArrayContent CreateContent(JObject jsonBody, Boolean compressContent)
+        {
+            if (compressContent == false)
+            {
+                return new StringContent(jsonBody.ToString(Formatting.None));
+            }
+            else
+            {
+                using (MemoryStream memoryStream = new())
+                using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize))
+                using (System.IO.StreamWriter streamWriter = new(gZipStream))
+                {
+                    streamWriter.Write(jsonBody.ToString(Formatting.None));
+                    streamWriter.Flush();
+                    memoryStream.Position = 0;
+
+                    return new ByteArrayContent(memoryStream.ToArray());
+                }
+            }
         }
     }
 }
