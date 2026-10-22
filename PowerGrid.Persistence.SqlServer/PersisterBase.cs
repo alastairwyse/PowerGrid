@@ -23,6 +23,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
+using PowerGrid.Persistence.Metrics;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.SqlServer.Metrics;
 using ApplicationLogging;
@@ -823,6 +824,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
         protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, TGridItem item, DateTime insertDateTime)
         {
+            Guid beginId = metricLogger.Begin(new GridItemInsertTime());
             try
             {
                 using (var command = new SqlCommand())
@@ -838,8 +840,11 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
+                metricLogger.CancelBegin(beginId, new GridItemInsertTime());
                 throw new Exception($"Failed to insert {item.ToString()} into SQL Server.", e);
             }
+            metricLogger.End(beginId, new GridItemInsertTime());
+            metricLogger.Increment(new GridItemInserted());
         }
 
         /// <summary>
