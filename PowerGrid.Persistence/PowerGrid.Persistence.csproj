@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PowerGrid.Core\PowerGrid.Core.csproj" />
     <ProjectReference Include="..\PowerGrid.Grids\PowerGrid.Grids.csproj" />
+    <ProjectReference Include="..\PowerGrid.Persistence.Metrics\PowerGrid.Persistence.Metrics.csproj" />
   </ItemGroup>
 
 </Project>

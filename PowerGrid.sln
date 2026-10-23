@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Persistence.SqlSe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Hosting.Rest", "PowerGrid.Hosting.Rest\PowerGrid.Hosting.Rest.csproj", "{074DB4E4-286B-437A-B43B-EC9960968596}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerGrid.Persistence.Metrics", "PowerGrid.Persistence.Metrics\PowerGrid.Persistence.Metrics.csproj", "{02547772-9920-4CFF-BD96-0D7623B6B7D6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,10 @@ Global
 		{074DB4E4-286B-437A-B43B-EC9960968596}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{074DB4E4-286B-437A-B43B-EC9960968596}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{074DB4E4-286B-437A-B43B-EC9960968596}.Release|Any CPU.Build.0 = Release|Any CPU
+		{02547772-9920-4CFF-BD96-0D7623B6B7D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{02547772-9920-4CFF-BD96-0D7623B6B7D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{02547772-9920-4CFF-BD96-0D7623B6B7D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{02547772-9920-4CFF-BD96-0D7623B6B7D6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
