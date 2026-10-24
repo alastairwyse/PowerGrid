@@ -301,12 +301,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
-            mockSqlTransactionShim.Received(1).Commit(null);
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
             mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), null);
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
+            mockSqlTransactionShim.Received(1).Commit(null);
+            mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
             Assert.That(resultVersion == 2);
             Assert.That(resultStatistics.ItemsAddedCount == 1);
             Assert.That(resultStatistics.ItemsUpdatedCount == 1);
