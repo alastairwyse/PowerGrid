@@ -137,7 +137,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY Company;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
@@ -218,7 +218,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY Company;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
@@ -269,19 +269,26 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
             const String hitachiCompany = "Hitachi";
+            const String hondaCompany = "Honda";
+            const String mitsubishiCompany = "Mitsubishi";
             const String sonyCompany = "Sony";
+            const String sumitomoCompany = "Sumitomo";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
             DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-05-16 16:36:41.0000023");
             List<StockPrice> testGridItems = new()
             {
-                new StockPrice(canonCompany, 4441),
-                new StockPrice(hitachiCompany, 4732)
+                new StockPrice(hondaCompany, 1780),
+                new StockPrice(mitsubishiCompany, 4732),
+                new StockPrice(sonyCompany, 4137),
+                new StockPrice(sumitomoCompany, 1691)
             };
             List<StockPriceGridItemPTO> existingGridItems = new()
             {
-                new StockPriceGridItemPTO(1L, testTag, testDataSource, testDate, hitachiCompany, 4733, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
-                new StockPriceGridItemPTO(2L, testTag, testDataSource, testDate, sonyCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
+                new StockPriceGridItemPTO(1L, testTag, testDataSource, testDate, canonCompany, 4947, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
+                new StockPriceGridItemPTO(2L, testTag, testDataSource, testDate, hitachiCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
+                new StockPriceGridItemPTO(3L, testTag, testDataSource, testDate, hondaCompany, 1798, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
+                new StockPriceGridItemPTO(4L, testTag, testDataSource, testDate, mitsubishiCompany, 4715, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
             };
             String expectedReadExistingGridCommandText = @$"
             SELECT Id, 
@@ -298,7 +305,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY Company;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -330,10 +337,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns
             (
-                // Call to get existing grid contents
-                true, true, false,
                 // Call to get existing grid max id
-                true, false
+                true, false,
+                // Call to get existing grid contents
+                true, true, true, true, false
             );
             mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
             mockDataReader["Tag"].Returns<Object>(testTag);
@@ -350,29 +357,31 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.Received(2).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
             mockSqlConnectionShim.Received(4).GetRetryLogicProvider(Arg.Any<SqlConnection>());
             mockSqlConnectionShim.Received(2).Open(Arg.Any<SqlConnection>());
-            mockSqlCommandShim.Received(2).ExecuteReader(Arg.Any<SqlCommand>());
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
             mockSqlCommandShim.Received(8).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
             mockSqlCommandShim.Received(8).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
             mockSqlCommandShim.Received(6).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlConnectionShim.Received(1).BeginTransaction(Arg.Any<SqlConnection>());
-
-
-            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
-            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
-            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
-            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
-            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
-            mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), null);
-            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
+            mockSqlCommandShim.Received(4).SetCommandType(Arg.Any<SqlCommand>(), CommandType.StoredProcedure);
+            // calling sp -> could I check the values in the DataTable with an Action? -> or maybe at least count of rows
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@GridItems", SqlDbType.Structured, Arg.Any<DataTable>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@GridItemIds", SqlDbType.Structured, Arg.Any<DataTable>());
+            mockSqlCommandShim.Received(4).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.DateTime2, transactionTimeStamp);
+            mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
+            mockSqlCommandShim.Received(3).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(3).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(3).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(2).ExecuteReader(Arg.Any<SqlCommand>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlTransactionShim.Received(1).Commit(null);
             mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
             Assert.That(resultVersion == 2);
-            Assert.That(resultStatistics.ItemsAddedCount == 1);
-            Assert.That(resultStatistics.ItemsUpdatedCount == 1);
-            Assert.That(resultStatistics.ItemsDeletedCount == 1);
+            Assert.That(resultStatistics.ItemsAddedCount == 2);
+            Assert.That(resultStatistics.ItemsUpdatedCount == 4);
+            Assert.That(resultStatistics.ItemsDeletedCount == 2);
         }
     }
 }

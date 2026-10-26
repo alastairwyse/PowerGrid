@@ -136,7 +136,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY Company;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
@@ -217,7 +217,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY Company;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
             WHERE   Tag = @Tag 
@@ -297,7 +297,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
               AND  [Date] = CONVERT(date, @Date, 23) 
               AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
             ORDER  BY Company;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -327,6 +327,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+
+            // Is below order correct?  Does max id query comes before existing grid contents?  Need to check...
+            Assert.Fail();
+
             mockDataReader.Read().Returns
             (
                 // Call to get existing grid contents
@@ -359,7 +363,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
-            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
             mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), null);
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
@@ -1644,7 +1648,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1661,7 +1665,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                     testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
                 });
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
@@ -1681,7 +1685,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1719,7 +1723,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                     testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
                 });
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
@@ -1745,7 +1749,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1778,7 +1782,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 Int32 result = testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
@@ -1803,7 +1807,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
             StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
                 WHERE   Tag = @Tag 
@@ -1835,7 +1839,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 Int32 result = testStockPricePersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);

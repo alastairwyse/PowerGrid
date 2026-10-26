@@ -79,7 +79,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
                            City;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -159,7 +159,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
                            City;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -238,7 +238,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
                 ORDER   BY Country, 
                            City;";
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -301,7 +301,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
-            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
             mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), null);
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
@@ -1577,7 +1577,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021");
             WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -1594,7 +1594,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                     testWeatherForecastPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
                 });
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
@@ -1614,7 +1614,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021");
             WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -1652,7 +1652,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                     testWeatherForecastPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
                 });
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
@@ -1678,7 +1678,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021");
             WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -1711,7 +1711,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 Int32 result = testWeatherForecastPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
@@ -1736,7 +1736,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
             DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-09-02 22:27:28.0000021");
             WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
-            String expectedMaxIdQueryText = @$"
+            String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
                 WHERE   Tag = @Tag 
@@ -1768,7 +1768,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 Int32 result = testWeatherForecastPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
 
-                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxIdQueryText);
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
                 mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
                 mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
                 mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
