@@ -17,6 +17,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
+using System.Linq.Expressions;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
@@ -337,17 +339,17 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns
             (
-                // Call to get existing grid max id
-                true, false,
                 // Call to get existing grid contents
-                true, true, true, true, false
+                true, true, true, true, false,
+                // Call to get existing grid max id
+                true, false
             );
             mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
             mockDataReader["Tag"].Returns<Object>(testTag);
             mockDataReader["DataSource"].Returns<Object>(testDataSource);
             mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
-            mockDataReader["Company"].Returns<Object>(existingGridItems[0].Company, existingGridItems[1].Company);
-            mockDataReader["Price"].Returns<Object>(existingGridItems[0].Price, existingGridItems[1].Price);
+            mockDataReader["Company"].Returns<Object>(existingGridItems[0].Company, existingGridItems[1].Company, existingGridItems[2].Company, existingGridItems[3].Company);
+            mockDataReader["Price"].Returns<Object>(existingGridItems[0].Price, existingGridItems[1].Price, existingGridItems[2].Price, existingGridItems[3].Price);
             mockDataReader["TransactionFrom"].Returns<Object>("2026-05-15T09:05:40.0000012");
             mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
             mockDataReader["MaxVersion"].Returns<Object>(1);
@@ -364,7 +366,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.Received(1).BeginTransaction(Arg.Any<SqlConnection>());
             mockSqlCommandShim.Received(4).SetCommandType(Arg.Any<SqlCommand>(), CommandType.StoredProcedure);
             // calling sp -> could I check the values in the DataTable with an Action? -> or maybe at least count of rows
-            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@GridItems", SqlDbType.Structured, Arg.Any<DataTable>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@GridItems", SqlDbType.Structured, Arg.Is<DataTable>(DataTableWithRowCount(3)));
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@GridItemIds", SqlDbType.Structured, Arg.Any<DataTable>());
             mockSqlCommandShim.Received(4).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.DateTime2, transactionTimeStamp);
             mockSqlCommandShim.Received(5).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
@@ -380,8 +382,43 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
             Assert.That(resultVersion == 2);
             Assert.That(resultStatistics.ItemsAddedCount == 2);
-            Assert.That(resultStatistics.ItemsUpdatedCount == 4);
+            Assert.That(resultStatistics.ItemsUpdatedCount == 2);
             Assert.That(resultStatistics.ItemsDeletedCount == 2);
         }
+
+        #region Private/Protected Methods
+
+        protected Expression<Predicate<DataTable>> DataTableWithRowCount(Int32 expectedRowCount)
+        {
+            // return (DataTable actual) => actual.Rows.Count == expectedRowCount;
+            return (DataTable actual) => EnableDebugging(actual, expectedRowCount);
+        }
+
+        protected Boolean EnableDebugging(DataTable actual, Int32 expectedRowCount)
+        {
+            return actual.Rows.Count == expectedRowCount;
+        }
+
+        /*
+        /// <summary>
+        /// NSubstitute argument matcher for <see cref="DataTable"/> arguments, which checks that the argument has a specified row count.
+        /// </summary>
+        /// <param name="expectedRowCount">The number of rows the argument is expected to have.</param>
+        protected class DataTableWithRowCount(Int32 expectedRowCount) : IArgumentMatcher<DataTable>, IDescribeNonMatches
+        {
+            /// <inheritdoc/>
+            public String DescribeFor(Object argument)
+            {
+                return $"{nameof(DataTable)} parameter was expected to contain {expectedRowCount} rows, but contained {((DataTable)argument).Rows.Count}";
+            }
+
+            /// <inheritdoc/>
+            public Boolean IsSatisfiedBy(DataTable? argument)
+            {
+                return (argument != null && argument.Rows.Count == expectedRowCount);
+            }
+        }
+        */
+        #endregion
     }
 }
