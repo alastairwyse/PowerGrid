@@ -62,23 +62,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Kobe", 22, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")), 
                 new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 23, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
             };
-            String expectedReadExistingGridCommandText = @$"
-                SELECT  Id, 
-                        Tag, 
-                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
-                        Country, 
-                        City, 
-                        Temperature, 
-                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM    WeatherForecasts 
-                WHERE   Tag = @Tag 
-                  AND   [Date] = CONVERT(date, @Date, 23) 
-                  AND   [Time] = CONVERT(time, @Time, 24) 
-                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
-                ORDER   BY Country, 
-                           City;";
             String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
@@ -142,23 +125,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Kobe", 22, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")), 
                 new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 23, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
             };
-            String expectedReadExistingGridCommandText = @$"
-                SELECT  Id, 
-                        Tag, 
-                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
-                        Country, 
-                        City, 
-                        Temperature, 
-                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM    WeatherForecasts 
-                WHERE   Tag = @Tag 
-                  AND   [Date] = CONVERT(date, @Date, 23) 
-                  AND   [Time] = CONVERT(time, @Time, 24) 
-                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
-                ORDER   BY Country, 
-                           City;";
             String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 
@@ -221,23 +187,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Himeji", 20, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
                 new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 21, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
             };
-            String expectedReadExistingGridCommandText = @$"
-                SELECT  Id, 
-                        Tag, 
-                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                        CONVERT(nvarchar(30), [Time], 24) AS [Time], 
-                        Country, 
-                        City, 
-                        Temperature, 
-                        CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                        CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-                FROM    WeatherForecasts 
-                WHERE   Tag = @Tag 
-                  AND   [Date] = CONVERT(date, @Date, 23) 
-                  AND   [Time] = CONVERT(time, @Time, 24) 
-                  AND   CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
-                ORDER   BY Country, 
-                           City;";
             String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    WeatherForecastGrids 

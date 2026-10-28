@@ -121,21 +121,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new StockPriceGridItemPTO(1L, testTag, testDataSource, testDate, hitachiCompany, 4733, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
                 new StockPriceGridItemPTO(2L, testTag, testDataSource, testDate, sonyCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
             };
-            String expectedReadExistingGridCommandText = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = @Tag 
-              AND  DataSource = @DataSource
-              AND  [Date] = CONVERT(date, @Date, 23) 
-              AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company;";
             String expectedMaxVersionQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -202,21 +187,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new StockPriceGridItemPTO(1L, testTag, testDataSource, testDate, hitachiCompany, 4733, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
                 new StockPriceGridItemPTO(2L, testTag, testDataSource, testDate, sonyCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
             };
-            String expectedReadExistingGridCommandText = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = @Tag 
-              AND  DataSource = @DataSource
-              AND  [Date] = CONVERT(date, @Date, 23) 
-              AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company;";
             String expectedMaxVersionQueryText = @$"
             SELECT  MAX([Version]) AS MaxVersion 
             FROM    StockPriceGrids 
@@ -282,21 +252,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new StockPriceGridItemPTO(1L, testTag, testDataSource, testDate, hitachiCompany, 4733, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
                 new StockPriceGridItemPTO(2L, testTag, testDataSource, testDate, sonyCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
             };
-            String expectedReadExistingGridCommandText = @$"
-            SELECT Id, 
-                   Tag, 
-                   DataSource, 
-                   CONVERT(nvarchar(30), [Date], 23) AS [Date], 
-                   Company, 
-                   Price, 
-                   CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
-                   CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
-            FROM   StockPrices 
-            WHERE  Tag = @Tag 
-              AND  DataSource = @DataSource 
-              AND  [Date] = CONVERT(date, @Date, 23) 
-              AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo
-            ORDER  BY Company;";
             String expectedMaxVersionQueryText = @$"
                 SELECT  MAX([Version]) AS MaxVersion 
                 FROM    StockPriceGrids 
@@ -327,10 +282,6 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
-
-            // Is below order correct?  Does max id query comes before existing grid contents?  Need to check...
-            Assert.Fail();
-
             mockDataReader.Read().Returns
             (
                 // Call to get existing grid contents
