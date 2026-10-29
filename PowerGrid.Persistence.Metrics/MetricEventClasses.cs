@@ -51,5 +51,65 @@ namespace PowerGrid.Persistence.Metrics
         }
     }
 
+    /// <summary>
+    /// Count metric which records that an item was updated in a grid as part of a PersistGrid() operation".
+    /// </summary>
+    public class GridItemUpdated : CountMetric
+    {
+        protected static String staticName = "GridItemUpdated";
+        protected static String staticDescription = "An item was updated in a grid as part of a PersistGrid() operation";
+
+        public GridItemUpdated()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to update an item in a grid as part of a PersistGrid() operation.
+    /// </summary>
+    public class GridItemUpdateTime : IntervalMetric
+    {
+        protected static String staticName = "GridItemUpdateTime";
+        protected static String staticDescription = "The time taken to update an item in a grid as part of a PersistGrid() operation";
+
+        public GridItemUpdateTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that an item was deleted from a grid as part of a PersistGrid() operation".
+    /// </summary>
+    public class GridItemDeleted : CountMetric
+    {
+        protected static String staticName = "GridItemDeleted";
+        protected static String staticDescription = "An item was deleted from a grid as part of a PersistGrid() operation";
+
+        public GridItemDeleted()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to delete an item from a grid as part of a PersistGrid() operation.
+    /// </summary>
+    public class GridItemDeleteTime : IntervalMetric
+    {
+        protected static String staticName = "GridItemDeleteTime";
+        protected static String staticDescription = "The time taken to delete an item from a grid as part of a PersistGrid() operation";
+
+        public GridItemDeleteTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
     #pragma warning restore 1591
 }

@@ -857,6 +857,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
         protected void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO supersededItem, TGridItem newItem, DateTime udpateDateTime)
         {
+            Guid beginId = metricLogger.Begin(new GridItemUpdateTime());
             try
             {
                 DeleteGridItem(connection, transaction, supersededItem, udpateDateTime);
@@ -864,8 +865,11 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
+                metricLogger.CancelBegin(beginId, new GridItemUpdateTime());
                 throw new Exception($"Failed to update {GridItemEntityName} with id '{supersededItem.Id}' in SQL Server.", e);
             }
+            metricLogger.End(beginId, new GridItemUpdateTime());
+            metricLogger.Increment(new GridItemDeleted());
         }
 
         /// <summary>
@@ -882,6 +886,7 @@ namespace PowerGrid.Persistence.SqlServer
             SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
             WHERE   Id = {idParameterName};";
 
+            Guid beginId = metricLogger.Begin(new GridItemDeleteTime());
             try
             {
                 using (var command = new SqlCommand())
@@ -895,8 +900,11 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
+                metricLogger.CancelBegin(beginId, new GridItemDeleteTime());
                 throw new Exception($"Failed to delete {GridItemEntityName} with id '{item.Id}' in SQL Server.", e);
             }
+            metricLogger.End(beginId, new GridItemDeleteTime());
+            metricLogger.Increment(new GridItemDeleted());
         }
 
         /// <summary>
