@@ -22,7 +22,7 @@ namespace PowerGrid.Persistence.Metrics
     #pragma warning disable 1591
 
     /// <summary>
-    /// Count metric which records that an item was inserted into a grid as part of a PersistGrid() operation".
+    /// Count metric which records that an item was inserted into a grid as part of a PersistGrid() operation.
     /// </summary>
     public class GridItemInserted : CountMetric
     {
@@ -52,7 +52,7 @@ namespace PowerGrid.Persistence.Metrics
     }
 
     /// <summary>
-    /// Count metric which records that an item was updated in a grid as part of a PersistGrid() operation".
+    /// Count metric which records that an item was updated in a grid as part of a PersistGrid() operation.
     /// </summary>
     public class GridItemUpdated : CountMetric
     {
@@ -82,7 +82,7 @@ namespace PowerGrid.Persistence.Metrics
     }
 
     /// <summary>
-    /// Count metric which records that an item was deleted from a grid as part of a PersistGrid() operation".
+    /// Count metric which records that an item was deleted from a grid as part of a PersistGrid() operation.
     /// </summary>
     public class GridItemDeleted : CountMetric
     {
@@ -105,6 +105,51 @@ namespace PowerGrid.Persistence.Metrics
         protected static String staticDescription = "The time taken to delete an item from a grid as part of a PersistGrid() operation";
 
         public GridItemDeleteTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to retrieve the current maximum grid version from persistent storage.
+    /// </summary>
+    public class GridMaximumVersionRetrieveTime : IntervalMetric
+    {
+        protected static String staticName = "GridMaximumVersionRetrieveTime";
+        protected static String staticDescription = "The time taken to retrieve the current maximum grid version from persistent storage";
+
+        public GridMaximumVersionRetrieveTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to create a grid in persistent storage.
+    /// </summary>
+    public class GridCreateTime : IntervalMetric
+    {
+        protected static String staticName = "GridCreateTime";
+        protected static String staticDescription = "The time taken to create a grid in persistent storage";
+
+        public GridCreateTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that a grid was created in persistent storage.
+    /// </summary>
+    public class GridCreated : CountMetric
+    {
+        protected static String staticName = "GridCreated";
+        protected static String staticDescription = "A grid was created in persistent storage";
+
+        public GridCreated()
         {
             base.name = staticName;
             base.description = staticDescription;

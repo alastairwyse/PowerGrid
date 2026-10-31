@@ -921,6 +921,7 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 gridVersionNumber = 1;
             using (var command = new SqlCommand())
             {
+                Guid maxVersionBeginId = metricLogger.Begin(new GridMaximumVersionRetrieveTime());
                 try
                 {
                     sqlCommandShim.SetCommandText(command, GridMaxVersionQuery + ";");
@@ -939,10 +940,13 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(maxVersionBeginId, new GridMaximumVersionRetrieveTime());
                     throw new Exception($"Failed to retrieve latest grid version number while inserting {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} into SQL Server.", e);
                 }
+                metricLogger.End(maxVersionBeginId, new GridMaximumVersionRetrieveTime());
             }
 
+            Guid gridCreateBeginId = metricLogger.Begin(new GridCreateTime());
             try
             {
                 using (var command = new SqlCommand())
@@ -957,8 +961,11 @@ namespace PowerGrid.Persistence.SqlServer
             }
             catch (Exception e)
             {
+                metricLogger.CancelBegin(gridCreateBeginId, new GridCreateTime());
                 throw new Exception($"Failed to insert {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} and version {gridVersionNumber} into SQL Server.", e);
             }
+            metricLogger.End(gridCreateBeginId, new GridCreateTime());
+            metricLogger.Increment(new GridCreated());
 
             return gridVersionNumber;
         }
