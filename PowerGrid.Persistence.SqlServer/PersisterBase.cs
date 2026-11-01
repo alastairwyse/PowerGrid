@@ -453,6 +453,7 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand())
                 using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
                 {
+                    Guid beginId = metricLogger.Begin(new LatestGridSoftDeleteTime());
                     try
                     {
                         DateTime deleteTimestamp = dateTimeProvider.UtcNow();
@@ -467,8 +468,11 @@ namespace PowerGrid.Persistence.SqlServer
                     }
                     catch (Exception e)
                     {
+                        metricLogger.CancelBegin(beginId, new LatestGridSoftDeleteTime());
                         throw new Exception($"Failed to delete latest grid items for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
                     }
+                    metricLogger.End(beginId, new LatestGridSoftDeleteTime());
+                    metricLogger.Increment(new LatestGridSoftDeleted());
                 }
             }
         }

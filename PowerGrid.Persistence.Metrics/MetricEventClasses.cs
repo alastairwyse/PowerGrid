@@ -22,6 +22,36 @@ namespace PowerGrid.Persistence.Metrics
     #pragma warning disable 1591
 
     /// <summary>
+    /// Interval metric which records the time taken to soft delete the latest grid defined by outer key properties from persistent storage.
+    /// </summary>
+    public class LatestGridSoftDeleteTime : IntervalMetric
+    {
+        protected static String staticName = "LatestGridSoftDeleteTime";
+        protected static String staticDescription = "The time taken to soft delete the latest grid defined by outer key properties from persistent storage";
+
+        public LatestGridSoftDeleteTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that the latest grid defined by outer key properties was soft deleted from persistent storage.
+    /// </summary>
+    public class LatestGridSoftDeleted : CountMetric
+    {
+        protected static String staticName = "LatestGridSoftDeleted";
+        protected static String staticDescription = "The latest grid defined by outer key properties was soft deleted from persistent storage";
+
+        public LatestGridSoftDeleted()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
     /// Interval metric which records the time taken to hard delete a set of grids defined by outer key properties from persistent storage.
     /// </summary>
     public class GridsHardDeleteByOuterKeyPropertiesTime : IntervalMetric
