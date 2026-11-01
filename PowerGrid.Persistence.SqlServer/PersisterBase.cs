@@ -480,6 +480,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var gridsDeleteCommand = new SqlCommand())
             using (var gridItemsDeleteCommand = new SqlCommand())
             {
+                Guid beginId = metricLogger.Begin(new GridsHardDeleteByOuterKeyPropertiesTime());
                 try
                 {
                     PrepareConnection(connection);
@@ -497,12 +498,14 @@ namespace PowerGrid.Persistence.SqlServer
                         sqlTransactionShim.Commit(transaction);
                         sqlConnectionShim.Close(connection);
                     }
-
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(beginId, new GridsHardDeleteByOuterKeyPropertiesTime());
                     throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
                 }
+                metricLogger.End(beginId, new GridsHardDeleteByOuterKeyPropertiesTime());
+                metricLogger.Increment(new GridsHardDeletedByOuterKeyProperties());
             }
         }
 
@@ -513,6 +516,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var gridsDeleteCommand = new SqlCommand())
             using (var gridItemsDeleteCommand = new SqlCommand())
             {
+                Guid beginId = metricLogger.Begin(new GridsHardDeleteByCommonKeyPropertiesTime());
                 try
                 {
                     PrepareConnection(connection);
@@ -534,8 +538,11 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(beginId, new GridsHardDeleteByCommonKeyPropertiesTime());
                     throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
                 }
+                metricLogger.End(beginId, new GridsHardDeleteByCommonKeyPropertiesTime());
+                metricLogger.Increment(new GridsHardDeletedByCommonKeyProperties());
             }
         }
 
@@ -699,6 +706,7 @@ namespace PowerGrid.Persistence.SqlServer
 
             using (var command = new SqlCommand())
             {
+                Guid beginId = metricLogger.Begin(new GridMaximumVersionAndTransactionTimestampRetrieveTime());
                 try
                 {
                     sqlCommandShim.SetCommandText(command, GridMaxVersionAndTransactionTimestampQuery);
@@ -722,11 +730,14 @@ namespace PowerGrid.Persistence.SqlServer
                             alreadyReadResult = true;
                         }
                     }
+                    metricLogger.End(beginId, new GridMaximumVersionAndTransactionTimestampRetrieveTime());
+                    metricLogger.Increment(new GridMaximumVersionAndTransactionTimestampRetrieved());
 
                     return (latestGridVersionNumber, latestGridTransactionTimestamp);
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(beginId, new GridMaximumVersionAndTransactionTimestampRetrieveTime());
                     throw new Exception($"Failed to read latest {GridItemEntityName} grid version for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
                 }
             }
@@ -746,6 +757,7 @@ namespace PowerGrid.Persistence.SqlServer
             {
                 DateTime transactionTimestamp = DateTime.MinValue;
                 Boolean alreadyReadResult = false;
+                Guid beginId = metricLogger.Begin(new GridTransactionTimestampRetrieveTime());
                 try
                 {
                     sqlCommandShim.SetCommandText(command, GridTransactionTimestampQuery);
@@ -767,12 +779,14 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(beginId, new GridTransactionTimestampRetrieveTime());
                     throw new Exception($"Failed to read {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()}, and version {version} from SQL Server.", e);
                 }
                 if (alreadyReadResult == false)
                 {
                     throw new Exception($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()}, and version {version} did not exist.");
                 }
+                metricLogger.End(beginId, new GridTransactionTimestampRetrieveTime());
 
                 return transactionTimestamp;
             }

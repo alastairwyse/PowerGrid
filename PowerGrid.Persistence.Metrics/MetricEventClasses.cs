@@ -22,6 +22,111 @@ namespace PowerGrid.Persistence.Metrics
     #pragma warning disable 1591
 
     /// <summary>
+    /// Interval metric which records the time taken to hard delete a set of grids defined by outer key properties from persistent storage.
+    /// </summary>
+    public class GridsHardDeleteByOuterKeyPropertiesTime : IntervalMetric
+    {
+        protected static String staticName = "GridsHardDeleteByOuterKeyPropertiesTime";
+        protected static String staticDescription = "The time taken to hard delete a set of grids defined by outer key properties from persistent storage";
+
+        public GridsHardDeleteByOuterKeyPropertiesTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that a set of grids defined by outer key properties were deleted from persistent storage.
+    /// </summary>
+    public class GridsHardDeletedByOuterKeyProperties : CountMetric
+    {
+        protected static String staticName = "GridsHardDeletedByOuterKeyProperties";
+        protected static String staticDescription = "A set of grids defined by outer key properties were deleted from persistent storage";
+
+        public GridsHardDeletedByOuterKeyProperties()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to hard delete a set of grids defined by common key properties from persistent storage.
+    /// </summary>
+    public class GridsHardDeleteByCommonKeyPropertiesTime : IntervalMetric
+    {
+        protected static String staticName = "GridsHardDeleteByCommonKeyPropertiesTime";
+        protected static String staticDescription = "The time taken to hard delete a set of grids defined by common key properties from persistent storage";
+
+        public GridsHardDeleteByCommonKeyPropertiesTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that a set of grids defined by common key properties were deleted from persistent storage.
+    /// </summary>
+    public class GridsHardDeletedByCommonKeyProperties : CountMetric
+    {
+        protected static String staticName = "GridsHardDeletedByCommonKeyProperties";
+        protected static String staticDescription = "A set of grids defined by common key properties were deleted from persistent storage";
+
+        public GridsHardDeletedByCommonKeyProperties()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to retrieve the current maximum grid version and corresponding transaction timestamp from persistent storage.
+    /// </summary>
+    public class GridMaximumVersionAndTransactionTimestampRetrieveTime : IntervalMetric
+    {
+        protected static String staticName = "GridMaximumVersionAndTransactionTimestampRetrieveTime";
+        protected static String staticDescription = "The time taken to retrieve the current maximum grid version and corresponding transaction timestamp from persistent storage";
+
+        public GridMaximumVersionAndTransactionTimestampRetrieveTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that the current maximum grid version and corresponding transaction timestamp were retrieved from persistent storage.
+    /// </summary>
+    public class GridMaximumVersionAndTransactionTimestampRetrieved : CountMetric
+    {
+        protected static String staticName = "GridMaximumVersionAndTransactionTimestampRetrieved";
+        protected static String staticDescription = "The current maximum grid version and corresponding transaction timestamp were retrieved from persistent storage";
+
+        public GridMaximumVersionAndTransactionTimestampRetrieved()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to retrieve a grid transaction timestamp from persistent storage.
+    /// </summary>
+    public class GridTransactionTimestampRetrieveTime : IntervalMetric
+    {
+        protected static String staticName = "GridTransactionTimestampRetrieveTime";
+        protected static String staticDescription = "The time taken to retrieve a grid transaction timestamp from persistent storage";
+
+        public GridTransactionTimestampRetrieveTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
     /// Count metric which records that an item was inserted into a grid as part of a PersistGrid() operation.
     /// </summary>
     public class GridItemInserted : CountMetric
