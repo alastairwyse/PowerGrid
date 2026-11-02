@@ -363,6 +363,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand())
             {
+                Guid beginId = metricLogger.Begin(new GridDetailsByOuterKeyPropertiesRetrieveTime());
                 try
                 {
                     PrepareConnection(connection);
@@ -383,11 +384,14 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
                     sqlConnectionShim.Close(connection);
+                    metricLogger.End(beginId, new GridDetailsByOuterKeyPropertiesRetrieveTime());
+                    metricLogger.Increment(new GridDetailsByOuterKeyPropertiesRetrieved());
 
                     return returnList;
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(beginId, new GridDetailsByOuterKeyPropertiesRetrieveTime());
                     throw new Exception($"Failed to read grid details for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
                 }
             }
@@ -399,6 +403,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand())
             {
+                Guid beginId = metricLogger.Begin(new GridDetailsByCommonKeyPropertiesRetrieveTime());
                 try
                 {
                     PrepareConnection(connection);
@@ -420,11 +425,14 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
                     sqlConnectionShim.Close(connection);
+                    metricLogger.End(beginId, new GridDetailsByCommonKeyPropertiesRetrieveTime());
+                    metricLogger.Increment(new GridDetailsByCommonKeyPropertiesRetrieved());
 
                     return returnList;
                 }
                 catch (Exception e)
                 {
+                    metricLogger.CancelBegin(beginId, new GridDetailsByCommonKeyPropertiesRetrieveTime());
                     throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
                 }
             }
@@ -484,7 +492,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var gridsDeleteCommand = new SqlCommand())
             using (var gridItemsDeleteCommand = new SqlCommand())
             {
-                Guid beginId = metricLogger.Begin(new GridsHardDeleteByOuterKeyPropertiesTime());
+                Guid beginId = metricLogger.Begin(new GridsByOuterKeyPropertiesHardDeleteTime());
                 try
                 {
                     PrepareConnection(connection);
@@ -505,11 +513,11 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
-                    metricLogger.CancelBegin(beginId, new GridsHardDeleteByOuterKeyPropertiesTime());
+                    metricLogger.CancelBegin(beginId, new GridsByOuterKeyPropertiesHardDeleteTime());
                     throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
                 }
-                metricLogger.End(beginId, new GridsHardDeleteByOuterKeyPropertiesTime());
-                metricLogger.Increment(new GridsHardDeletedByOuterKeyProperties());
+                metricLogger.End(beginId, new GridsByOuterKeyPropertiesHardDeleteTime());
+                metricLogger.Increment(new GridsByOuterKeyPropertiesHardDeleted());
             }
         }
 
@@ -520,7 +528,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var gridsDeleteCommand = new SqlCommand())
             using (var gridItemsDeleteCommand = new SqlCommand())
             {
-                Guid beginId = metricLogger.Begin(new GridsHardDeleteByCommonKeyPropertiesTime());
+                Guid beginId = metricLogger.Begin(new GridsByCommonKeyPropertiesHardDeleteTime());
                 try
                 {
                     PrepareConnection(connection);
@@ -542,11 +550,11 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 catch (Exception e)
                 {
-                    metricLogger.CancelBegin(beginId, new GridsHardDeleteByCommonKeyPropertiesTime());
+                    metricLogger.CancelBegin(beginId, new GridsByCommonKeyPropertiesHardDeleteTime());
                     throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
                 }
-                metricLogger.End(beginId, new GridsHardDeleteByCommonKeyPropertiesTime());
-                metricLogger.Increment(new GridsHardDeletedByCommonKeyProperties());
+                metricLogger.End(beginId, new GridsByCommonKeyPropertiesHardDeleteTime());
+                metricLogger.Increment(new GridsByCommonKeyPropertiesHardDeleted());
             }
         }
 

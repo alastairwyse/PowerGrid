@@ -22,6 +22,66 @@ namespace PowerGrid.Persistence.Metrics
     #pragma warning disable 1591
 
     /// <summary>
+    /// Interval metric which records the time taken to retrieve grid details defined by outer key properties from persistent storage.
+    /// </summary>
+    public class GridDetailsByOuterKeyPropertiesRetrieveTime : IntervalMetric
+    {
+        protected static String staticName = "GridDetailsByOuterKeyPropertiesRetrieveTime";
+        protected static String staticDescription = "The time taken to retrieve grid details defined by outer key properties from persistent storage";
+
+        public GridDetailsByOuterKeyPropertiesRetrieveTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that grid details defined by outer key properties were retrieved from persistent storage.
+    /// </summary>
+    public class GridDetailsByOuterKeyPropertiesRetrieved : CountMetric
+    {
+        protected static String staticName = "GridDetailsByOuterKeyPropertiesRetrieved";
+        protected static String staticDescription = "Grid details defined by outer key properties were retrieved from persistent storage";
+
+        public GridDetailsByOuterKeyPropertiesRetrieved()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Interval metric which records the time taken to retrieve grid details defined by common key properties from persistent storage.
+    /// </summary>
+    public class GridDetailsByCommonKeyPropertiesRetrieveTime : IntervalMetric
+    {
+        protected static String staticName = "GridDetailsByCommonKeyPropertiesRetrieveTime";
+        protected static String staticDescription = "The time taken to retrieve grid details defined by common key properties from persistent storage";
+
+        public GridDetailsByCommonKeyPropertiesRetrieveTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that grid details defined by common key properties were retrieved from persistent storage.
+    /// </summary>
+    public class GridDetailsByCommonKeyPropertiesRetrieved : CountMetric
+    {
+        protected static String staticName = "GridDetailsByCommonKeyPropertiesRetrieved";
+        protected static String staticDescription = "Grid details defined by common key properties were retrieved from persistent storage";
+
+        public GridDetailsByCommonKeyPropertiesRetrieved()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
     /// Interval metric which records the time taken to soft delete the latest grid defined by outer key properties from persistent storage.
     /// </summary>
     public class LatestGridSoftDeleteTime : IntervalMetric
@@ -54,12 +114,12 @@ namespace PowerGrid.Persistence.Metrics
     /// <summary>
     /// Interval metric which records the time taken to hard delete a set of grids defined by outer key properties from persistent storage.
     /// </summary>
-    public class GridsHardDeleteByOuterKeyPropertiesTime : IntervalMetric
+    public class GridsByOuterKeyPropertiesHardDeleteTime : IntervalMetric
     {
-        protected static String staticName = "GridsHardDeleteByOuterKeyPropertiesTime";
+        protected static String staticName = "GridsByOuterKeyPropertiesHardDeleteTime";
         protected static String staticDescription = "The time taken to hard delete a set of grids defined by outer key properties from persistent storage";
 
-        public GridsHardDeleteByOuterKeyPropertiesTime()
+        public GridsByOuterKeyPropertiesHardDeleteTime()
         {
             base.name = staticName;
             base.description = staticDescription;
@@ -69,12 +129,12 @@ namespace PowerGrid.Persistence.Metrics
     /// <summary>
     /// Count metric which records that a set of grids defined by outer key properties were deleted from persistent storage.
     /// </summary>
-    public class GridsHardDeletedByOuterKeyProperties : CountMetric
+    public class GridsByOuterKeyPropertiesHardDeleted : CountMetric
     {
-        protected static String staticName = "GridsHardDeletedByOuterKeyProperties";
+        protected static String staticName = "GridsByOuterKeyPropertiesHardDeleted";
         protected static String staticDescription = "A set of grids defined by outer key properties were deleted from persistent storage";
 
-        public GridsHardDeletedByOuterKeyProperties()
+        public GridsByOuterKeyPropertiesHardDeleted()
         {
             base.name = staticName;
             base.description = staticDescription;
@@ -84,12 +144,12 @@ namespace PowerGrid.Persistence.Metrics
     /// <summary>
     /// Interval metric which records the time taken to hard delete a set of grids defined by common key properties from persistent storage.
     /// </summary>
-    public class GridsHardDeleteByCommonKeyPropertiesTime : IntervalMetric
+    public class GridsByCommonKeyPropertiesHardDeleteTime : IntervalMetric
     {
-        protected static String staticName = "GridsHardDeleteByCommonKeyPropertiesTime";
+        protected static String staticName = "GridsByCommonKeyPropertiesHardDeleteTime";
         protected static String staticDescription = "The time taken to hard delete a set of grids defined by common key properties from persistent storage";
 
-        public GridsHardDeleteByCommonKeyPropertiesTime()
+        public GridsByCommonKeyPropertiesHardDeleteTime()
         {
             base.name = staticName;
             base.description = staticDescription;
@@ -99,12 +159,12 @@ namespace PowerGrid.Persistence.Metrics
     /// <summary>
     /// Count metric which records that a set of grids defined by common key properties were deleted from persistent storage.
     /// </summary>
-    public class GridsHardDeletedByCommonKeyProperties : CountMetric
+    public class GridsByCommonKeyPropertiesHardDeleted : CountMetric
     {
-        protected static String staticName = "GridsHardDeletedByCommonKeyProperties";
+        protected static String staticName = "GridsByCommonKeyPropertiesHardDeleted";
         protected static String staticDescription = "A set of grids defined by common key properties were deleted from persistent storage";
 
-        public GridsHardDeletedByCommonKeyProperties()
+        public GridsByCommonKeyPropertiesHardDeleted()
         {
             base.name = staticName;
             base.description = staticDescription;
