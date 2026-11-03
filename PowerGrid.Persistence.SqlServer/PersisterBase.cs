@@ -282,6 +282,7 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
 
+                    Guid beginId = metricLogger.Begin(new GridPersistTime());
                     try
                     {
                         sqlConnectionShim.Open(readConnection);
@@ -322,11 +323,17 @@ namespace PowerGrid.Persistence.SqlServer
                     }
                     catch (Exception e)
                     {
+                        metricLogger.CancelBegin(beginId, new GridPersistTime());
                         throw new Exception("Failed to persist grid to SQL Server.", e);
                     }
+                    metricLogger.End(beginId, new GridPersistTime());
+                    metricLogger.Increment(new GridPersisted());
                 }
                 TeardownConnection(readConnection);
                 TeardownConnection(writeConnection);
+                metricLogger.Add(new ComparedGridItemsAdded(), comparisonStatistics.ItemsAddedCount);
+                metricLogger.Add(new ComparedGridItemsUpdated(), comparisonStatistics.ItemsUpdatedCount);
+                metricLogger.Add(new ComparedGridItemsDeleted(), comparisonStatistics.ItemsDeletedCount);
 
                 return (gridVersion, comparisonStatistics);
             }

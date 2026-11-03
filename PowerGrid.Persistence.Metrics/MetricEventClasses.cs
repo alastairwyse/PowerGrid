@@ -22,6 +22,81 @@ namespace PowerGrid.Persistence.Metrics
     #pragma warning disable 1591
 
     /// <summary>
+    /// Interval metric which records the time taken to write a grid to persistent storage.
+    /// </summary>
+    public class GridPersistTime : IntervalMetric
+    {
+        protected static String staticName = "GridPersistTime";
+        protected static String staticDescription = "The time taken to write a grid to persistent storage";
+
+        public GridPersistTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that a grid was written to persistent storage.
+    /// </summary>
+    public class GridPersisted : CountMetric
+    {
+        protected static String staticName = "GridPersisted";
+        protected static String staticDescription = "A grid was written to persistent storage";
+
+        public GridPersisted()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Amount metric which records the number of items in a grid designated to be added as a result of a compare operation.
+    /// </summary>
+    public class ComparedGridItemsAdded : AmountMetric
+    {
+        protected static String staticName = "ComparedGridItemsAdded";
+        protected static String staticDescription = "The number of items in a grid designated to be added as a result of a compare operation";
+
+        public ComparedGridItemsAdded()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Amount metric which records the number of items in a grid designated to be updated as a result of a compare operation.
+    /// </summary>
+    public class ComparedGridItemsUpdated : AmountMetric
+    {
+        protected static String staticName = "ComparedGridItemsUpdated";
+        protected static String staticDescription = "The number of items in a grid designated to be updated as a result of a compare operation";
+
+        public ComparedGridItemsUpdated()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Amount metric which records the number of items in a grid designated to be deleted as a result of a compare operation.
+    /// </summary>
+    public class ComparedGridItemsDeleted : AmountMetric
+    {
+        protected static String staticName = "ComparedGridItemsDeleted";
+        protected static String staticDescription = "The number of items in a grid designated to be deleted as a result of a compare operation";
+
+        public ComparedGridItemsDeleted()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
     /// Interval metric which records the time taken to retrieve grid details defined by outer key properties from persistent storage.
     /// </summary>
     public class GridDetailsByOuterKeyPropertiesRetrieveTime : IntervalMetric

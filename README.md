@@ -40,7 +40,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * Grid Item - A single data point within a grid.  E.g. the closing price of a single stock (e.g. Apple) within a in market index for a single day.
 * Key Property - A property of a grid which classifies the data within that grid.  Where a grid contains a single key property, there should only be one item in the grid per key property.  Where a grid contains multiple key properties, there should only be one item in the grid per unique combination of key properties.  E.g. in a grid holding closing stock prices for a market index (e.g. S&P 500) for a single day, the single key property would be the stock's symbol/ticker (e.g. Apple/AAPL), as there would be expected to be only a single closing price for Apple stock.
 * Value Property - A property of a grid which does not classify data within that grid, and holds a value of an item.  E.g. in a grid holding stock prices for a market index (e.g. S&P 500) for a single day, the closing price would be a value property.
-* Outer Key Property - (might change this terminology)
+* Outer Key Property - An extension of key properties which includes fundamental properties which classify data within a grid (like a stock's symbol/ticker described above), and additional properties which further classify the data, for example the source which provided the stock price data (this would typically be a market data provider like Bloomberg, Reuters, or Refinitiv).  The condition that there should only be one item in a grid per unique combination of key properties, similarly applies to outer key properties.
 * Common Key Property
 * Grid Lock Key (outer and common)
 * Plus do diagramatic explanation of common, outer, inner key properties
