@@ -46,9 +46,10 @@ namespace PowerGrid.Persistence
         /// </summary>
         /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of all items in parameter <paramref name="items"/>.</param>
         /// <param name="items">The items to persist.</param>
+        /// <param name="persistComparisonStrategy">The strategy/method to use when comparing the specified grid items against any grid items already persisted.</param>
         /// <returns>A tuple containing: the version number of the written grid, and statistics containing counts of the items persisted.</returns>
         /// <remarks>Any existing grid items which are deleted or updated as a result of this method call are 'soft' deleted by end-dating the item's period of validity in the <see href="https://en.wikipedia.org/wiki/Temporal_database">temporal model</see>.</remarks>
-        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items);
+        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise);
 
         /// <summary>
         /// Retrieve the grid with the specified properties.

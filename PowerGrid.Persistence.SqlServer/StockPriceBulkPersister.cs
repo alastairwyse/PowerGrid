@@ -122,7 +122,7 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <inheritdoc/>
-        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items)
+        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise)
         {
             if (items.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
