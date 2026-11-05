@@ -262,7 +262,101 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Assert.That(resultStatistics.ItemsUpdatedCount == 1);
             Assert.That(resultStatistics.ItemsDeletedCount == 1);
         }
-        
+
+        [Test]
+        public void PersistGrid_AddAndUpdateOnlyPersistComparisonStrategy()
+        {
+            const String testTag = "Apple";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-09-22");
+            TimeOnly testTime = utils.CreateTimeOnlyFromString("22:00:00");
+            WeatherForecastGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDate, testTime);
+            DateTime transactionTimeStamp = utils.CreateDataTimeFromString("2026-09-22 01:23:45.0000040");
+            List<WeatherForecast> testGridItems = new()
+            {
+                new WeatherForecast("Japan", "Kobe", 24),
+                new WeatherForecast("Japan", "Tokyo", 23)
+            };
+            List<WeatherForecastGridItemPTO> existingGridItems = new()
+            {
+                new WeatherForecastGridItemPTO(1L, testTag, testDate, testTime, "Japan", "Himeji", 20, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999")),
+                new WeatherForecastGridItemPTO(2L, testTag, testDate, testTime, "Japan", "Tokyo", 21, utils.CreateDataTimeFromString("2026-09-22 01:00:02.0000041"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"))
+            };
+            String expectedMaxVersionQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    WeatherForecastGrids 
+                WHERE   Tag = @Tag 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Time] = CONVERT(time, @Time, 24);";
+            String expectedGridInsertStatementText = @$"
+                INSERT 
+                INTO    WeatherForecastGrids 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            CONVERT(date, @Date, 23), 
+                            CONVERT(time, @Time, 24), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
+            mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                // Call to get existing grid contents
+                true, true, false,
+                // Call to get existing grid max id
+                true, false
+            );
+            mockDataReader["Id"].Returns<Object>(existingGridItems[0].Id, existingGridItems[1].Id);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Time"].Returns<Object>(testTime.ToString(transactSql24TimeStyle));
+            mockDataReader["Country"].Returns<Object>(existingGridItems[0].Country, existingGridItems[1].Country);
+            mockDataReader["City"].Returns<Object>(existingGridItems[0].City, existingGridItems[1].City);
+            mockDataReader["Temperature"].Returns<Object>(existingGridItems[0].Temperature, existingGridItems[1].Temperature);
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-09-22T01:00:02.0000041");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+
+            (Int32 resultVersion, GridComparisonStatistics resultStatistics) = testWeatherForecastPersister.PersistGrid(testOuterKeyProperties, testGridItems, PersistComparisonStrategy.AddAndUpdateOnly);
+
+            mockSqlConnectionShim.Received(2).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(4).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(2).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).ExecuteReader(Arg.Any<SqlCommand>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), "SET DEADLOCK_PRIORITY HIGH;");
+            mockSqlCommandShim.Received(7).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(7).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(5).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlConnectionShim.Received(1).BeginTransaction(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(5).AddParameter(Arg.Any<SqlCommand>(), "@Time", SqlDbType.NVarChar, testTime.ToString(transactSql24TimeStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
+            mockSqlCommandShim.Received(4).SetTransaction(Arg.Any<SqlCommand>(), null);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, transactionTimeStamp.ToString(transactSql126DateStyle));
+            mockSqlTransactionShim.Received(1).Commit(null);
+            mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
+            Assert.That(resultVersion == 2);
+            Assert.That(resultStatistics.ItemsAddedCount == 1);
+            Assert.That(resultStatistics.ItemsUpdatedCount == 1);
+            Assert.That(resultStatistics.ItemsDeletedCount == 0);
+        }
+
         [Test]
         public void GetGrid_VersionParameterLessThan1()
         {

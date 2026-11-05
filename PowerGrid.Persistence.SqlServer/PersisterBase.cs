@@ -220,8 +220,6 @@ namespace PowerGrid.Persistence.SqlServer
         /// <inheritdoc/>
         public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(TOuterKeyProperties gridOuterKeyProperties, IList<TEntity> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise)
         {
-            throw new NotImplementedException();
-
             if (items.Count == 0)
                 throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
 
@@ -259,7 +257,15 @@ namespace PowerGrid.Persistence.SqlServer
                         DeleteGridItem(connection, transaction, deletedGridItem, transactionDateTime);
                     };
                     DataBaseOperationEmitter<TGridItemPTO> deletedItemEmitter = new(writeConnection, transaction, transactionTimestamp, deletedItemEmitterOperationAction);
-                    GridComparer<TGridItemPTO, TGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+                    GridComparer<TGridItemPTO, TGridItem> gridComparer;
+                    if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
+                    {
+                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, new NullEmitter<TGridItemPTO>());
+                    }
+                    else
+                    {
+                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+                    }
 
                     // Setup IEnumerable 'chains' 
                     GridContentsValidator<TEntity> newItemValidator = new();
@@ -333,6 +339,10 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 TeardownConnection(readConnection);
                 TeardownConnection(writeConnection);
+                if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
+                {
+                    comparisonStatistics = new GridComparisonStatistics(comparisonStatistics.ItemsAddedCount, comparisonStatistics.ItemsUpdatedCount, 0);
+                }
                 metricLogger.Add(new ComparedGridItemsAdded(), comparisonStatistics.ItemsAddedCount);
                 metricLogger.Add(new ComparedGridItemsUpdated(), comparisonStatistics.ItemsUpdatedCount);
                 metricLogger.Add(new ComparedGridItemsDeleted(), comparisonStatistics.ItemsDeletedCount);

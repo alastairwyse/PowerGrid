@@ -154,7 +154,15 @@ namespace PowerGrid.Persistence.SqlServer
                         addedItemEmitter.Emit(updatedGridItems.Item2);
                     };
                     DataBaseOperationEmitter<Tuple<StockPriceGridItemPTO, StockPriceGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
-                    GridComparer<StockPriceGridItemPTO, StockPriceGridItem> gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+                    GridComparer<StockPriceGridItemPTO, StockPriceGridItem> gridComparer;
+                    if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
+                    {
+                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, new NullEmitter<StockPriceGridItemPTO>());
+                    }
+                    else
+                    {
+                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+                    }
 
                     // Setup IEnumerable 'chains' 
                     GridContentsValidator<StockPrice> newItemValidator = new();
@@ -226,6 +234,10 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 TeardownConnection(readConnection);
                 TeardownConnection(writeConnection);
+                if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
+                {
+                    comparisonStatistics = new GridComparisonStatistics(comparisonStatistics.ItemsAddedCount, comparisonStatistics.ItemsUpdatedCount, 0);
+                }
 
                 return (gridVersion, comparisonStatistics);
             }
