@@ -815,7 +815,7 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 if (alreadyReadResult == false)
                 {
-                    throw new Exception($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()}, and version {version} did not exist.");
+                    throw new ArgumentException($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()}, and version {version} did not exist.");
                 }
                 metricLogger.End(beginId, new GridTransactionTimestampRetrieveTime());
 

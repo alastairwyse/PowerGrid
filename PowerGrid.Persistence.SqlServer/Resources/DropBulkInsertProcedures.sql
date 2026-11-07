@@ -11,6 +11,8 @@ GO
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
+DROP PROCEDURE dbo.BulkDeleteWeatherForecasts;
+DROP PROCEDURE dbo.BulkInsertWeatherForecasts;
 DROP PROCEDURE dbo.BulkDeleteStockPrices;
 DROP PROCEDURE dbo.BulkInsertStockPrices;
 

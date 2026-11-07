@@ -52,12 +52,13 @@ namespace PowerGrid.Hosting.Rest.Controllers
         /// Writes the specified grid of weather forecasts to persistent storage.
         /// </summary>
         /// <param name="weatherForecastGrid">The request parameters.</param>
+        /// <param name="persistComparisonStrategy">The strategy/method to use when comparing the specified grid items against any grid items already persisted.</param>
         /// <returns>The response parameters.</returns>
         [HttpPost]
         [ApiExplorerSettings(GroupName = "WeatherForecasts")]
         [Route("weatherForecasts")]
         [ProducesResponseType(StatusCodes.Status201Created)]
-        public ActionResult<PersistGridResponse> PersistGrid([FromBody] InputWeatherForecastGrid weatherForecastGrid)
+        public ActionResult<PersistGridResponse> PersistGrid([FromBody] InputWeatherForecastGrid weatherForecastGrid, [FromQuery] PersistComparisonStrategy persistComparisonStrategy)
         {
             Grids.WeatherForecastGridOuterKeyProperties weatherForecastGridOuterKeyProperties = new
             (
@@ -65,7 +66,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
                 weatherForecastGrid.WeatherForecastGridOuterKeyProperties.Date,
                 weatherForecastGrid.WeatherForecastGridOuterKeyProperties.Time
             );
-            (Int32 version, Core.GridComparisonStatistics gridComparisonStatistics) result = persisterHost.PersistGrid(weatherForecastGridOuterKeyProperties, weatherForecastGrid.Items);
+            (Int32 version, Core.GridComparisonStatistics gridComparisonStatistics) result = persisterHost.PersistGrid(weatherForecastGridOuterKeyProperties, weatherForecastGrid.Items, persistComparisonStrategy);
 
             return new ActionResult<PersistGridResponse>
             (

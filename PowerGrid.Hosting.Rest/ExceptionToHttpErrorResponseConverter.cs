@@ -154,10 +154,11 @@ namespace PowerGrid.Hosting.Rest
                 (Exception exception) =>
                 {
                     var argumentException = (ArgumentException)exception;
-                    var attributes = new List<Tuple<String, String>>()
+                    var attributes = new List<Tuple<String, String>>();
+                    if (argumentException.ParamName != null)
                     {
-                        new Tuple<String, String>("ParameterName", $"{argumentException.ParamName}")
-                    };
+                        attributes.Add(new Tuple<String, String>("ParameterName", $"{argumentException.ParamName}"));
+                    }
                     if (exception.TargetSite == null)
                     {
                         return new HttpErrorResponse(exception.GetType().Name, exception.Message, attributes);

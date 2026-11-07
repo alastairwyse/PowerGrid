@@ -52,12 +52,13 @@ namespace PowerGrid.Hosting.Rest.Controllers
         /// Writes the specified grid of stock prices to persistent storage.
         /// </summary>
         /// <param name="stockPriceGrid">The request parameters.</param>
+        /// <param name="persistComparisonStrategy">The strategy/method to use when comparing the specified grid items against any grid items already persisted.</param>
         /// <returns>The response parameters.</returns>
         [HttpPost]
         [ApiExplorerSettings(GroupName = "StockPrices")]
         [Route("stockPrices")]
         [ProducesResponseType(StatusCodes.Status201Created)]
-        public ActionResult<PersistGridResponse> PersistGrid([FromBody] InputStockPriceGrid stockPriceGrid)
+        public ActionResult<PersistGridResponse> PersistGrid([FromBody] InputStockPriceGrid stockPriceGrid, [FromQuery] PersistComparisonStrategy persistComparisonStrategy)
         {
             Grids.StockPriceGridOuterKeyProperties stockPriceGridOuterKeyProperties = new
             (
@@ -65,7 +66,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
                 stockPriceGrid.StockPriceGridOuterKeyProperties.DataSource,
                 stockPriceGrid.StockPriceGridOuterKeyProperties.Date
             );
-            (Int32 version, Core.GridComparisonStatistics gridComparisonStatistics) result = persisterHost.PersistGrid(stockPriceGridOuterKeyProperties, stockPriceGrid.Items);
+            (Int32 version, Core.GridComparisonStatistics gridComparisonStatistics) result = persisterHost.PersistGrid(stockPriceGridOuterKeyProperties, stockPriceGrid.Items, persistComparisonStrategy);
 
             return new ActionResult<PersistGridResponse>
             (

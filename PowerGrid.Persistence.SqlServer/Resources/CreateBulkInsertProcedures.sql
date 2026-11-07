@@ -156,3 +156,122 @@ BEGIN
 
 END
 GO
+
+
+--------------------------------------------------------------------------------
+-- dbo.BulkInsertWeatherForecasts
+
+CREATE PROCEDURE dbo.BulkInsertWeatherForecasts
+(
+    @GridItems             GridItemTableType  READONLY, 
+    @TransactionTimestamp  datetime2
+)
+AS
+BEGIN
+
+    DECLARE @ErrorMessage  nvarchar(max);
+
+    DECLARE @CurrentTag                  nvarchar(max);
+    DECLARE @CurrentDateAsString         nvarchar(max);
+    DECLARE @CurrentTimeAsString         nvarchar(max);
+    DECLARE @CurrentCountry              nvarchar(max);
+    DECLARE @CurrentCity                 nvarchar(max);
+    DECLARE @CurrentTemperatureAsString  nvarchar(max);
+
+    DECLARE InputTableCursor CURSOR LOCAL FAST_FORWARD FOR
+    SELECT  GridItemData1,
+            GridItemData2, 
+            GridItemData3, 
+            GridItemData4, 
+            GridItemData5, 
+            GridItemData6
+    FROM    @GridItems;
+
+    OPEN InputTableCursor;
+    FETCH NEXT 
+    FROM        InputTableCursor
+    INTO        @CurrentTag, 
+                @CurrentDateAsString, 
+                @CurrentTimeAsString, 
+                @CurrentCountry, 
+                @CurrentCity,
+                @CurrentTemperatureAsString;
+
+    WHILE (@@FETCH_STATUS = 0)
+        BEGIN
+
+            BEGIN TRY
+                INSERT 
+                INTO    WeatherForecasts 
+                        (
+                            Tag, 
+                            [Date], 
+                            [Time], 
+                            Country, 
+                            City, 
+                            Temperature, 
+                            TransactionFrom, 
+                            TransactionTo
+                        )
+                VALUES  (
+                            @CurrentTag, 
+                            CONVERT(date, @CurrentDateAsString, 23), 
+                            CONVERT(time, @CurrentTimeAsString, 24), 
+                            @CurrentCountry, 
+                            @CurrentCity, 
+                            CONVERT(int, @CurrentTemperatureAsString, 0), 
+                            @TransactionTimestamp, 
+                            CONVERT(datetime2, '9999-12-31T23:59:59.9999999', 126)
+                        );
+            END TRY
+            BEGIN CATCH
+                SET @ErrorMessage = N'Error occurred when inserting WeatherForecast for ''' + ISNULL(@CurrentTag, '(null)') + ''', ''' + ISNULL(@CurrentDateAsString, '(null)') + ''', ''' + ISNULL(@CurrentTimeAsString, '(null)') + ''', ''' + ISNULL(@CurrentCountry, '(null)') + ''', ''' + ISNULL(@CurrentCity, '(null)') + ''' and ''' + ISNULL(@CurrentTemperatureAsString, '(null)') + '''; ' + ERROR_MESSAGE();
+                THROW 50001, @ErrorMessage, 1;
+            END CATCH
+
+            FETCH NEXT 
+            FROM        InputTableCursor
+            INTO        @CurrentTag, 
+                        @CurrentDateAsString, 
+                        @CurrentTimeAsString, 
+                        @CurrentCountry, 
+                        @CurrentCity,
+                        @CurrentTemperatureAsString;
+        END;
+
+    CLOSE InputTableCursor;
+    DEALLOCATE InputTableCursor;
+
+END
+GO
+
+
+--------------------------------------------------------------------------------
+-- dbo.BulkDeleteWeatherForecasts
+
+CREATE PROCEDURE dbo.BulkDeleteWeatherForecasts
+(
+    @GridItemIds           GridIdTableType  READONLY, 
+    @TransactionTimestamp  datetime2
+)
+AS
+BEGIN
+
+    DECLARE @ErrorMessage  nvarchar(max);
+
+    BEGIN TRY
+        UPDATE  WeatherForecasts 
+        SET     TransactionTo = DATEADD(nanosecond, -100, @TransactionTimestamp)
+        WHERE   Id IN  
+                (
+                    SELECT  Id 
+                    FROM    @GridItemIds
+                );
+    END TRY
+    BEGIN CATCH
+        SET @ErrorMessage = N'Error occurred when deleting WeatherForecasts; ' + ERROR_MESSAGE();
+        THROW 50001, @ErrorMessage, 1;
+    END CATCH
+
+END
+GO

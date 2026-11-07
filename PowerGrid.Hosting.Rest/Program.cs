@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text.Json.Serialization; 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
@@ -58,15 +59,19 @@ namespace PowerGrid.Hosting.Rest
             ILogger weatherForecastPersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<WeatherForecastPersister>>();
             builder.Services.AddSingleton<WeatherForecastPersister>
             (
-                new WeatherForecastPersister(connectionString, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(weatherForecastPersisterLogger))
+                new WeatherForecastBulkPersister(connectionString, 50, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(weatherForecastPersisterLogger))
             );
 
             builder.Services.AddControllers()
             // Override the default model-binding failure behaviour, to return a HttpErrorResponse object rather than the standard ProblemDetails
             .MapModelBindingFailureToHttpErrorResponse()
             // Return HTTP 406 (not acceptable) statuses if the 'Accept' request header does not match the controller's 'ProducesResponseType' attribute (i.e. '*/*' or 'application/json')
-            .ReturnHttpNotAcceptableOnUnsupportedAcceptHeader();
-
+            .ReturnHttpNotAcceptableOnUnsupportedAcceptHeader()
+            // Convert controller enum parameters to and from strings
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
             // Allow APIs to be versioned
             builder.Services.SetupApiVersioning();
 

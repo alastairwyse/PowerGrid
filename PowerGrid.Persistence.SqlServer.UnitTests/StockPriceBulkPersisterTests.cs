@@ -18,13 +18,12 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Linq.Expressions;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
-using NSubstitute;
 using NUnit.Framework;
+using NSubstitute;
 
 namespace PowerGrid.Persistence.SqlServer.UnitTests
 {
@@ -427,7 +426,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.AddParameter(Arg.Any<SqlCommand>(), "@GridItems", SqlDbType.Structured, Arg.Do<DataTable>(dataTable => gridItemsStoredProcedureParameterRowCounts.Add(dataTable.Rows.Count)));
             mockSqlCommandShim.AddParameter(Arg.Any<SqlCommand>(), "@GridItemIds", SqlDbType.Structured, Arg.Do<DataTable>(dataTable => gridItemIdsStoredProcedureParameterRowCounts.Add(dataTable.Rows.Count)));
 
-            (Int32 resultVersion, GridComparisonStatistics resultStatistics) = testStockPriceBulkPersister.PersistGrid(testOuterKeyProperties, testGridItems);
+            (Int32 resultVersion, GridComparisonStatistics resultStatistics) = testStockPriceBulkPersister.PersistGrid(testOuterKeyProperties, testGridItems, PersistComparisonStrategy.Syncronise);
 
             mockSqlConnectionShim.Received(2).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
             mockSqlConnectionShim.Received(4).GetRetryLogicProvider(Arg.Any<SqlConnection>());

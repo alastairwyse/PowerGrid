@@ -1236,7 +1236,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
 
             using (var connection = new SqlConnection(testConnectionString))
             {
-                var e = Assert.Throws<Exception>(delegate
+                var e = Assert.Throws<ArgumentException>(delegate
                 {
                     testStockPricePersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
                 });

@@ -121,6 +121,128 @@ namespace PowerGrid.Persistence.SqlServer
             this.bufferSizeLimit = bufferSizeLimit;
         }
 
+        /// <inheritdoc/>
+        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, IList<WeatherForecast> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise)
+        {
+            if (items.Count == 0)
+                throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
+
+            using (var readConnection = new SqlConnection(connectionString))
+            using (var writeConnection = new SqlConnection(connectionString))
+            {
+                Int32 gridVersion;
+                GridComparisonStatistics comparisonStatistics;
+                try
+                {
+                    PrepareConnection(readConnection);
+                    sqlConnectionShim.Open(writeConnection);
+                    PrepareConnection(writeConnection, SessionDeadlockPriority.High);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+
+                DateTime transactionTimestamp = dateTimeProvider.UtcNow();
+                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
+                {
+                    BulkAddEmitter addedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
+                    BulkDeleteEmitter deletedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
+                    Action<SqlConnection, SqlTransaction, Tuple<WeatherForecastGridItemPTO, WeatherForecastGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<WeatherForecastGridItemPTO, WeatherForecastGridItem> updatedGridItems, DateTime transactionDateTime) =>
+                    {
+                        deletedItemEmitter.Emit(updatedGridItems.Item1);
+                        addedItemEmitter.Emit(updatedGridItems.Item2);
+                    };
+                    DataBaseOperationEmitter<Tuple<WeatherForecastGridItemPTO, WeatherForecastGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
+                    GridComparer<WeatherForecastGridItemPTO, WeatherForecastGridItem> gridComparer;
+                    if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
+                    {
+                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, new NullEmitter<WeatherForecastGridItemPTO>());
+                    }
+                    else
+                    {
+                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
+                    }
+
+                    // Setup IEnumerable 'chains' 
+                    GridContentsValidator<WeatherForecast> newItemValidator = new();
+                    GridContentsDuplicateChecker<WeatherForecast> newItemsDuplicateChecker = new();
+                    // Order of below chain is 1 validate, 2 order, 3 dup check
+                    IEnumerable<WeatherForecast> newGridContents = newItemsDuplicateChecker.CheckForDuplicates
+                    (
+                        newItemValidator.ValidateItems
+                        (
+                            items,
+                            NewEntityValidationAction
+                        ).Order(Comparer<WeatherForecast>.Create
+                        (
+                            (WeatherForecast first, WeatherForecast second) => { return first.KeyCompareTo(second); }
+                        ))
+                    );
+                    IEnumerable<WeatherForecastGridItem> ConvertEntitiesToGridItems(IEnumerable<WeatherForecast> items)
+                    {
+                        foreach (WeatherForecast currentItem in items)
+                        {
+                            yield return ConvertEntityAndOuterKeyPropertiesToGridItem(gridOuterKeyProperties, currentItem);
+                        }
+                    }
+
+                    try
+                    {
+                        sqlConnectionShim.Open(readConnection);
+                        IEnumerable<WeatherForecastGridItemPTO> existingGridContents;
+                        try
+                        {
+                            existingGridContents = GetGrid(readConnection, gridOuterKeyProperties, transactionTimestamp);
+                        }
+                        catch (Exception e)
+                        {
+                            throw new Exception($"Failed to read existing {GridItemEntityName} grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
+                        }
+                        {
+                            try
+                            {
+                                comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertEntitiesToGridItems(newGridContents));
+                                deletedItemEmitter.Flush();
+                                addedItemEmitter.Flush();
+                            }
+                            catch (Exception e)
+                            {
+                                Exception compareException = new($"Failed to compare new {GridItemEntityName} grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
+                                try
+                                {
+                                    // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
+                                    sqlTransactionShim.Rollback(transaction);
+                                }
+                                catch (Exception rollbackException)
+                                {
+                                    throw new AggregateException($"Failed to rollback transaction after exception comparing {GridItemEntityName} grid to existing data.", rollbackException, compareException);
+                                }
+                                throw compareException;
+                            }
+                        }
+                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, gridOuterKeyProperties, transactionTimestamp);
+                        sqlTransactionShim.Commit(transaction);
+
+                        sqlConnectionShim.Close(writeConnection);
+                        sqlConnectionShim.Close(readConnection);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception("Failed to persist grid to SQL Server.", e);
+                    }
+                }
+                TeardownConnection(readConnection);
+                TeardownConnection(writeConnection);
+                if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
+                {
+                    comparisonStatistics = new GridComparisonStatistics(comparisonStatistics.ItemsAddedCount, comparisonStatistics.ItemsUpdatedCount, 0);
+                }
+
+                return (gridVersion, comparisonStatistics);
+            }
+        }
+
         #region Private/Protected Methods
 
         #pragma warning disable 1591
@@ -138,15 +260,15 @@ namespace PowerGrid.Persistence.SqlServer
         #region Nested Classes
 
         /// <summary>
-        /// An implementation of <see cref="IEmitter{T}"/> which persists <see cref="StockPriceGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="BulkAddEmitter.Emit(StockPriceGridItem)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
+        /// An implementation of <see cref="IEmitter{T}"/> which persists <see cref="WeatherForecastGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="BulkAddEmitter.Emit(WeatherForecastGridItem)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkAddEmitter : BulkPersistenceStoredProcedureEmitterBase<StockPriceGridItem>
+        protected class BulkAddEmitter : BulkPersistenceStoredProcedureEmitterBase<WeatherForecastGridItem>
         {
             /// <summary>
-            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkAddEmitter class.
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastBulkPersister+BulkAddEmitter class.
             /// </summary>
             /// <param name="transactionTimestamp">The timestamp representing when the objects emitted were either inserted or deleted.</param>
-            /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItem"/> objects to hold in the buffer.</param>
+            /// <param name="bufferSizeLimit">The maximum number of <see cref="WeatherForecastGridItem"/> objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
             /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
@@ -178,14 +300,15 @@ namespace PowerGrid.Persistence.SqlServer
             protected override void Persist()
             {
                 bulkInsertStagingTable.Rows.Clear();
-                foreach (StockPriceGridItem currentGridItem in buffer)
+                foreach (WeatherForecastGridItem currentGridItem in buffer)
                 {
                     var row = bulkInsertStagingTable.NewRow();
                     row[gridItemData1ColumnName] = currentGridItem.Tag;
-                    row[gridItemData2ColumnName] = currentGridItem.DataSource;
-                    row[gridItemData3ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
-                    row[gridItemData4ColumnName] = currentGridItem.Company;
-                    row[gridItemData5ColumnName] = currentGridItem.Price.ToString(CultureInfo.InvariantCulture);
+                    row[gridItemData2ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
+                    row[gridItemData3ColumnName] = currentGridItem.Time.ToString(transactSql24TimeStyle);
+                    row[gridItemData4ColumnName] = currentGridItem.Country;
+                    row[gridItemData5ColumnName] = currentGridItem.City;
+                    row[gridItemData6ColumnName] = currentGridItem.Temperature.ToString(CultureInfo.InvariantCulture);
                     bulkInsertStagingTable.Rows.Add(row);
                 }
                 var parameters = new List<SqlParameter>()
@@ -193,7 +316,7 @@ namespace PowerGrid.Persistence.SqlServer
                     CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
                     CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
                 };
-                ExecuteStoredProcedureWithDeadlockRetry("BulkInsertStockPrices", parameters);
+                ExecuteStoredProcedureWithDeadlockRetry("BulkInsertWeatherForecasts", parameters);
                 bulkInsertStagingTable.Rows.Clear();
                 buffer.Clear();
             }
@@ -202,15 +325,15 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         /// <summary>
-        /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="StockPriceGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(StockPriceGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
+        /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="WeatherForecastGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(WeatherForecastGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkDeleteEmitter : BulkPersistenceStoredProcedureEmitterBase<StockPriceGridItemPTO>
+        protected class BulkDeleteEmitter : BulkPersistenceStoredProcedureEmitterBase<WeatherForecastGridItemPTO>
         {
             /// <summary>
-            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkDeleteEmitter class.
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastBulkPersister+BulkDeleteEmitter class.
             /// </summary>
             /// <param name="transactionTimestamp">The timestamp representing when the objects emitted were either inserted or deleted.</param>
-            /// <param name="bufferSizeLimit">The maximum number of <see cref="StockPriceGridItemPTO"/> objects to hold in the buffer.</param>
+            /// <param name="bufferSizeLimit">The maximum number of <see cref="WeatherForecastGridItemPTO"/> objects to hold in the buffer.</param>
             /// <param name="sqlConnectionShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</param>
             /// <param name="sqlCommandShim">Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</param>
             /// <param name="sqlConnection">The connection to use to insert or delete.</param>
@@ -241,7 +364,7 @@ namespace PowerGrid.Persistence.SqlServer
             /// </summary>
             protected override void Persist()
             {
-                foreach (StockPriceGridItemPTO currentGridItem in buffer)
+                foreach (WeatherForecastGridItemPTO currentGridItem in buffer)
                 {
                     var row = bulkDeleteStagingTable.NewRow();
                     row[idColumnName] = currentGridItem.Id;
@@ -252,7 +375,7 @@ namespace PowerGrid.Persistence.SqlServer
                     CreateSqlParameterWithValue("@GridItemIds", SqlDbType.Structured, bulkDeleteStagingTable),
                     CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
                 };
-                ExecuteStoredProcedureWithDeadlockRetry("BulkDeleteStockPrices", parameters);
+                ExecuteStoredProcedureWithDeadlockRetry("BulkDeleteWeatherForecasts", parameters);
                 bulkDeleteStagingTable.Rows.Clear();
                 buffer.Clear();
             }

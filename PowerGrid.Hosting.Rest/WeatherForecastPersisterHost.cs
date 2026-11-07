@@ -47,7 +47,7 @@ namespace PowerGrid.Hosting.Rest
             this.weatherForecastPersister = weatherForecastPersister;
         }
 
-        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, IList<WeatherForecast> items)
+        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, IList<WeatherForecast> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise)
         {
             GridCommonKeyProperties commonLockKeyProperties = new GridCommonKeyProperties(gridOuterKeyProperties.Tag);
             GridCommonKeyPropertiesLockKey commonLockKey = new(commonLockKeyProperties);
@@ -60,7 +60,7 @@ namespace PowerGrid.Hosting.Rest
                 outerLockKey,
                 () =>
                 {
-                    result = weatherForecastPersister.PersistGrid(gridOuterKeyProperties, items);
+                    result = weatherForecastPersister.PersistGrid(gridOuterKeyProperties, items, persistComparisonStrategy);
                 }
             );
 

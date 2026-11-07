@@ -51,7 +51,7 @@ namespace PowerGrid.Hosting.Rest
             this.stockPricePersister = stockPricePersister;
         }
 
-        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items)
+        public (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(StockPriceGridOuterKeyProperties gridOuterKeyProperties, IList<StockPrice> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise)
         {
             GridCommonKeyProperties commonLockKeyProperties = new GridCommonKeyProperties(gridOuterKeyProperties.Tag);
             GridCommonKeyPropertiesLockKey commonLockKey = new(commonLockKeyProperties);
@@ -64,7 +64,7 @@ namespace PowerGrid.Hosting.Rest
                 outerLockKey,
                 () => 
                 {
-                    result = stockPricePersister.PersistGrid(gridOuterKeyProperties, items);
+                    result = stockPricePersister.PersistGrid(gridOuterKeyProperties, items, persistComparisonStrategy);
                 }
             );
 
