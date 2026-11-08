@@ -178,7 +178,8 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 retryCount,
             Int32 retryInterval,
             Int32 operationTimeout,
-            IApplicationLogger logger, IMetricLogger metricLogger
+            IApplicationLogger logger, 
+            IMetricLogger metricLogger
         )
             : this(connectionString, retryCount, retryInterval, operationTimeout, logger)
         {
