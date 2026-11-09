@@ -725,6 +725,12 @@ namespace PowerGrid.Persistence.SqlServer
 
         #endregion
 
+        #region Overridable Metric Classes
+
+
+
+        #endregion
+
         /// <summary>
         /// Gets the latest grid version for the specified parameters.
         /// </summary>
