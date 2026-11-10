@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
@@ -68,6 +69,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 testStockPricePersister.PersistGrid(testOuterKeyProperties, new List<StockPrice>());
             });
 
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
             Assert.That(e.Message, Does.StartWith($"Parameter 'items' contained no items."));
             Assert.That(e.ParamName == "items");
         }
@@ -97,6 +99,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
             mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
             mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
             Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -104,6 +107,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void PersistGrid_NewGridItemPriceLessThan0()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
@@ -131,6 +135,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -157,7 +162,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 testStockPricePersister.PersistGrid(testOuterKeyProperties, testGridItems);
             });
-            
+
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridPersistTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridPersistTime>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 2);
             Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
             Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
             Assert.That(e.InnerException.InnerException is GridContentsValidationException<StockPrice>);
@@ -170,6 +178,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void PersistGrid_DuplicateGridItems()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
@@ -197,6 +206,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -224,6 +234,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 testStockPricePersister.PersistGrid(testOuterKeyProperties, testGridItems);
             });
 
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridPersistTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridPersistTime>());
             Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
             Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
             Assert.That(e.InnerException.InnerException is GridContentsDuplicateItemsException<StockPrice>);
@@ -453,6 +465,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 new List<StockPriceGridItemPTO>(testStockPricePersister.GetGrid(testOuterKeyProperties, 0));
             });
 
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
             Assert.That(e.Message, Does.StartWith($"Parameter 'version' with value 0 must be greater than 0."));
             Assert.That(e.ParamName == "version");
         }
@@ -473,6 +486,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             });
 
             mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
             Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -552,6 +566,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload_ExceptionReading()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
@@ -568,6 +583,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
@@ -586,6 +602,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 2);
             Assert.That(e.Message, Does.StartWith($"Failed to read grid details for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-06-21' }} from SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -593,6 +612,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Reuters";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
@@ -609,6 +629,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
@@ -633,6 +654,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
             mockDataReader.Received(3).Read();
             mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieved>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 3);
             Assert.That(result.Count == 2);
             Assert.That(result[0].Version == 1);
             Assert.That(result[0].TransactionTimestamp == utils.CreateDataTimeFromString("2026-05-30 13:02:53.1837676"));
@@ -643,6 +668,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void GetGridDetailsGridCommonKeyPropertiesOverload_ExceptionReading()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedCommandText = @$"
@@ -655,6 +681,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
@@ -671,6 +698,9 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
             mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 2);
             Assert.That(e.Message, Does.StartWith($"Failed to read grid details for GridCommonKeyProperties {{ Tag = 'Market' }} from SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -678,6 +708,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void GetGridDetailsGridCommonKeyPropertiesOverload()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Calibrated";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedCommandText = @$"
@@ -690,6 +721,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
@@ -715,6 +747,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
             mockDataReader.Received(4).Read();
             mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieved>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 3);
             Assert.That(result.Count == 3);
             Assert.That(result[0].Item1.Tag == testTag);
             Assert.That(result[0].Item1.DataSource == "Bloomberg");
@@ -754,6 +790,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
             mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
             mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
             Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -783,6 +820,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void SoftDeleteLatestGrid_ExceptionDeleting()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
@@ -798,6 +836,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<LatestGridSoftDeleteTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
@@ -824,6 +863,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+            mockMetricLogger.Received(1).Begin(Arg.Any<LatestGridSoftDeleteTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<LatestGridSoftDeleteTime>());
             Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -831,6 +872,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void SoftDeleteLatestGrid()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
@@ -846,6 +888,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             IDataReader mockDataReader = Substitute.For<IDataReader>();
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<LatestGridSoftDeleteTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
@@ -870,11 +913,15 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
             mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<LatestGridSoftDeleteTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<LatestGridSoftDeleteTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<LatestGridSoftDeleted>());
         }
 
         [Test]
         public void HardDeleteGridsGridOuterKeyPropertiesOverload_ExceptionDeleting()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Calibration";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
@@ -887,6 +934,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
@@ -907,6 +955,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
             Assert.That(e.Message, Does.StartWith($"Failed to delete stock price grids for StockPriceGridOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -914,6 +964,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void HardDeleteGridsGridOuterKeyPropertiesOverload()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Calibration";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
@@ -932,6 +983,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   [Date] = CONVERT(date, @Date, 23);";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
 
             testStockPricePersister.HardDeleteGrids(testOuterKeyProperties);
@@ -950,11 +1002,15 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
             mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridsByOuterKeyPropertiesHardDeleted>());
         }
 
         [Test]
         public void HardDeleteGridsCommonKeyPropertiesOverload_ExceptionDeleting()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Calibration";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedStockPriceGridsDeleteCommandText = @$"
@@ -963,6 +1019,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             var mockException = new Exception("Mock exception");
             mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
@@ -981,6 +1038,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
             mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
             mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
             Assert.That(e.Message, Does.StartWith($"Failed to delete stock price grids for GridCommonKeyProperties {{ Tag = 'Calibration' }} in SQL Server."));
             Assert.That(e.InnerException == mockException);
         }
@@ -988,6 +1047,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void HardDeleteGridsCommonKeyPropertiesOverload()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Calibration";
             GridCommonKeyProperties testCommonKeyProperties = new(testTag);
             String expectedStockPriceGridsDeleteCommandText = @$"
@@ -1000,6 +1060,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 WHERE   Tag = @Tag;";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
 
             testStockPricePersister.HardDeleteGrids(testCommonKeyProperties);
@@ -1016,7 +1077,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
             mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridsByCommonKeyPropertiesHardDeleted>());
         }
+
+        // 2026-11-10 TODO
+        //   Add metrics to unit tests from here
 
         [Test]
         public void GetLatestGridVersion_ExceptionReading()
