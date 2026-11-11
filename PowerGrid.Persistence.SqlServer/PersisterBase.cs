@@ -822,6 +822,7 @@ namespace PowerGrid.Persistence.SqlServer
                 }
                 if (alreadyReadResult == false)
                 {
+                    metricLogger.CancelBegin(beginId, new GridTransactionTimestampRetrieveTime());
                     throw new ArgumentException($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()}, and version {version} did not exist.");
                 }
                 metricLogger.End(beginId, new GridTransactionTimestampRetrieveTime());
@@ -921,7 +922,7 @@ namespace PowerGrid.Persistence.SqlServer
                 throw new Exception($"Failed to update {GridItemEntityName} with id '{supersededItem.Id}' in SQL Server.", e);
             }
             metricLogger.End(beginId, new GridItemUpdateTime());
-            metricLogger.Increment(new GridItemDeleted());
+            metricLogger.Increment(new GridItemUpdated());
         }
 
         /// <summary>
