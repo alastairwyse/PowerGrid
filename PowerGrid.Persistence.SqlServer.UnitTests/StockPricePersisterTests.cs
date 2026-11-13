@@ -18,14 +18,13 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
-using PowerGrid.Core.UnitTests;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Metrics;
 using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using PowerGrid.Persistence.SqlServer.Metrics;
 using ApplicationLogging;
 using ApplicationMetrics;
 using NUnit.Framework;
@@ -1765,12 +1764,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             }
         }
 
-        // 2026-11-11 TODO
-        //   Add metrics to unit tests from here
-
         [Test]
         public void DeleteGridItem_ExceptionDeleting()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
@@ -1782,6 +1779,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
             WHERE   Id = @Id;";
             var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridItemDeleteTime>()).Returns(testBeginId);
             mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
 
             using (var connection = new SqlConnection(testConnectionString))
@@ -1792,6 +1790,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 });
 
                 mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemDeleteTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridItemDeleteTime>());
                 Assert.That(e.Message, Does.StartWith($"Failed to delete stock price with id '{testItem.Id}' in SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
@@ -1800,6 +1800,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void DeleteGridItem()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
@@ -1810,6 +1811,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             UPDATE  StockPrices 
             SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
             WHERE   Id = @Id;";
+            mockMetricLogger.Begin(Arg.Any<GridItemDeleteTime>()).Returns(testBeginId);
 
             using (var connection = new SqlConnection(testConnectionString))
             {
@@ -1822,12 +1824,16 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemDeleteTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridItemDeleteTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridItemDeleted>());
             }
         }
 
         [Test]
         public void CreateGrid_ExceptionRetrievingLatestGridVersion()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
@@ -1840,6 +1846,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                   AND   DataSource = @DataSource 
                   AND   [Date] = CONVERT(date, @Date, 23);";
             var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId);
             mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
 
             using (var readConnection = new SqlConnection(testConnectionString))
@@ -1857,6 +1864,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridMaximumVersionRetrieveTime>());
                 Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
@@ -1865,6 +1874,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_ExceptionInserting()
         {
+            Guid testBeginId1 = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            Guid testBeginId2 = Guid.Parse("cd9d3c57-3b60-4abd-993b-f684caf529f1");
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
@@ -1894,6 +1905,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                             CONVERT(datetime2, @CreateDateTime, 126)
                         );";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId1);
+            mockMetricLogger.Begin(Arg.Any<GridCreateTime>()).Returns(testBeginId2);
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
             mockDataReader["MaxVersion"].Returns<Object>(1);
@@ -1921,6 +1934,10 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId1, Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId2, Arg.Any<GridCreateTime>());
                 Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} and version 2 into SQL Server."));
                 Assert.That(e.InnerException == mockException);
             }
@@ -1929,6 +1946,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_GridAlreadyExists()
         {
+            Guid testBeginId1 = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            Guid testBeginId2 = Guid.Parse("cd9d3c57-3b60-4abd-993b-f684caf529f1");
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
@@ -1958,6 +1977,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                             CONVERT(datetime2, @CreateDateTime, 126)
                         );";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId1);
+            mockMetricLogger.Begin(Arg.Any<GridCreateTime>()).Returns(testBeginId2);
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(true, false);
             mockDataReader["MaxVersion"].Returns<Object>(1);
@@ -1980,6 +2001,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId1, Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).End(testBeginId2, Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridCreated>());
                 Assert.That(result == 2);
             }
         }
@@ -1987,6 +2013,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void CreateGrid_NoGridExists()
         {
+            Guid testBeginId1 = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            Guid testBeginId2 = Guid.Parse("cd9d3c57-3b60-4abd-993b-f684caf529f1");
             const String testTag = "Market";
             const String testDataSource = "Refinitiv";
             DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
@@ -2016,6 +2044,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                             CONVERT(datetime2, @CreateDateTime, 126)
                         );";
             IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId1);
+            mockMetricLogger.Begin(Arg.Any<GridCreateTime>()).Returns(testBeginId2);
             mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
             mockDataReader.Read().Returns(false);
 
@@ -2036,6 +2066,11 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 1);
                 mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
                 mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId1, Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).End(testBeginId2, Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridCreated>());
                 Assert.That(result == 1);
             }
         }
@@ -2059,6 +2094,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             {
                 testStockPricePersister.ExecuteNonQueryWithDeadlockRetry(connection, null, command);
 
+                mockLogger.Received(1).Log(testStockPricePersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 1 of 5).", Arg.Any<SqlException>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<SqlCommandExecutionRetried>());
                 mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
@@ -2077,7 +2114,13 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 {
                     testStockPricePersister.ExecuteNonQueryWithDeadlockRetry(connection, null, command);
                 });
-                
+
+                mockLogger.Received(1).Log(testStockPricePersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 1 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPricePersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 2 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPricePersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 3 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPricePersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 4 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPricePersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 5 of 5).", Arg.Any<SqlException>());
+                mockMetricLogger.Received(5).Increment(Arg.Any<SqlCommandExecutionRetried>());
                 mockSqlCommandShim.Received(6).ExecuteNonQuery(Arg.Any<SqlCommand>());
             }
         }
