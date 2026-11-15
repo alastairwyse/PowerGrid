@@ -52,6 +52,36 @@ namespace PowerGrid.Persistence.Metrics
     }
 
     /// <summary>
+    /// Interval metric which records the time taken to write a grid to persistent storage in bulk.
+    /// </summary>
+    public class GridBulkPersistTime : IntervalMetric
+    {
+        protected static String staticName = "GridBulkPersistTime";
+        protected static String staticDescription = "The time taken to write a grid to persistent storage in bulk";
+
+        public GridBulkPersistTime()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
+    /// Count metric which records that a grid was written to persistent storage in bulk.
+    /// </summary>
+    public class GridBulkPersisted : CountMetric
+    {
+        protected static String staticName = "GridBulkPersisted";
+        protected static String staticDescription = "A grid was written to persistent storage in bulk";
+
+        public GridBulkPersisted()
+        {
+            base.name = staticName;
+            base.description = staticDescription;
+        }
+    }
+
+    /// <summary>
     /// Amount metric which records the number of items in a grid designated to be added as a result of a compare operation.
     /// </summary>
     public class ComparedGridItemsAdded : AmountMetric

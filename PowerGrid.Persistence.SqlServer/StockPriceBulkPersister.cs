@@ -22,6 +22,7 @@ using System.Linq;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Metrics;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using ApplicationLogging;
 using ApplicationMetrics;
@@ -187,6 +188,7 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
 
+                    Guid beginId = metricLogger.Begin(new GridBulkPersistTime());
                     try
                     {
                         sqlConnectionShim.Open(readConnection);
@@ -229,8 +231,11 @@ namespace PowerGrid.Persistence.SqlServer
                     }
                     catch (Exception e)
                     {
+                        metricLogger.CancelBegin(beginId, new GridBulkPersistTime());
                         throw new Exception("Failed to persist grid to SQL Server.", e);
                     }
+                    metricLogger.End(beginId, new GridBulkPersistTime());
+                    metricLogger.Increment(new GridBulkPersisted());
                 }
                 TeardownConnection(readConnection);
                 TeardownConnection(writeConnection);
@@ -238,6 +243,9 @@ namespace PowerGrid.Persistence.SqlServer
                 {
                     comparisonStatistics = new GridComparisonStatistics(comparisonStatistics.ItemsAddedCount, comparisonStatistics.ItemsUpdatedCount, 0);
                 }
+                metricLogger.Add(new ComparedGridItemsAdded(), comparisonStatistics.ItemsAddedCount);
+                metricLogger.Add(new ComparedGridItemsUpdated(), comparisonStatistics.ItemsUpdatedCount);
+                metricLogger.Add(new ComparedGridItemsDeleted(), comparisonStatistics.ItemsDeletedCount);
 
                 return (gridVersion, comparisonStatistics);
             }

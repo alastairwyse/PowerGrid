@@ -21,6 +21,7 @@ using System.Linq;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
+using PowerGrid.Persistence.Metrics;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using NUnit.Framework;
 using NSubstitute;
@@ -105,6 +106,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void PersistGrid_NewGridItemPriceLessThan0()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
@@ -132,6 +134,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridBulkPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -159,6 +162,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 testStockPriceBulkPersister.PersistGrid(testOuterKeyProperties, testGridItems);
             });
 
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridBulkPersistTime>());
             Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
             Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
             Assert.That(e.InnerException.InnerException is GridContentsValidationException<StockPrice>);
@@ -171,6 +176,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void PersistGrid_DuplicateGridItems()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
@@ -198,6 +204,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             ";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridBulkPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -225,6 +232,8 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                 testStockPriceBulkPersister.PersistGrid(testOuterKeyProperties, testGridItems);
             });
 
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridBulkPersistTime>());
             Assert.That(e.Message, Does.StartWith($"Failed to persist grid to SQL Server."));
             Assert.That(e.InnerException.Message, Does.StartWith($"Failed to compare new stock price grid to existing grid in SQL Server for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction time '2026-05-16T16:36:41.0000023'."));
             Assert.That(e.InnerException.InnerException is GridContentsDuplicateItemsException<StockPrice>);
@@ -236,6 +245,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void PersistGrid()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
@@ -286,6 +296,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         );";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridBulkPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -337,6 +348,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlTransactionShim.Received(1).Commit(null);
             mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridBulkPersisted>());
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsAdded>(), 2);
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsUpdated>(), 2);
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsDeleted>(), 2);
             Assert.That(resultVersion == 2);
             Assert.That(resultStatistics.ItemsAddedCount == 2);
             Assert.That(resultStatistics.ItemsUpdatedCount == 2);
@@ -354,6 +371,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         {
             // Tests that if items remain in the buffers of the BulkAddEmitter and BulkDeleteEmitter classes after comparison between new and existing grid items is complete, those remaining items are also persisted
 
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String hitachiCompany = "Hitachi";
@@ -400,6 +418,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         );";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridBulkPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -451,6 +470,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlTransactionShim.Received(1).Commit(null);
             mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridBulkPersisted>());
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsAdded>(), 1);
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsUpdated>(), 2);
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsDeleted>(), 1);
             Assert.That(resultVersion == 2);
             Assert.That(resultStatistics.ItemsAddedCount == 1);
             Assert.That(resultStatistics.ItemsUpdatedCount == 2);
@@ -464,6 +489,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         [Test]
         public void PersistGrid_AddAndUpdateOnlyPersistComparisonStrategy()
         {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
             const String testTag = "Market";
             const String testDataSource = "Bloomberg";
             const String canonCompany = "Canon";
@@ -514,6 +540,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
                         );";
             SqlRetryLogicOption sqlRetryLogicOption = new();
             sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridBulkPersistTime>()).Returns(testBeginId);
             mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
             mockDateTimeProvider.UtcNow().Returns<DateTime>(transactionTimeStamp);
             mockSqlConnectionShim.BeginTransaction(Arg.Any<SqlConnection>()).Returns<SqlTransaction>((SqlTransaction)null);
@@ -565,6 +592,12 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridInsertStatementText);
             mockSqlTransactionShim.Received(1).Commit(null);
             mockSqlConnectionShim.Received(2).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridBulkPersistTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridBulkPersisted>());
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsAdded>(), 2);
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsUpdated>(), 2);
+            mockMetricLogger.Received(1).Add(Arg.Any<ComparedGridItemsDeleted>(), 0);
             Assert.That(resultVersion == 2);
             Assert.That(resultStatistics.ItemsAddedCount == 2);
             Assert.That(resultStatistics.ItemsUpdatedCount == 2);
