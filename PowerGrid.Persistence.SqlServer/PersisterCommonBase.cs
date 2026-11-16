@@ -1,0 +1,1114 @@
+﻿/*
+ * Copyright 2026 Alastair Wyse (https://github.com/alastairwyse/PowerGrid/)
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Data;
+using System.Globalization;
+using System.Text;
+using Microsoft.Data.SqlClient;
+using PowerGrid.Core;
+using PowerGrid.Persistence.Metrics;
+using PowerGrid.Persistence.Models;
+using PowerGrid.Persistence.SqlServer.Metrics;
+using ApplicationLogging;
+using ApplicationMetrics;
+
+namespace PowerGrid.Persistence.SqlServer
+{
+    /// <summary>
+    /// Base for classes which write and read grids to and from Microsoft SQL Server databases.
+    /// </summary>
+    /// <typeparam name="TEntity">The type of data held in each item in the grid.</typeparam>
+    /// <typeparam name="TOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the items in the grid.</typeparam>
+    /// <typeparam name="TGridItem">The items in the grid (i.e. where each item includes the <see cref="IGridOuterKeyProperties">outer key properties</see>).</typeparam>
+    /// <typeparam name="TGridItemPTO">The <see cref="IPersistenceTransferObject">persistence transfer object</see> equivalent of <see cref="TGridItem"/>.</typeparam>
+    public abstract class PersisterCommonBase<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO> : Persistence.PersisterBase<TEntity, TCommonKeyProperties, TOuterKeyProperties, TGridItem, TGridItemPTO>
+        where TEntity : IGridItem<TEntity>
+        where TCommonKeyProperties : Core.IGridCommonKeyProperties
+        where TOuterKeyProperties : IGridOuterKeyProperties
+        where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
+        where TGridItemPTO : IGridOuterKeyProperties, TGridItem, IGridItem<TGridItem>, IPersistenceTransferObject
+    {
+        protected const String maxVersionColumnAlias = "MaxVersion";
+
+        protected const String versionParameterName = "@Version";
+        protected const String idParameterName = "@Id";
+        protected const String createDateTimeParameterName = "@CreateDateTime";
+        protected const String insertDateTimeParameterName = "@InsertDateTime";
+        protected const String deleteDateTimeParameterName = "@DeleteDateTime";
+        protected const String temporalMaximumDateTimeParameterName = "@TemporalMaximumDateTime";
+        protected const String transactionTimestampParameterName = "@TransactionTimestamp";
+        protected const String currentDateTimeParameterName = "@CurrentDateTime";
+
+        protected const String idColumnName = "Id";
+        protected const String transactionFromColumnName = "TransactionFrom";
+        protected const String transactionToColumnName = "TransactionTo";
+        protected const String versionColumnName = "Version";
+        protected const String transactionTimestampColumnName = "TransactionTimestamp";
+
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 23 date and time style</see>.</summary>
+        protected const String transactSql23DateStyle = "yyyy-MM-dd";
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 24 time style</see>.</summary>
+        protected const String transactSql24TimeStyle = "HH:mm:ss";
+        /// <summary>DateTime format string which matches the <see href="https://docs.microsoft.com/en-us/sql/t-sql/functions/cast-and-convert-transact-sql?view=sql-server-ver16#date-and-time-styles">Transact-SQL 126 date and time style</see>.</summary>
+        protected const String transactSql126DateStyle = "yyyy-MM-ddTHH:mm:ss.fffffff";
+        /// <summary>The maximum possible <see cref="DateTime"/> value to use as the upper bound for validity period in the persisted temporal model.</summary>
+        protected readonly DateTime temporalMaximumDateTime = DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc);
+
+        /// <summary>The string to use to connect to the SQL Server database.</summary>
+        protected String connectionString;
+        /// <summary>The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</summary>
+        protected Int32 operationTimeout;
+        /// <summary>Provider for the current date and time.</summary>
+        protected IDateTimeProvider dateTimeProvider;
+        /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlConnection"/> class.</summary>
+        protected ISqlConnectionShim sqlConnectionShim;
+        /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlTransaction"/> class.</summary>
+        protected ISqlTransactionShim sqlTransactionShim;
+        /// <summary>Acts as a <see href="https://en.wikipedia.org/wiki/Shim_(computing)">shim</see> to the <see cref="SqlCommand"/> class.</summary>
+        protected ISqlCommandShim sqlCommandShim;
+        /// <summary>A set of SQL Server database engine error numbers which denote a transient fault.</summary>
+        /// <see href="https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-ver16"/>
+        /// <see href="https://docs.microsoft.com/en-us/azure/azure-sql/database/troubleshoot-common-errors-issues?view=azuresql"/>
+        protected List<Int32> sqlServerTransientErrorNumbers;
+        /// <summary>The retry logic to use when connecting to and executing against the SQL Server database.</summary>
+        protected SqlRetryLogicOption sqlRetryLogicOption;
+        /// <summary>Maps <see cref="SessionDeadlockPriority"/> values to their equivalent SQL Server string value.</summary>
+        protected IDictionary<SessionDeadlockPriority, String> deadlockPriorityToStringValueMap;
+        /// <summary>The action to invoke if an action is retried due to a transient error.</summary>
+        protected EventHandler<SqlRetryingEventArgs> connectionRetryAction;
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.PersisterCommonBase class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        public PersisterCommonBase
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger
+        )
+            : base(logger)
+        {
+            ThrowExceptionIfConnectionStringParameterNullOrWhitespace(nameof(connectionString), connectionString);
+            ThrowExceptionIfOperationTimeoutParameterLessThanZero(nameof(operationTimeout), operationTimeout);
+            if (retryCount < 0)
+                throw new ArgumentOutOfRangeException(nameof(retryCount), $"Parameter '{nameof(retryCount)}' with value {retryCount} cannot be less than 0.");
+            if (retryCount > 59)
+                throw new ArgumentOutOfRangeException(nameof(retryCount), $"Parameter '{nameof(retryCount)}' with value {retryCount} cannot be greater than 59.");
+            if (retryInterval < 0)
+                throw new ArgumentOutOfRangeException(nameof(retryInterval), $"Parameter '{nameof(retryInterval)}' with value {retryInterval} cannot be less than 0.");
+            if (retryInterval > 120)
+                throw new ArgumentOutOfRangeException(nameof(retryInterval), $"Parameter '{nameof(retryInterval)}' with value {retryInterval} cannot be greater than 120.");
+            if (operationTimeout < 0)
+                throw new ArgumentOutOfRangeException(nameof(operationTimeout), $"Parameter '{nameof(operationTimeout)}' with value {operationTimeout} cannot be less than 0.");
+
+            this.connectionString = connectionString;
+            this.operationTimeout = operationTimeout;
+            dateTimeProvider = new DefaultDateTimeProvider();
+            sqlConnectionShim = new DefaultSqlConnectionShim();
+            sqlTransactionShim = new DefaultSqlTransactionShim();
+            sqlCommandShim = new DefaultSqlCommandShim();
+            // Setup retry logic
+            sqlServerTransientErrorNumbers = GenerateSqlServerTransientErrorNumbers();
+            sqlRetryLogicOption = new SqlRetryLogicOption();
+            sqlRetryLogicOption.NumberOfTries = retryCount + 1;  // According to documentation... "1 means to execute one time and if an error is encountered, don't retry"
+            sqlRetryLogicOption.MinTimeInterval = TimeSpan.FromSeconds(0);
+            sqlRetryLogicOption.MaxTimeInterval = TimeSpan.FromSeconds(120);
+            sqlRetryLogicOption.DeltaTime = TimeSpan.FromSeconds(retryInterval);
+            sqlRetryLogicOption.TransientErrors = sqlServerTransientErrorNumbers;
+            deadlockPriorityToStringValueMap = new Dictionary<SessionDeadlockPriority, String>()
+            {
+                { SessionDeadlockPriority.Low, "LOW"},
+                { SessionDeadlockPriority.Normal, "NORMAL"},
+                { SessionDeadlockPriority.High, "HIGH"},
+            };
+            deadlockPriorityToStringValueMap = deadlockPriorityToStringValueMap.ToFrozenDictionary();
+            connectionRetryAction = (Object sender, SqlRetryingEventArgs eventArgs) =>
+            {
+                Exception lastException = eventArgs.Exceptions[eventArgs.Exceptions.Count - 1];
+                Int32 retryDelayInSeconds = eventArgs.Delay.Seconds;
+                if (typeof(SqlException).IsAssignableFrom(lastException.GetType()) == true)
+                {
+                    var se = (SqlException)lastException;
+                    logger.Log(this, LogLevel.Warning, $"SQL Server error with number {se.Number} occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", se);
+                }
+                else
+                {
+                    logger.Log(this, LogLevel.Warning, $"Exception occurred when executing command.  Retrying in {retryDelayInSeconds} seconds (retry {eventArgs.RetryCount} of {retryCount}).", lastException);
+                }
+                metricLogger.Increment(new SqlCommandExecutionRetried());
+            };
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.PersisterCommonBase class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="logger">The logger for general logging.</param>
+        /// <param name="metricLogger">The logger for metrics.</param>
+        public PersisterCommonBase
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger
+        )
+            : this(connectionString, retryCount, retryInterval, operationTimeout, logger)
+        {
+            this.metricLogger = metricLogger;
+        }
+
+        /// <summary>
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.PersisterCommonBase class.
+        /// </summary>
+        /// <param name="connectionString">The string to use to connect to the SQL Server database.</param>
+        /// <param name="retryCount">The number of times an operation against the SQL Server database should be retried in the case of execution failure.</param>
+        /// <param name="retryInterval">">The time in seconds between operation retries.</param>
+        /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
+        /// <param name="dateTimeProvider">A mock <see cref="IDateTimeProvider"/></param>
+        /// <param name="sqlConnectionShim">A mock <see cref="ISqlConnectionShim"/>.</param>
+        /// <param name="sqlTransactionShim">A mock <see cref="ISqlTransactionShim"/>.</param>
+        /// <param name="sqlCommandShim">A mock <see cref="ISqlCommandShim"/>.</param>
+        /// <remarks>This constructor is included to facilitate unit testing.</remarks>
+        public PersisterCommonBase
+        (
+            String connectionString,
+            Int32 retryCount,
+            Int32 retryInterval,
+            Int32 operationTimeout,
+            IApplicationLogger logger,
+            IMetricLogger metricLogger,
+            IDateTimeProvider dateTimeProvider,
+            ISqlConnectionShim sqlConnectionShim,
+            ISqlTransactionShim sqlTransactionShim,
+            ISqlCommandShim sqlCommandShim
+        ) : this(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
+        {
+            this.dateTimeProvider = dateTimeProvider;
+            this.sqlConnectionShim = sqlConnectionShim;
+            this.sqlTransactionShim = sqlTransactionShim;
+            this.sqlCommandShim = sqlCommandShim;
+        }
+
+        /// <inheritdoc/>
+        public override IEnumerable<TGridItemPTO> GetGrid(TOuterKeyProperties gridOuterKeyProperties, Int32 version)
+        {
+            if (version < 1)
+                throw new ArgumentOutOfRangeException(nameof(version), $"Parameter '{nameof(version)}' with value {version} must be greater than 0.");
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                try
+                {
+                    sqlConnectionShim.Open(connection);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+                DateTime transactionTimestamp = GetGridTransactionTimestamp(connection, gridOuterKeyProperties, version);
+
+                foreach (TGridItemPTO currentItem in GetGrid(connection, gridOuterKeyProperties, transactionTimestamp))
+                {
+                    yield return currentItem;
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override IList<GridVersionAndTransactionTimestamp> GetGridDetails(TOuterKeyProperties gridOuterKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand())
+            {
+                Guid beginId = metricLogger.Begin(new GridDetailsByOuterKeyPropertiesRetrieveTime());
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    sqlCommandShim.SetCommandText(command, GridDetailsByOuterKeyPropertiesQuery);
+                    PrepareCommand(connection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    List<GridVersionAndTransactionTimestamp> returnList = new();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            Int32 version = (Int32)dataReader["Version"];
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
+                            returnList.Add(new GridVersionAndTransactionTimestamp(version, transactionTimestamp));
+                        }
+                    }
+                    sqlConnectionShim.Close(connection);
+                    metricLogger.End(beginId, new GridDetailsByOuterKeyPropertiesRetrieveTime());
+                    metricLogger.Increment(new GridDetailsByOuterKeyPropertiesRetrieved());
+
+                    return returnList;
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(beginId, new GridDetailsByOuterKeyPropertiesRetrieveTime());
+                    throw new Exception($"Failed to read grid details for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override IList<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> GetGridDetails(TCommonKeyProperties gridCommonKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var command = new SqlCommand())
+            {
+                Guid beginId = metricLogger.Begin(new GridDetailsByCommonKeyPropertiesRetrieveTime());
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    sqlCommandShim.SetCommandText(command, GridDetailsByCommonKeyPropertiesQuery);
+                    PrepareCommand(connection, command);
+                    AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, command, gridCommonKeyProperties);
+                    List<Tuple<TOuterKeyProperties, GridVersionAndTransactionTimestamp>> returnList = new();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            TOuterKeyProperties outerKeyProperties = GetOuterKeyPropertiesFromDataReader(dataReader);
+                            Int32 version = (Int32)dataReader["Version"];
+                            DateTime transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            transactionTimestamp = DateTime.SpecifyKind(transactionTimestamp, DateTimeKind.Utc);
+                            returnList.Add(Tuple.Create(outerKeyProperties, new GridVersionAndTransactionTimestamp(version, transactionTimestamp)));
+                        }
+                    }
+                    sqlConnectionShim.Close(connection);
+                    metricLogger.End(beginId, new GridDetailsByCommonKeyPropertiesRetrieveTime());
+                    metricLogger.Increment(new GridDetailsByCommonKeyPropertiesRetrieved());
+
+                    return returnList;
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(beginId, new GridDetailsByCommonKeyPropertiesRetrieveTime());
+                    throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void SoftDeleteLatestGrid(TOuterKeyProperties gridOuterKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to connect to SQL Server.", e);
+                }
+                (Int32 version, DateTime transactionTimestamp) = GetLatestGridVersion(connection, gridOuterKeyProperties);
+                if (version == 0)
+                {
+                    throw new Exception($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()} does not exist.");
+                }
+
+                using (var command = new SqlCommand())
+                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                {
+                    Guid beginId = metricLogger.Begin(new LatestGridSoftDeleteTime());
+                    try
+                    {
+                        DateTime deleteTimestamp = dateTimeProvider.UtcNow();
+                        sqlCommandShim.SetCommandText(command, SoftDeleteLatestGridStatementSqlText);
+                        PrepareCommand(connection, transaction, command);
+                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                        sqlCommandShim.AddParameter(command, currentDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.ToString(transactSql126DateStyle));
+                        sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+                    catch (Exception e)
+                    {
+                        metricLogger.CancelBegin(beginId, new LatestGridSoftDeleteTime());
+                        throw new Exception($"Failed to delete latest grid items for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
+                    }
+                    metricLogger.End(beginId, new LatestGridSoftDeleteTime());
+                    metricLogger.Increment(new LatestGridSoftDeleted());
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void HardDeleteGrids(TOuterKeyProperties gridOuterKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var gridsDeleteCommand = new SqlCommand())
+            using (var gridItemsDeleteCommand = new SqlCommand())
+            {
+                Guid beginId = metricLogger.Begin(new GridsByOuterKeyPropertiesHardDeleteTime());
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                    {
+                        sqlCommandShim.SetCommandText(gridsDeleteCommand, HardDeleteGridsByOuterKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridsDeleteCommand);
+                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, gridsDeleteCommand, gridOuterKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridsDeleteCommand);
+                        sqlCommandShim.SetCommandText(gridItemsDeleteCommand, HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridItemsDeleteCommand);
+                        AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, gridItemsDeleteCommand, gridOuterKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridItemsDeleteCommand);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(beginId, new GridsByOuterKeyPropertiesHardDeleteTime());
+                    throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
+                }
+                metricLogger.End(beginId, new GridsByOuterKeyPropertiesHardDeleteTime());
+                metricLogger.Increment(new GridsByOuterKeyPropertiesHardDeleted());
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void HardDeleteGrids(TCommonKeyProperties gridCommonKeyProperties)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            using (var gridsDeleteCommand = new SqlCommand())
+            using (var gridItemsDeleteCommand = new SqlCommand())
+            {
+                Guid beginId = metricLogger.Begin(new GridsByCommonKeyPropertiesHardDeleteTime());
+                try
+                {
+                    PrepareConnection(connection);
+                    sqlConnectionShim.Open(connection);
+                    using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
+                    {
+                        sqlCommandShim.SetCommandText(gridsDeleteCommand, HardDeleteGridsByCommonKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridsDeleteCommand);
+                        AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, gridsDeleteCommand, gridCommonKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridsDeleteCommand);
+                        sqlCommandShim.SetCommandText(gridItemsDeleteCommand, HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText);
+                        PrepareCommand(connection, transaction, gridItemsDeleteCommand);
+                        AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, gridItemsDeleteCommand, gridCommonKeyProperties);
+                        ExecuteNonQueryWithDeadlockRetry(connection, transaction, gridItemsDeleteCommand);
+                        sqlTransactionShim.Commit(transaction);
+                        sqlConnectionShim.Close(connection);
+                    }
+
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(beginId, new GridsByCommonKeyPropertiesHardDeleteTime());
+                    throw new Exception($"Failed to delete {GridItemEntityName} grids for {gridCommonKeyProperties.ToString()} in SQL Server.", e);
+                }
+                metricLogger.End(beginId, new GridsByCommonKeyPropertiesHardDeleteTime());
+                metricLogger.Increment(new GridsByCommonKeyPropertiesHardDeleted());
+            }
+        }
+
+        #region Private/Protected Methods
+
+        #region Abstract Poperties and Methods
+
+        /// <summary>
+        /// The name of the table which stores the grid items.
+        /// </summary>
+        protected abstract String GridItemTableName { get; }
+
+        /// <summary>
+        /// The name of the table which stores the grids.
+        /// </summary>
+        protected abstract String GridTableName { get; }
+
+        /// <summary>
+        /// The human readable name of the type of data which is held in a grid item.
+        /// </summary>
+        /// <remarks>For use in exception messages.  All words should be lower case and singular, e.g. 'stock price'.</remarks>
+        protected abstract String GridItemEntityName { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the maximum version of a grid, given the outer key properties.
+        /// </summary>
+        protected abstract String GridMaxVersionQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the maximum version of a grid and its transaction timestamp, given the outer key properties.
+        /// </summary>
+        protected abstract String GridMaxVersionAndTransactionTimestampQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the transaction timestamp of a grid, given the outer key properties and a grid version.
+        /// </summary>
+        protected abstract String GridTransactionTimestampQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the contents (items) from a single grid.
+        /// </summary>
+        protected abstract String GridContentsQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of common key properties.
+        /// </summary>
+        protected abstract String GridDetailsByCommonKeyPropertiesQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of outer key properties.
+        /// </summary>
+        protected abstract String GridDetailsByOuterKeyPropertiesQuery { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which soft deletes the latest grid.
+        /// </summary>
+        protected abstract String SoftDeleteLatestGridStatementSqlText { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which hard deletes all grids for specified common key properties.
+        /// </summary>
+        protected abstract String HardDeleteGridsByCommonKeyPropertiesStatementSqlText { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which hard deletes all grid items for specified common key properties.
+        /// </summary>
+        protected abstract String HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which hard deletes all grids for specified outer key properties.
+        /// </summary>
+        protected abstract String HardDeleteGridsByOuterKeyPropertiesStatementSqlText { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which hard deletes all grid items for specified outer key properties.
+        /// </summary>
+        protected abstract String HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which inserts a grid.
+        /// </summary>
+        protected abstract String GridInsertStatementSqlText { get; }
+
+        /// <summary>
+        /// The text for a SQL statement which inserts a set of grid items.
+        /// </summary>
+        protected abstract String GridItemsInsertStatementSqlText { get; }
+
+        /// <summary>
+        /// An action used to validate any persisted entities/items.  Accepts a single parameter which is the item to validate.
+        /// </summary>
+        /// <remarks>Is expected to throw a <see cref="GridContentsValidationException{T}"/> if the item fails validation.</remarks>
+        protected abstract Action<TEntity> NewEntityValidationAction { get; }
+
+        /// <summary>
+        /// Reads and populates all properties of a <see cref="TOuterKeyProperties"/> object from the specified <see cref="IDataReader"/>.
+        /// </summary>
+        /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
+        /// <returns>The <see cref="TOuterKeyProperties"/>.</returns>
+        protected abstract TOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader);
+
+        /// <summary>
+        /// Reads and populates all properties of a <see cref="TGridItemPTO"/> object from the specified <see cref="IDataReader"/>.
+        /// </summary>
+        /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
+        /// <returns>The <see cref="TGridItemPTO"/>.</returns>
+        /// <remarks>Columns names in the <see cref="IDataReader"/> are expected to match the results produced by the query in property <see cref="GridContentsQuery"/>.</remarks>
+        protected abstract TGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader);
+
+        /// <summary>
+        /// Sets grid common key property query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
+        /// </summary>
+        /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
+        /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
+        /// <param name="gridCommonKeyProperties">The common key properties to use in the parameters.</param>
+        protected abstract void AddGridCommonKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TCommonKeyProperties gridCommonKeyProperties);
+
+        /// <summary>
+        /// Sets grid outer key property query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
+        /// </summary>
+        /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
+        /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
+        /// <param name="gridOuterKeyProperties">The outer key properties to use in the parameters.</param>
+        protected abstract void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TOuterKeyProperties gridOuterKeyProperties);
+
+        /// <summary>
+        /// Sets entity query parameters on the specified <see cref="ISqlCommandShim"/> using the <see cref="ISqlCommandShim.AddParameter(SqlCommand, String, SqlDbType, Object)"/> method.
+        /// </summary>
+        /// <param name="sqlCommandShim">The <see cref="ISqlCommandShim"/> to set the parameters on.</param>
+        /// <param name="command">The <see cref="SqlCommand"/> fronted by the shim.</param>
+        /// <param name="entity">The entity to use in the parameters.</param>
+        protected abstract void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, TEntity entity);
+
+        /// <summary>
+        /// Extracts and returns the outer key properties from the specified grid item.
+        /// </summary>
+        /// <param name="gridItem">The grid item to extract the outer key properties from.</param>
+        /// <returns>The outer key properties.</returns>
+        protected abstract TOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(TGridItem gridItem);
+
+        /// <summary>
+        /// Converts the specified <see cref="TOuterKeyProperties"/> and <see cref="TEntity"/> to a <see cref="TGridItem"/>.
+        /// </summary>
+        /// <param name="gridOuterKeyProperties">The <see cref="TOuterKeyProperties"/> to convert.</param>
+        /// <param name="entity">The <see cref="TEntity"/> to convert.</param>
+        /// <returns>The <see cref="TGridItem"/>.</returns>
+        protected abstract TGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(TOuterKeyProperties gridOuterKeyProperties, TEntity entity);
+
+        #endregion
+
+        #region Overridable Metric Classes
+
+
+
+        #endregion
+
+        /// <summary>
+        /// Gets the latest grid version for the specified parameters.
+        /// </summary>
+        /// <param name="connection">The connection to use to retrieve the grid version.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid version to retrieve.</param>
+        /// <returns>A tuple containing: the version number of the latest grid (or 0 if no grids exist for the specified parameters), and the transaction (creation) timestamp of the grid (or <see cref="DateTime.MinValue"/> if no grids exist for the specified parameters).</returns>
+        protected (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, TOuterKeyProperties gridOuterKeyProperties)
+        {
+            // REFACTORING: 
+            //   Use AppAccess SqlServerPersisterUtilities and ReadQueryGeneratorBase classes for influence in how to split platform-agnostic SQL into base classes
+
+            using (var command = new SqlCommand())
+            {
+                Guid beginId = metricLogger.Begin(new GridMaximumVersionAndTransactionTimestampRetrieveTime());
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, GridMaxVersionAndTransactionTimestampQuery);
+                    PrepareCommand(connection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    Int32 latestGridVersionNumber = 0;
+                    DateTime latestGridTransactionTimestamp = DateTime.MinValue.ToUniversalTime();
+
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        Boolean alreadyReadResult = false;
+                        while (dataReader.Read())
+                        {
+                            if (alreadyReadResult == true)
+                            {
+                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve latest {GridItemEntityName} grid version for {gridOuterKeyProperties.ToString()}.");
+                            }
+                            latestGridVersionNumber = (Int32)dataReader[versionColumnName];
+                            latestGridTransactionTimestamp = DateTime.ParseExact((String)dataReader[transactionTimestampColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            latestGridTransactionTimestamp = DateTime.SpecifyKind(latestGridTransactionTimestamp, DateTimeKind.Utc);
+                            alreadyReadResult = true;
+                        }
+                    }
+                    metricLogger.End(beginId, new GridMaximumVersionAndTransactionTimestampRetrieveTime());
+                    metricLogger.Increment(new GridMaximumVersionAndTransactionTimestampRetrieved());
+
+                    return (latestGridVersionNumber, latestGridTransactionTimestamp);
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(beginId, new GridMaximumVersionAndTransactionTimestampRetrieveTime());
+                    throw new Exception($"Failed to read latest {GridItemEntityName} grid version for {gridOuterKeyProperties.ToString()} from SQL Server.", e);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the transaction (creation) timestamp for the grid with the specified parameters and version.
+        /// </summary>
+        /// <param name="connection">The connection to use to retrieve the grid version.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <param name="version">The version number of the grid.</param>
+        /// <returns>The transaction (creation) timestamp of the grid.</returns>
+        /// <exception cref="Exception">A grid with the specified parameters does not exist.</exception>
+        protected DateTime GetGridTransactionTimestamp(SqlConnection connection, TOuterKeyProperties gridOuterKeyProperties, Int32 version)
+        {
+            using (var command = new SqlCommand())
+            {
+                DateTime transactionTimestamp = DateTime.MinValue;
+                Boolean alreadyReadResult = false;
+                Guid beginId = metricLogger.Begin(new GridTransactionTimestampRetrieveTime());
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, GridTransactionTimestampQuery);
+                    PrepareCommand(connection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, version);
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            if (alreadyReadResult == true)
+                            {
+                                throw new Exception($"Read multiple results from SQL Server when attempting to retrieve {GridItemEntityName} grid version for {gridOuterKeyProperties.ToString()}, and version {version}.");
+                            }
+                            transactionTimestamp = DateTime.ParseExact((String)dataReader["TransactionTimestamp"], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+                            alreadyReadResult = true;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(beginId, new GridTransactionTimestampRetrieveTime());
+                    throw new Exception($"Failed to read {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()}, and version {version} from SQL Server.", e);
+                }
+                if (alreadyReadResult == false)
+                {
+                    metricLogger.CancelBegin(beginId, new GridTransactionTimestampRetrieveTime());
+                    throw new ArgumentException($"{CapitalizeFirstLetterOfString(GridItemEntityName)} grid for {gridOuterKeyProperties.ToString()}, and version {version} did not exist.");
+                }
+                metricLogger.End(beginId, new GridTransactionTimestampRetrieveTime());
+
+                return transactionTimestamp;
+            }
+        }
+
+        /// <summary>
+        /// Gets the contents of a grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to retrieve the grid.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to retrieve.</param>
+        /// <param name="transactionTimestamp">The transaction timestamp when the grid was created.</param>
+        /// <returns>The items in the grid.</returns>
+        protected IEnumerable<TGridItemPTO> GetGrid(SqlConnection connection, TOuterKeyProperties gridOuterKeyProperties, DateTime transactionTimestamp)
+        {
+            using (var command = new SqlCommand())
+            {
+                IDataReader dataReader = null;
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, GridContentsQuery);
+                    PrepareCommand(connection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    sqlCommandShim.AddParameter(command, transactionTimestampParameterName, SqlDbType.NVarChar, transactionTimestamp.ToString(transactSql126DateStyle));
+                    dataReader = sqlCommandShim.ExecuteReader(command);
+                }
+                catch (Exception e)
+                {
+                    if (dataReader != null)
+                    {
+                        dataReader.Dispose();
+                    }
+                    throw new Exception($"Failed to read {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()}, and transaction timestamp '{transactionTimestamp.ToString("yyyy-MM-dd HH:mm:ss.fffffff")}' from SQL Server.", e);
+                }
+                while (dataReader.Read())
+                {
+                    yield return GetGridItemPTOFromDataReader(dataReader);
+                }
+                // Can't do below in a try/finally as it results in 'cannot yield a value in the body of a try block with a catch clause'
+                dataReader.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Adds an item to the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to insert.</param>
+        /// <param name="transaction">The transaction to execute the add operation in.</param>
+        /// <param name="item">The item to add.</param>
+        /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
+        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, TGridItem item, DateTime insertDateTime)
+        {
+            Guid beginId = metricLogger.Begin(new GridItemInsertTime());
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, GridItemsInsertStatementSqlText);
+                    PrepareCommand(connection, transaction, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, ExtractOuterKeyPropertiesFromGridItem(item));
+                    AddGridItemQueryParameters(sqlCommandShim, command, item);
+                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(beginId, new GridItemInsertTime());
+                throw new Exception($"Failed to insert {item.ToString()} into SQL Server.", e);
+            }
+            metricLogger.End(beginId, new GridItemInsertTime());
+            metricLogger.Increment(new GridItemInserted());
+        }
+
+        /// <summary>
+        /// Updates an existing item in the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to update.</param>
+        /// <param name="transaction">The transaction to execute the update operation in.</param>
+        /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
+        /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
+        /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
+        protected void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO supersededItem, TGridItem newItem, DateTime udpateDateTime)
+        {
+            Guid beginId = metricLogger.Begin(new GridItemUpdateTime());
+            try
+            {
+                DeleteGridItem(connection, transaction, supersededItem, udpateDateTime);
+                InsertGridItem(connection, transaction, newItem, udpateDateTime);
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(beginId, new GridItemUpdateTime());
+                throw new Exception($"Failed to update {GridItemEntityName} with id '{supersededItem.Id}' in SQL Server.", e);
+            }
+            metricLogger.End(beginId, new GridItemUpdateTime());
+            metricLogger.Increment(new GridItemUpdated());
+        }
+
+        /// <summary>
+        /// Deletes an existing item from the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to delete.</param>
+        /// <param name="transaction">The transaction to execute the delete operation in.</param>
+        /// <param name="item">The item to delete.</param>
+        /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
+        protected void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO item, DateTime deleteDateTime)
+        {
+            String deleteStatement = @$"
+            UPDATE  {GridItemTableName} 
+            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
+            WHERE   Id = {idParameterName};";
+
+            Guid beginId = metricLogger.Begin(new GridItemDeleteTime());
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, deleteStatement);
+                    PrepareCommand(connection, transaction, command);
+                    sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
+                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(beginId, new GridItemDeleteTime());
+                throw new Exception($"Failed to delete {GridItemEntityName} with id '{item.Id}' in SQL Server.", e);
+            }
+            metricLogger.End(beginId, new GridItemDeleteTime());
+            metricLogger.Increment(new GridItemDeleted());
+        }
+
+        /// <summary>
+        /// Creates a new grid.
+        /// </summary>
+        /// <param name="readConnection">The connection to use to read existing data.</param>
+        /// <param name="writeConnection">The connection to use to write the grid.</param>
+        /// <param name="transaction">The transaction to execute the write operation in.</param>
+        /// <param name="gridOuterKeyProperties">The <see cref="IGridOuterKeyProperties">outer key properties</see> of the grid to create.</param>
+        /// <param name="createDateTime">The timestamp when the grid was created.</param>
+        /// <returns>The version number of the new grid.</returns>
+        protected virtual Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, TOuterKeyProperties gridOuterKeyProperties, DateTime createDateTime)
+        {
+            Int32 gridVersionNumber = 1;
+            using (var command = new SqlCommand())
+            {
+                Guid maxVersionBeginId = metricLogger.Begin(new GridMaximumVersionRetrieveTime());
+                try
+                {
+                    sqlCommandShim.SetCommandText(command, GridMaxVersionQuery + ";");
+                    PrepareCommand(readConnection, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    using (IDataReader dataReader = sqlCommandShim.ExecuteReader(command))
+                    {
+                        while (dataReader.Read())
+                        {
+                            if (dataReader[maxVersionColumnAlias] != DBNull.Value)
+                            {
+                                gridVersionNumber = (Int32)dataReader[maxVersionColumnAlias] + 1;
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    metricLogger.CancelBegin(maxVersionBeginId, new GridMaximumVersionRetrieveTime());
+                    throw new Exception($"Failed to retrieve latest grid version number while inserting {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} into SQL Server.", e);
+                }
+                metricLogger.End(maxVersionBeginId, new GridMaximumVersionRetrieveTime());
+            }
+
+            Guid gridCreateBeginId = metricLogger.Begin(new GridCreateTime());
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, GridInsertStatementSqlText);
+                    PrepareCommand(writeConnection, transaction, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, gridOuterKeyProperties);
+                    sqlCommandShim.AddParameter(command, versionParameterName, SqlDbType.Int, gridVersionNumber);
+                    sqlCommandShim.AddParameter(command, createDateTimeParameterName, SqlDbType.NVarChar, createDateTime.ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(writeConnection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(gridCreateBeginId, new GridCreateTime());
+                throw new Exception($"Failed to insert {GridItemEntityName} grid for {gridOuterKeyProperties.ToString()} and version {gridVersionNumber} into SQL Server.", e);
+            }
+            metricLogger.End(gridCreateBeginId, new GridCreateTime());
+            metricLogger.Increment(new GridCreated());
+
+            return gridVersionNumber;
+        }
+
+        /// <summary>
+        /// Reads and returns transaction 'from' and 'to' properties from the specified <see cref="IDataReader"/>.
+        /// </summary>
+        /// <param name="dataReader">The <see cref="IDataReader"/> to read the properties from.</param>
+        /// <returns>The transaction 'from' and transaction 'to' values.</returns>
+        protected (DateTime TransactionFrom, DateTime TransactionTo) GetTransactionFromAndToDateTimesFromDataReader(IDataReader dataReader)
+        {
+            DateTime transactionFrom = DateTime.ParseExact((String)dataReader[transactionFromColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+            transactionFrom = DateTime.SpecifyKind(transactionFrom, DateTimeKind.Utc);
+            DateTime transactionTo = DateTime.ParseExact((String)dataReader[transactionToColumnName], transactSql126DateStyle, DateTimeFormatInfo.InvariantInfo);
+            transactionTo = DateTime.SpecifyKind(transactionTo, DateTimeKind.Utc);
+
+            return (transactionFrom, transactionTo);
+        }
+
+        /// <summary>
+        /// Attempts to execute a non-query SQL command catching any deadlock (<see href="https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/mssqlserver-1205-database-engine-error?view=sql-server-ver16">1205</see>) exceptions and retrying according to the specified retry logic.
+        /// </summary>
+        /// <param name="connection">The connection to use to execute the command.</param>
+        /// <param name="transaction">The transaction to execute the command under.</param>
+        /// <param name="command">The SQL command to executeg.</param>
+        protected void ExecuteNonQueryWithDeadlockRetry(SqlConnection connection, SqlTransaction transaction, SqlCommand command)
+        {
+            const Int32 deadlockErrorNumber = 1205;
+
+            Int32 retryCount = sqlRetryLogicOption.NumberOfTries - 1;
+            var exceptions = new List<Exception>();
+            while (true)
+            {
+                try
+                {
+                    sqlCommandShim.ExecuteNonQuery(command);
+                    break;
+                }
+                catch (SqlException sqlException)
+                {
+                    if (sqlException.Errors.Count > 0 && sqlException.Errors[0].Number == deadlockErrorNumber)
+                    {
+                        exceptions.Add(sqlException);
+                        if (retryCount > 0)
+                        {
+                            var retryEventArgs = new SqlRetryingEventArgs(sqlRetryLogicOption.NumberOfTries - retryCount, new TimeSpan(0), exceptions);
+                            connectionRetryAction.Invoke(this, retryEventArgs);
+                            retryCount--;
+                        }
+                        else
+                        {
+                            String exceptionMessage = $"The number of deadlock retries has exceeded the maximum of {sqlRetryLogicOption.NumberOfTries} attempt(s).";
+                            throw new AggregateException(exceptionMessage, exceptions);
+                        }
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Prepares the specified <see cref="SqlConnection"/>.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        protected void PrepareConnection(SqlConnection connection)
+        {
+            sqlConnectionShim.SetRetryLogicProvider(connection, SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            sqlConnectionShim.GetRetryLogicProvider(connection).Retrying += connectionRetryAction;
+        }
+
+        /// <summary>
+        /// Prepares the specified <see cref="SqlConnection"/> and sets the session deadlock priority.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="deadlockPriority">The <see cref="SessionDeadlockPriority"/> to assign to the session.</param>
+        protected virtual void PrepareConnection(SqlConnection connection, SessionDeadlockPriority deadlockPriority)
+        {
+            PrepareConnection(connection);
+            String setDeadlockPriorityStatement = $"SET DEADLOCK_PRIORITY {deadlockPriorityToStringValueMap[deadlockPriority]};";
+            using (var setDeadlockPriorityCommand = new SqlCommand())
+            {
+                sqlCommandShim.SetCommandText(setDeadlockPriorityCommand, setDeadlockPriorityStatement);
+                PrepareCommand(connection, setDeadlockPriorityCommand);
+                sqlCommandShim.ExecuteNonQuery(setDeadlockPriorityCommand);
+            }
+        }
+
+        /// <summary>
+        /// Prepares the specified <see cref="SqlCommand"/>.
+        /// </summary>
+        /// <param name="connection">The connection to SQL Server.</param>
+        /// <param name="command">The command.</param>
+        protected void PrepareCommand(SqlConnection connection, SqlCommand command)
+        {
+            sqlCommandShim.SetConnection(command, connection);
+            sqlCommandShim.SetCommandTimeout(command, operationTimeout);
+        }
+
+        /// <summary>
+        /// Prepares the specified <see cref="SqlCommand"/>.
+        /// </summary>
+        /// <param name="connection">The connection to SQL Server.</param>
+        /// <param name="transaction">The transaction to execute the command under.</param>
+        /// <param name="command">The command.</param>
+        protected void PrepareCommand(SqlConnection connection, SqlTransaction transaction, SqlCommand command)
+        {
+            PrepareCommand(connection, command);
+            sqlCommandShim.SetTransaction(command, transaction);
+        }
+
+        /// <summary>
+        /// Performs teardown/deconstruct operations on the the specified <see cref="SqlConnection"/> after utilizing it.
+        /// </summary>
+        /// <param name="connection">The connection to SQL Server.</param>
+        protected void TeardownConnection(SqlConnection connection)
+        {
+            sqlConnectionShim.GetRetryLogicProvider(connection).Retrying -= connectionRetryAction;
+        }
+
+        /// <summary>
+        /// Capitalizes the first letter of the specified string.
+        /// </summary>
+        /// <param name="inputString">The string to capitalize the first letter of.</param>
+        /// <returns>The capitalized string.</returns>
+        protected String CapitalizeFirstLetterOfString(String inputString)
+        {
+            StringBuilder returnStringBuilder = new();
+            Int32 currentIndex = 0;
+            foreach (Char currentChar in inputString)
+            {
+                if (currentIndex == 0)
+                {
+                    returnStringBuilder.Append(currentChar.ToString().ToUpper());
+                }
+                else
+                {
+                    returnStringBuilder.Append(currentChar); ;
+                }
+                currentIndex++;
+            }
+
+            return returnStringBuilder.ToString();
+        }
+
+        /// <summary>
+        /// Returns a list of SQL Server error numbers which indicate errors which are transient (i.e. could be recovered from after retry).
+        /// </summary>
+        /// <returns>The list of SQL Server error numbers.</returns>
+        /// <remarks>See <see href="https://docs.microsoft.com/en-us/azure/azure-sql/database/troubleshoot-common-errors-issues?view=azuresql">Troubleshooting connectivity issues and other errors with Azure SQL Database and Azure SQL Managed Instance</see></remarks> 
+        protected List<Int32> GenerateSqlServerTransientErrorNumbers()
+        {
+            // Below obtained from https://docs.microsoft.com/en-us/azure/azure-sql/database/troubleshoot-common-errors-issues?view=azuresql
+            var returnList = new List<Int32>() { 26, 40, 615, 926, 4060, 4221, 10053, 10928, 10929, 11001, 40197, 40501, 40613, 40615, 40544, 40549, 49918, 49919, 49920 };
+            // These are additional error numbers encountered during testing
+            returnList.AddRange(new List<Int32>() { -2, 53, 121 });
+
+            return returnList;
+        }
+
+        /// <summary>
+        /// Throws an <see cref="ArgumentException"/> is the specified 'connectionString' parameter is null or whitespace.
+        /// </summary>
+        /// <param name="connectionStringParameterName">The name of the parameter.</param>
+        /// <param name="connectionString">The value of the parameter.</param>
+        protected void ThrowExceptionIfConnectionStringParameterNullOrWhitespace(String connectionStringParameterName, String connectionString)
+        {
+            if (String.IsNullOrWhiteSpace(connectionString) == true)
+                throw new ArgumentException($"Parameter '{connectionStringParameterName}' must contain a value.", nameof(connectionString));
+        }
+
+        /// <summary>
+        /// Throws an <see cref="ArgumentOutOfRangeException"/> is the specified 'operationTimeout' parameter is less than 0.
+        /// </summary>
+        /// <param name="operationTimeoutParameterName">The name of the parameter.</param>
+        /// <param name="operationTimeout">The value of the parameter.</param>
+        protected void ThrowExceptionIfOperationTimeoutParameterLessThanZero(String operationTimeoutParameterName, Int32 operationTimeout)
+        {
+            if (operationTimeout < 0)
+                throw new ArgumentOutOfRangeException(nameof(operationTimeout), $"Parameter '{operationTimeoutParameterName}' with value {operationTimeout} cannot be less than 0.");
+        }
+
+        #endregion
+
+        #region Nested Classes
+
+        /// <summary>
+        /// An implementation of <see cref="IEmitter{T}"/> which performs an action against a SQL Server database.
+        /// </summary>
+        /// <typeparam name="T">The type of object emitted and used in the database operation.</typeparam>
+        protected class DataBaseOperationEmitter<T> : IEmitter<T>
+        {
+            /// <summary>The connection to use to perform the operation.</summary>
+            protected SqlConnection connection;
+            /// <summary>The transaction to perform the operation under.</summary>
+            protected SqlTransaction transaction;
+            /// <summary>The date and time that the operation occurred.</summary>
+            protected DateTime operationDateTime;
+            /// <summary>An action which performs the database operation.  Accepts 3 parameters: the connection to use to perform the operation, the transaction to perform the operation under, the object used in the database operation, and the date and time that the operation occurred.</summary>
+            protected Action<SqlConnection, SqlTransaction, T, DateTime> operationAction;
+
+            /// <summary>
+            /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.PersisterBase+DataBaseOperationEmitter class.
+            /// </summary>
+            /// <param name="connection">The connection to use to perform the operation.</param>
+            /// <param name="transaction">The transaction to perform the operation under.</param>
+            /// <param name="operationDateTime">The date and time that the operation occurred.</param>
+            /// <param name="operationAction">An action which performs the database operation.  Accepts 3 parameters: the connection to use to perform the operation, the transaction to perform the operation under, the object used in the database operation, and the date and time that the operation occurred.</param>
+            public DataBaseOperationEmitter(SqlConnection connection, SqlTransaction transaction, DateTime operationDateTime, Action<SqlConnection, SqlTransaction, T, DateTime> operationAction)
+            {
+                this.connection = connection;
+                this.transaction = transaction;
+                this.operationDateTime = operationDateTime;
+                this.operationAction = operationAction;
+            }
+
+            /// <inheritdoc/>
+            public void Emit(T instance)
+            {
+                operationAction(connection, transaction, instance, operationDateTime);
+            }
+        }
+
+        #endregion
+    }
+}
