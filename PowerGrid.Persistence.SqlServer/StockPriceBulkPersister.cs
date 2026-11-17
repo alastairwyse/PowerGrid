@@ -32,10 +32,271 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Reads and bulk writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPriceBulkPersister : StockPricePersister
+    public class StockPriceBulkPersister : PersisterCommonBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
         /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</summary>
         protected Int32 bufferSizeLimit;
+
+
+        const String tagParameterName = "@Tag";
+        const String dataSourceParameterName = "@DataSource";
+        const String dateParameterName = "@Date";
+        const String companyParameterName = "@Company";
+        const String priceParameterName = "@Price";
+
+        const String tagColumnName = "Tag";
+        const String dataSourceColumnName = "DataSource";
+        const String dateColumnName = "Date";
+        const String companyColumnName = "Company";
+        const String priceColumnName = "Price";
+
+        #region Base Class Property Implementations
+
+        /// <inheritdoc/>
+        protected override String GridItemTableName
+        {
+            get { return "StockPrices"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridTableName
+        {
+            get { return "StockPriceGrids"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridItemEntityName
+        {
+            get { return "stock price"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridMaxVersionQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  MAX([{versionColumnName}]) AS {maxVersionColumnAlias} 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23)";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridMaxVersionAndTransactionTimestampQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{versionColumnName}] = 
+                        (
+                          {GridMaxVersionQuery}
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridTransactionTimestampQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{versionColumnName}] = {versionParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridContentsQuery
+        {
+            get
+            {
+                return @$"
+                SELECT Id, 
+                       {tagColumnName}, 
+                       {dataSourceColumnName}, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [{dateColumnName}], 
+                       {companyColumnName}, 
+                       {priceColumnName}, 
+                       CONVERT(nvarchar(30), {transactionFromColumnName}, 126) AS {transactionFromColumnName}, 
+                       CONVERT(nvarchar(30), {transactionToColumnName}, 126) AS {transactionToColumnName}
+                FROM   {GridItemTableName} 
+                WHERE  {tagColumnName} = {tagParameterName}
+                  AND  {dataSourceColumnName} = {dataSourceParameterName}
+                  AND  [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND  CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
+                ORDER  BY {companyColumnName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridDetailsByCommonKeyPropertiesQuery
+        {
+            get
+            {
+                return @$"{GridDetailsBaseQuery}
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        protected override String GridDetailsByOuterKeyPropertiesQuery
+        {
+            get
+            {
+                return @$"{GridDetailsBaseQuery}
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String SoftDeleteLatestGridStatementSqlText
+        {
+            get
+            {
+                return @$"
+                UPDATE  {GridItemTableName} 
+                SET     {transactionToColumnName} = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   CONVERT(datetime2, {currentDateTimeParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridsByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridsByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   {dataSourceColumnName} = {dataSourceParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridInsertStatementSqlText
+        {
+            get
+            {
+                return $@"
+                INSERT 
+                INTO    {GridTableName} 
+                        (
+                            {tagColumnName}, 
+                            {dataSourceColumnName}, 
+                            [{dateColumnName}], 
+                            [{versionColumnName}], 
+                            {transactionTimestampColumnName}
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            {dataSourceParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            {versionParameterName}, 
+                            CONVERT(datetime2, {createDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridItemsInsertStatementSqlText
+        {
+            get
+            {
+                return @$"
+                INSERT 
+                INTO    {GridItemTableName} 
+                        (
+                            {tagColumnName}, 
+                            {dataSourceColumnName}, 
+                            [{dateColumnName}], 
+                            {companyColumnName}, 
+                            {priceColumnName}, 
+                            {transactionFromColumnName}, 
+                            {transactionToColumnName} 
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            {dataSourceParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            {companyParameterName}, 
+                            {priceParameterName}, 
+                            CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
+                            CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override Action<StockPrice> NewEntityValidationAction
+        {
+            get
+            {
+                return (StockPrice stockPrice) =>
+                {
+                    if (stockPrice.Price < 0)
+                        throw new GridContentsValidationException<StockPrice>($"{stockPrice.ToString()} has negative {nameof(StockPrice.Price)} {stockPrice.Price}.", stockPrice);
+                };
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister class.
@@ -252,6 +513,83 @@ namespace PowerGrid.Persistence.SqlServer
         }
 
         #region Private/Protected Methods
+
+
+        #region Base Class Method Implementations
+
+        /// <inheritdoc/>
+        protected override StockPriceGridOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader)
+        {
+            String tag = (String)dataReader[tagColumnName];
+            String dataSource = (String)dataReader[dataSourceColumnName];
+            DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+
+            return new StockPriceGridOuterKeyProperties(tag, dataSource, date);
+        }
+
+        /// <inheritdoc/>
+        protected override StockPriceGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader)
+        {
+            Int64 id = (Int64)dataReader[idColumnName];
+            StockPriceGridOuterKeyProperties outerKeyProperties = GetOuterKeyPropertiesFromDataReader(dataReader);
+            String company = (String)dataReader[companyColumnName];
+            Decimal price = (Decimal)dataReader[priceColumnName];
+            (DateTime transactionFrom, DateTime transactionTo) = GetTransactionFromAndToDateTimesFromDataReader(dataReader);
+
+            return new StockPriceGridItemPTO(id, outerKeyProperties.Tag, outerKeyProperties.DataSource, outerKeyProperties.Date, company, price, transactionFrom, transactionTo);
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridCommonKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, GridCommonKeyProperties gridCommonKeyProperties)
+        {
+            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPriceGridOuterKeyProperties gridOuterKeyProperties)
+        {
+            AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, command, new GridCommonKeyProperties(gridOuterKeyProperties.Tag));
+            sqlCommandShim.AddParameter(command, dataSourceParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.DataSource);
+            sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, StockPrice entity)
+        {
+            sqlCommandShim.AddParameter(command, companyParameterName, SqlDbType.NVarChar, entity.Company);
+            sqlCommandShim.AddParameter(command, priceParameterName, SqlDbType.Money, entity.Price);
+        }
+
+        /// <inheritdoc/>
+        protected override StockPriceGridOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(StockPriceGridItem gridItem)
+        {
+            return new StockPriceGridOuterKeyProperties(gridItem.Tag, gridItem.DataSource, gridItem.Date);
+        }
+
+        /// <inheritdoc/>
+        protected override StockPriceGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(StockPriceGridOuterKeyProperties gridOuterKeyProperties, StockPrice entity)
+        {
+            return new StockPriceGridItem(gridOuterKeyProperties.Tag, gridOuterKeyProperties.DataSource, gridOuterKeyProperties.Date, entity.Company, entity.Price);
+        }
+
+        #endregion
+
+        /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of outer key properties.
+        /// </summary>
+        protected String GridDetailsBaseQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  {tagColumnName}, 
+                        {dataSourceColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName}, 126) AS {transactionTimestampColumnName} 
+                FROM    {GridTableName} ";
+            }
+        }
 
         #pragma warning disable 1591
 

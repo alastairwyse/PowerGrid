@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Net.Mime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using PowerGrid.Grids;
 using PowerGrid.Hosting.Rest.Models.DataTransferObjects;
 using PowerGrid.Hosting.Rest.Models.DataTransferObjects.StockPrice;
 using PowerGrid.Persistence;
@@ -43,7 +44,11 @@ namespace PowerGrid.Hosting.Rest.Controllers
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Hosting.Rest.Controllers.StockPriceController class.
         /// </summary>
-        public StockPriceController(IPersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
+        public StockPriceController
+        (
+            IPersistenceConcurrencyManager concurrencyManager, 
+            PersisterCommonBase<StockPrice, GridCommonKeyProperties, Grids.StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO> stockPricePersister
+        )
         {
             persisterHost = new(concurrencyManager, stockPricePersister);
         }
@@ -112,7 +117,7 @@ namespace PowerGrid.Hosting.Rest.Controllers
             IEnumerable<StockPriceGridItemPTO> gridItems = persisterHost.GetGrid(stockPriceGridOuterKeyProperties, parsedVersion);
             OutputStockPriceGrid returnGrid = new()
             {
-                StockPriceGridOuterKeyProperties = new StockPriceGridOuterKeyProperties()
+                StockPriceGridOuterKeyProperties = new Models.DataTransferObjects.StockPrice.StockPriceGridOuterKeyProperties()
                 {
                     Tag = decodedTag,
                     DataSource = decodedDataSource,

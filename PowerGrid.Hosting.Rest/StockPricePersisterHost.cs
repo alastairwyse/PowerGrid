@@ -38,14 +38,18 @@ namespace PowerGrid.Hosting.Rest
         /// <summary>Manages locks to allow concurrent persistence of grids.</summary>
         protected IPersistenceConcurrencyManager concurrencyManager;
         /// <summary>Persister for grids of stock prices.</summary>
-        protected StockPricePersister stockPricePersister;
+        protected PersisterCommonBase<StockPrice, GridCommonKeyProperties, Grids.StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO> stockPricePersister;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Hosting.Rest.StockPricePersisterHost class.
         /// </summary>
         /// <param name="concurrencyManager">Manages locks to allow concurrent persistence of grids.</param>
         /// <param name="stockPricePersister">Persister for grids of stock prices.</param>
-        public StockPricePersisterHost(IPersistenceConcurrencyManager concurrencyManager, StockPricePersister stockPricePersister)
+        public StockPricePersisterHost
+        (
+            IPersistenceConcurrencyManager concurrencyManager, 
+            PersisterCommonBase<StockPrice, GridCommonKeyProperties, Grids.StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO> stockPricePersister
+        )
         {
             this.concurrencyManager = concurrencyManager;
             this.stockPricePersister = stockPricePersister;

@@ -18,7 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Text.Json.Serialization; 
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
@@ -28,8 +28,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using PowerGrid.Grids;
 using PowerGrid.Hosting.Rest.Models.Options;
 using PowerGrid.Persistence;
+using PowerGrid.Persistence.Models.PersistenceTransferObjects;
 using PowerGrid.Persistence.SqlServer;
 using ApplicationLogging.Adapters.MicrosoftLoggingExtensions;
 
@@ -52,7 +54,7 @@ namespace PowerGrid.Hosting.Rest
             Int32 retryInterval = databaseConnectionOptions.RetryInterval;
             Int32 operationTimeout = databaseConnectionOptions.OperationTimeout;
             ILogger stockPricePersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<StockPricePersister>>();
-            builder.Services.AddSingleton<StockPricePersister>
+            builder.Services.AddSingleton<Persistence.SqlServer.PersisterCommonBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>>
             (
                 new StockPriceBulkPersister(connectionString, 1_000, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
             );

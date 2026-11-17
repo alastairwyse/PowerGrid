@@ -8,6 +8,17 @@ A prototype for a system persisting grids of data to a database, with advanced s
 * All data available via CRUD methods in a REST API
 * Simple UI allowing complete CRUD operations on grids (and data points within grids)
 
+#### Class Hierarchy Refactoring
+* StockPriceBulkPersister
+  * Create a BulkPersisterBase class
+  * Move 'bufferSizeLimit' to BulkPersisterBase class
+  * Most of BulkAddEmitter and BulkDeleteEmitter could be made more generic... in fact could make abstract classes out of these and implement derived version with relevant overridden bits as inner classes
+  * Figure out if theres anything not used currently defined in StockPriceBulkPersister and remove it (or if specific to itemwize loading move it to PersisterBase)
+  * Update unit tests to duplicate for StockPriceBulkPersister, and rename ones that should go to CommonBase appropriately (or if tests are done via StockPrice, considering naming it CommonBaseTests)
+* Change inheritance hierarchy of weather forecast aswell to make stock price
+* Update metrics to be overridable
+* Add metrics to BulkAddEmitter and BulkDeleteEmitter and make these overiddable too
+
 #### Immediate TODO
 * Inconsistencies in [model class]GridItem and [model class] records... some are records with no param validation (e.g. for empty/null strings), some have param validation.  Validation is done in persister, so maybe that's why I left it off.  Need to decide approach and make consistent.
 * StockPricePersister (and any other persister classes) should have logging and metrics.
