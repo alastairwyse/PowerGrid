@@ -10,7 +10,7 @@ A prototype for a system persisting grids of data to a database, with advanced s
 
 #### Class Hierarchy Refactoring
 * StockPriceBulkPersister
-  * Create a BulkPersisterBase class
+  * (DONE) Create a BulkPersisterBase class
   * Move 'bufferSizeLimit' to BulkPersisterBase class
   * Most of BulkAddEmitter and BulkDeleteEmitter could be made more generic... in fact could make abstract classes out of these and implement derived version with relevant overridden bits as inner classes
   * Figure out if theres anything not used currently defined in StockPriceBulkPersister and remove it (or if specific to itemwize loading move it to PersisterBase)

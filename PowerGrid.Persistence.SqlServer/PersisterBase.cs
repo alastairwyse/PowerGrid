@@ -45,7 +45,6 @@ namespace PowerGrid.Persistence.SqlServer
         where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridOuterKeyProperties, TGridItem, IGridItem<TGridItem>, IPersistenceTransferObject
     {
-
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.PersisterBase class.
         /// </summary>

@@ -32,7 +32,7 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Reads and bulk writes <see cref="StockPrice"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class StockPriceBulkPersister : PersisterCommonBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
+    public class StockPriceBulkPersister : BulkPersisterBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
         /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</summary>
         protected Int32 bufferSizeLimit;
