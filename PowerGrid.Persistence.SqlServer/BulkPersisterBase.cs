@@ -35,6 +35,8 @@ namespace PowerGrid.Persistence.SqlServer
         where TGridItem : TEntity, IGridOuterKeyProperties, IGridItem<TGridItem>
         where TGridItemPTO : IGridOuterKeyProperties, TGridItem, IGridItem<TGridItem>, IPersistenceTransferObject
     {
+        /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</summary>
+        protected Int32 bufferSizeLimit;
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.BulkPersisterBase class.

@@ -11,8 +11,8 @@ A prototype for a system persisting grids of data to a database, with advanced s
 #### Class Hierarchy Refactoring
 * StockPriceBulkPersister
   * (DONE) Create a BulkPersisterBase class
-  * Move 'bufferSizeLimit' to BulkPersisterBase class
-  * Most of BulkAddEmitter and BulkDeleteEmitter could be made more generic... in fact could make abstract classes out of these and implement derived version with relevant overridden bits as inner classes
+  * (DONE) Move 'bufferSizeLimit' to BulkPersisterBase class
+  * (DONE) Most of BulkAddEmitter and BulkDeleteEmitter could be made more generic... in fact could make abstract classes out of these and implement derived version with relevant overridden bits as inner classes
   * Figure out if theres anything not used currently defined in StockPriceBulkPersister and remove it (or if specific to itemwize loading move it to PersisterBase)
   * Update unit tests to duplicate for StockPriceBulkPersister, and rename ones that should go to CommonBase appropriately (or if tests are done via StockPrice, considering naming it CommonBaseTests)
 * Change inheritance hierarchy of weather forecast aswell to make stock price

@@ -34,10 +34,6 @@ namespace PowerGrid.Persistence.SqlServer
     /// </summary>
     public class StockPriceBulkPersister : BulkPersisterBase<StockPrice, GridCommonKeyProperties, StockPriceGridOuterKeyProperties, StockPriceGridItem, StockPriceGridItemPTO>
     {
-        /// <summary>The maximum number of <see cref="StockPriceGridItem"/> objects buffer before writing in bulk.</summary>
-        protected Int32 bufferSizeLimit;
-
-
         const String tagParameterName = "@Tag";
         const String dataSourceParameterName = "@DataSource";
         const String dateParameterName = "@Date";
