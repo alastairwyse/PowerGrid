@@ -15,9 +15,11 @@
  */
 
 using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Globalization;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
-using PowerGrid.Grids;
 
 namespace PowerGrid.Persistence.SqlServer
 {
@@ -55,5 +57,39 @@ namespace PowerGrid.Persistence.SqlServer
             : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlTransaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction)
         {
         }
+
+        // 2026-11-22 TODO:
+        //   Mapping from currentGridItem to 'row' needs to be done in abstract method
+        //   Name of SP to call also needs to be in an anstract method (i.e. 'BulkInsertStockPrices' below)
+
+        #region Private/Protected Methods
+
+        /// <summary>
+        /// Persists all buffered items and then clears the buffer.
+        /// </summary>
+        protected override void Persist()
+        {
+            bulkInsertStagingTable.Rows.Clear();
+            foreach (TGridItem currentGridItem in buffer)
+            {
+                var row = bulkInsertStagingTable.NewRow();
+                row[gridItemData1ColumnName] = currentGridItem.Tag;
+                row[gridItemData2ColumnName] = currentGridItem.DataSource;
+                row[gridItemData3ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
+                row[gridItemData4ColumnName] = currentGridItem.Company;
+                row[gridItemData5ColumnName] = currentGridItem.Price.ToString(CultureInfo.InvariantCulture);
+                bulkInsertStagingTable.Rows.Add(row);
+            }
+            var parameters = new List<SqlParameter>()
+                {
+                    CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
+                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
+                };
+            ExecuteStoredProcedureWithDeadlockRetry("BulkInsertStockPrices", parameters);
+            bulkInsertStagingTable.Rows.Clear();
+            buffer.Clear();
+        }
+
+        #endregion
     }
 }
