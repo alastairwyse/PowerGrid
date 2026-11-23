@@ -604,8 +604,21 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which persists <see cref="StockPriceGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="BulkAddEmitter.Emit(StockPriceGridItem)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkAddEmitter : BulkPersistenceStoredProcedureEmitterBase<StockPriceGridItem>
+        protected class BulkAddEmitter : BulkAddStoredProcedureEmitterBase<StockPriceGridItem>
         {
+            #region Base Class Property Implementations
+
+            /// <inheritdoc/>
+            protected override String BulkInsertStoredProcedureName 
+            {
+                get 
+                {
+                    return "BulkInsertStockPrices";
+                }
+            }
+
+            #endregion
+
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkAddEmitter class.
             /// </summary>
@@ -636,31 +649,19 @@ namespace PowerGrid.Persistence.SqlServer
 
             #region Private/Protected Methods
 
-            /// <summary>
-            /// Persists all buffered items and then clears the buffer.
-            /// </summary>
-            protected override void Persist()
+            #region Base Class Method Implementations
+
+            /// <inheritdoc/>
+            protected override void CopyGridItemToDataRow(DataRow row, StockPriceGridItem gridItem)
             {
-                bulkInsertStagingTable.Rows.Clear();
-                foreach (StockPriceGridItem currentGridItem in buffer)
-                {
-                    var row = bulkInsertStagingTable.NewRow();
-                    row[gridItemData1ColumnName] = currentGridItem.Tag;
-                    row[gridItemData2ColumnName] = currentGridItem.DataSource;
-                    row[gridItemData3ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
-                    row[gridItemData4ColumnName] = currentGridItem.Company;
-                    row[gridItemData5ColumnName] = currentGridItem.Price.ToString(CultureInfo.InvariantCulture);
-                    bulkInsertStagingTable.Rows.Add(row);
-                }
-                var parameters = new List<SqlParameter>()
-                {
-                    CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
-                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
-                };
-                ExecuteStoredProcedureWithDeadlockRetry("BulkInsertStockPrices", parameters);
-                bulkInsertStagingTable.Rows.Clear();
-                buffer.Clear();
+                row[gridItemData1ColumnName] = gridItem.Tag;
+                row[gridItemData2ColumnName] = gridItem.DataSource;
+                row[gridItemData3ColumnName] = gridItem.Date.ToString(transactSql23DateStyle);
+                row[gridItemData4ColumnName] = gridItem.Company;
+                row[gridItemData5ColumnName] = gridItem.Price.ToString(CultureInfo.InvariantCulture);
             }
+
+            #endregion
 
             #endregion
         }
@@ -668,8 +669,21 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="StockPriceGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(StockPriceGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkDeleteEmitter : BulkPersistenceStoredProcedureEmitterBase<StockPriceGridItemPTO>
+        protected class BulkDeleteEmitter : BulkDeleteStoredProcedureEmitterBase<StockPriceGridItemPTO>
         {
+            #region Base Class Property Implementations
+
+            /// <inheritdoc/>
+            protected override String BulkDeleteStoredProcedureName
+            {
+                get
+                {
+                    return "BulkDeleteStockPrices";
+                }
+            }
+
+            #endregion
+
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.StockPriceBulkPersister+BulkDeleteEmitter class.
             /// </summary>
@@ -697,31 +711,6 @@ namespace PowerGrid.Persistence.SqlServer
                 : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlTransaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction)
             {
             }
-
-            #region Private/Protected Methods
-
-            /// <summary>
-            /// Deletes all buffered items and then clears the buffer.
-            /// </summary>
-            protected override void Persist()
-            {
-                foreach (StockPriceGridItemPTO currentGridItem in buffer)
-                {
-                    var row = bulkDeleteStagingTable.NewRow();
-                    row[idColumnName] = currentGridItem.Id;
-                    bulkDeleteStagingTable.Rows.Add(row);
-                }
-                var parameters = new List<SqlParameter>()
-                {
-                    CreateSqlParameterWithValue("@GridItemIds", SqlDbType.Structured, bulkDeleteStagingTable),
-                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
-                };
-                ExecuteStoredProcedureWithDeadlockRetry("BulkDeleteStockPrices", parameters);
-                bulkDeleteStagingTable.Rows.Clear();
-                buffer.Clear();
-            }
-
-            #endregion
         }
 
         #endregion

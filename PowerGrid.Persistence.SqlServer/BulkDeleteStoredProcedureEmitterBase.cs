@@ -17,21 +17,20 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
 using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 
 namespace PowerGrid.Persistence.SqlServer
 {
     /// <summary>
-    /// Base for implementations of <see cref="IEmitter{T}"/> which persist <see cref="TGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="IEmitter{T}.Emit(T)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
+    /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then delete <see cref="TGridItemPTO"/> objects from a SQL Server database in bulk via stored procedures and <see href="https://learn.microsoft.com/en-us/sql/relational-databases/tables/use-table-valued-parameters-database-engine?view=sql-server-ver17">table-valued parameters.
     /// </summary>
-    /// <typeparam name="TGridItem"></typeparam>
-    public abstract class BulkAddEmitterBase<TGridItem> : BulkPersistenceStoredProcedureEmitterBase<TGridItem>
-        where TGridItem : IGridOuterKeyProperties, IGridItem<TGridItem>
+    /// <typeparam name="TGridItemPTO">The type of the object deleted from the SQL Server database.</typeparam>
+    public abstract class BulkDeleteStoredProcedureEmitterBase<TGridItemPTO> : BulkPersistenceStoredProcedureEmitterBase<TGridItemPTO>
+        where TGridItemPTO : IGridOuterKeyProperties, IPersistenceTransferObject
     {
         /// <summary>
-        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.BulkAddEmitterBase class.
+        /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.BulkDeleteStoredProcedureEmitterBase class.
         /// </summary>
         /// <param name="transactionTimestamp">The timestamp representing when the objects emitted were either inserted or deleted.</param>
         /// <param name="bufferSizeLimit">The maximum number of <see cref="TGridItem"/> objects to hold in the buffer.</param>
@@ -42,7 +41,7 @@ namespace PowerGrid.Persistence.SqlServer
         /// <param name="sqlRetryLogicOption">Parameters for retrying when transient errors occur.</param>
         /// <param name="operationTimeout">The timeout in seconds before terminating an operation against the SQL Server database.  A value of 0 indicates no limit.</param>
         /// <param name="connectionRetryAction">The action to invoke if an action is retried due to a transient error.</param>
-        public BulkAddEmitterBase
+        public BulkDeleteStoredProcedureEmitterBase
         (
             DateTime transactionTimestamp,
             Int32 bufferSizeLimit,
@@ -58,35 +57,35 @@ namespace PowerGrid.Persistence.SqlServer
         {
         }
 
-        // 2026-11-22 TODO:
-        //   Mapping from currentGridItem to 'row' needs to be done in abstract method
-        //   Name of SP to call also needs to be in an anstract method (i.e. 'BulkInsertStockPrices' below)
-
         #region Private/Protected Methods
 
+        #region Abstract Poperties and Methods
+
         /// <summary>
-        /// Persists all buffered items and then clears the buffer.
+        /// The name of the stored procedure which performs bulk delete for a collection of grid item PTOs.
+        /// </summary>
+        protected abstract String BulkDeleteStoredProcedureName { get; }
+
+        #endregion
+
+        /// <summary>
+        /// Deletes all buffered items and then clears the buffer.
         /// </summary>
         protected override void Persist()
         {
-            bulkInsertStagingTable.Rows.Clear();
-            foreach (TGridItem currentGridItem in buffer)
+            foreach (TGridItemPTO currentGridItem in buffer)
             {
-                var row = bulkInsertStagingTable.NewRow();
-                row[gridItemData1ColumnName] = currentGridItem.Tag;
-                row[gridItemData2ColumnName] = currentGridItem.DataSource;
-                row[gridItemData3ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
-                row[gridItemData4ColumnName] = currentGridItem.Company;
-                row[gridItemData5ColumnName] = currentGridItem.Price.ToString(CultureInfo.InvariantCulture);
-                bulkInsertStagingTable.Rows.Add(row);
+                var row = bulkDeleteStagingTable.NewRow();
+                row[idColumnName] = currentGridItem.Id;
+                bulkDeleteStagingTable.Rows.Add(row);
             }
             var parameters = new List<SqlParameter>()
                 {
-                    CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
+                    CreateSqlParameterWithValue("@GridItemIds", SqlDbType.Structured, bulkDeleteStagingTable),
                     CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
                 };
-            ExecuteStoredProcedureWithDeadlockRetry("BulkInsertStockPrices", parameters);
-            bulkInsertStagingTable.Rows.Clear();
+            ExecuteStoredProcedureWithDeadlockRetry(BulkDeleteStoredProcedureName, parameters);
+            bulkDeleteStagingTable.Rows.Clear();
             buffer.Clear();
         }
 

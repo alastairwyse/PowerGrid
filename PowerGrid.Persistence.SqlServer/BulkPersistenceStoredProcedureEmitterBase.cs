@@ -23,7 +23,7 @@ using PowerGrid.Core;
 namespace PowerGrid.Persistence.SqlServer
 {
     /// <summary>
-    /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then either insert objects into or delete objects from a SQL Server database in bulk via stored procedures and <see href="https://learn.microsoft.com/en-us/sql/relational-databases/tables/use-table-valued-parameters-database-engine?view=sql-server-ver17">table-valued parameters</see>.
+    /// Base for classes which implement <see cref="IEmitter{T}"/> and buffer and then either insert objects into or delete objects from a SQL Server database in bulk via stored procedures and <see href="https://learn.microsoft.com/en-us/sql/relational-databases/tables/use-table-valued-parameters-database-engine?view=sql-server-ver17">table-valued parameters.</see>.
     /// </summary>
     /// <typeparam name="T">The type of the object output in the <see cref="IEmitter{T}"/> implementation.</typeparam>
     public abstract class BulkPersistenceStoredProcedureEmitterBase<T> : IEmitter<T>, IDisposable

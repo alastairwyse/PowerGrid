@@ -262,8 +262,21 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which persists <see cref="WeatherForecastGridItem"/> objects to a SQL Server database in bulk, by buffering objects received through the <see cref="BulkAddEmitter.Emit(WeatherForecastGridItem)"/> method, and writing those objects to SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkAddEmitter : BulkPersistenceStoredProcedureEmitterBase<WeatherForecastGridItem>
+        protected class BulkAddEmitter : BulkAddStoredProcedureEmitterBase<WeatherForecastGridItem>
         {
+            #region Base Class Property Implementations
+
+            /// <inheritdoc/>
+            protected override String BulkInsertStoredProcedureName
+            {
+                get
+                {
+                    return "BulkInsertWeatherForecasts";
+                }
+            }
+
+            #endregion
+
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastBulkPersister+BulkAddEmitter class.
             /// </summary>
@@ -294,32 +307,20 @@ namespace PowerGrid.Persistence.SqlServer
 
             #region Private/Protected Methods
 
-            /// <summary>
-            /// Persists all buffered items and then clears the buffer.
-            /// </summary>
-            protected override void Persist()
+            #region Base Class Method Implementations
+
+            /// <inheritdoc/>
+            protected override void CopyGridItemToDataRow(DataRow row, WeatherForecastGridItem gridItem)
             {
-                bulkInsertStagingTable.Rows.Clear();
-                foreach (WeatherForecastGridItem currentGridItem in buffer)
-                {
-                    var row = bulkInsertStagingTable.NewRow();
-                    row[gridItemData1ColumnName] = currentGridItem.Tag;
-                    row[gridItemData2ColumnName] = currentGridItem.Date.ToString(transactSql23DateStyle);
-                    row[gridItemData3ColumnName] = currentGridItem.Time.ToString(transactSql24TimeStyle);
-                    row[gridItemData4ColumnName] = currentGridItem.Country;
-                    row[gridItemData5ColumnName] = currentGridItem.City;
-                    row[gridItemData6ColumnName] = currentGridItem.Temperature.ToString(CultureInfo.InvariantCulture);
-                    bulkInsertStagingTable.Rows.Add(row);
-                }
-                var parameters = new List<SqlParameter>()
-                {
-                    CreateSqlParameterWithValue("@GridItems", SqlDbType.Structured, bulkInsertStagingTable),
-                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
-                };
-                ExecuteStoredProcedureWithDeadlockRetry("BulkInsertWeatherForecasts", parameters);
-                bulkInsertStagingTable.Rows.Clear();
-                buffer.Clear();
+                row[gridItemData1ColumnName] = gridItem.Tag;
+                row[gridItemData2ColumnName] = gridItem.Date.ToString(transactSql23DateStyle);
+                row[gridItemData3ColumnName] = gridItem.Time.ToString(transactSql24TimeStyle);
+                row[gridItemData4ColumnName] = gridItem.Country;
+                row[gridItemData5ColumnName] = gridItem.City;
+                row[gridItemData6ColumnName] = gridItem.Temperature.ToString(CultureInfo.InvariantCulture);
             }
+
+            #endregion
 
             #endregion
         }
@@ -327,8 +328,21 @@ namespace PowerGrid.Persistence.SqlServer
         /// <summary>
         /// An implementation of <see cref="IEmitter{T}"/> which soft deletes <see cref="WeatherForecastGridItemPTO"/> objects in a SQL Server database in bulk, by buffering objects received through the <see cref="BulkDeleteEmitter.Emit(WeatherForecastGridItem)"/> method, and deleting those objects from SQL Server when the buffer reaches a specified size.
         /// </summary>
-        protected class BulkDeleteEmitter : BulkPersistenceStoredProcedureEmitterBase<WeatherForecastGridItemPTO>
+        protected class BulkDeleteEmitter : BulkDeleteStoredProcedureEmitterBase<WeatherForecastGridItemPTO>
         {
+            #region Base Class Property Implementations
+
+            /// <inheritdoc/>
+            protected override String BulkDeleteStoredProcedureName
+            {
+                get
+                {
+                    return "BulkDeleteWeatherForecasts";
+                }
+            }
+
+            #endregion
+
             /// <summary>
             /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastBulkPersister+BulkDeleteEmitter class.
             /// </summary>
@@ -356,31 +370,6 @@ namespace PowerGrid.Persistence.SqlServer
                 : base(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, sqlConnection, sqlTransaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction)
             {
             }
-
-            #region Private/Protected Methods
-
-            /// <summary>
-            /// Deletes all buffered items and then clears the buffer.
-            /// </summary>
-            protected override void Persist()
-            {
-                foreach (WeatherForecastGridItemPTO currentGridItem in buffer)
-                {
-                    var row = bulkDeleteStagingTable.NewRow();
-                    row[idColumnName] = currentGridItem.Id;
-                    bulkDeleteStagingTable.Rows.Add(row);
-                }
-                var parameters = new List<SqlParameter>()
-                {
-                    CreateSqlParameterWithValue("@GridItemIds", SqlDbType.Structured, bulkDeleteStagingTable),
-                    CreateSqlParameterWithValue(transactionTimestampParameterName, SqlDbType.DateTime2, transactionTimestamp)
-                };
-                ExecuteStoredProcedureWithDeadlockRetry("BulkDeleteWeatherForecasts", parameters);
-                bulkDeleteStagingTable.Rows.Clear();
-                buffer.Clear();
-            }
-
-            #endregion
         }
 
         #endregion
