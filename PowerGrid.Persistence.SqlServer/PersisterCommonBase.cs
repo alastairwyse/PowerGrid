@@ -248,7 +248,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand())
             {
-                Guid beginId = metricLogger.Begin(new GridDetailsByOuterKeyPropertiesRetrieveTime());
+                Guid beginId = metricLogger.Begin(GridDetailsByOuterKeyPropertiesRetrieveTimeMetric);
                 try
                 {
                     PrepareConnection(connection);
@@ -269,8 +269,8 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
                     sqlConnectionShim.Close(connection);
-                    metricLogger.End(beginId, new GridDetailsByOuterKeyPropertiesRetrieveTime());
-                    metricLogger.Increment(new GridDetailsByOuterKeyPropertiesRetrieved());
+                    metricLogger.End(beginId, GridDetailsByOuterKeyPropertiesRetrieveTimeMetric);
+                    metricLogger.Increment(GridDetailsByOuterKeyPropertiesRetrievedMetric);
 
                     return returnList;
                 }
@@ -592,7 +592,13 @@ namespace PowerGrid.Persistence.SqlServer
 
         #region Overridable Metric Classes
 
+        #pragma warning disable 1591
 
+        protected virtual IntervalMetric GridDetailsByOuterKeyPropertiesRetrieveTimeMetric { get => new GridDetailsByOuterKeyPropertiesRetrieveTime(); }
+
+        protected virtual CountMetric GridDetailsByOuterKeyPropertiesRetrievedMetric { get => new GridDetailsByOuterKeyPropertiesRetrieved(); }
+
+        #pragma warning restore 1591
 
         #endregion
 

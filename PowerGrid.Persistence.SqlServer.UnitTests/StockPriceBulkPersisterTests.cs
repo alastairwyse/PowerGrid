@@ -22,7 +22,11 @@ using Microsoft.Data.SqlClient;
 using PowerGrid.Core;
 using PowerGrid.Grids;
 using PowerGrid.Persistence.Metrics;
+using PowerGrid.Persistence.Models;
 using PowerGrid.Persistence.Models.PersistenceTransferObjects;
+using PowerGrid.Persistence.SqlServer.Metrics;
+using ApplicationLogging;
+using ApplicationMetrics;
 using NUnit.Framework;
 using NSubstitute;
 
@@ -33,14 +37,14 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
     /// </summary>
     public class StockPriceBulkPersisterTests : PersisterTestsBase
     {
-        private StockPriceBulkPersister testStockPriceBulkPersister;
+        private StockPriceBulkPersisterWithProtectedMembers testStockPriceBulkPersister;
 
         [SetUp]
         protected override void SetUp()
         {
             base.SetUp();
             Int32 bufferSizeLimit = 3;
-            testStockPriceBulkPersister = new StockPriceBulkPersister(testConnectionString, bufferSizeLimit, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
+            testStockPriceBulkPersister = new StockPriceBulkPersisterWithProtectedMembers(testConnectionString, bufferSizeLimit, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
         }
 
         [Test]
@@ -48,7 +52,7 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
         {
             var e = Assert.Throws<ArgumentOutOfRangeException>(delegate
             {
-                testStockPriceBulkPersister = new StockPriceBulkPersister(testConnectionString, 0, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
+                testStockPriceBulkPersister = new StockPriceBulkPersisterWithProtectedMembers(testConnectionString, 0, 5, 10, 0, mockLogger, mockMetricLogger, mockDateTimeProvider, mockSqlConnectionShim, mockSqlTransactionShim, mockSqlCommandShim);
             });
 
             Assert.That(e.Message, Does.StartWith($"Parameter 'bufferSizeLimit' with value 0 must be greater than 0."));
@@ -608,5 +612,1750 @@ namespace PowerGrid.Persistence.SqlServer.UnitTests
             Assert.That(gridItemIdsStoredProcedureParameterRowCounts.Count == 1);
             Assert.That(gridItemIdsStoredProcedureParameterRowCounts[0] == 2);
         }
+
+        [Test]
+        public void GetGrid_VersionParameterLessThan1()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+
+            var e = Assert.Throws<ArgumentOutOfRangeException>(delegate
+            {
+                new List<StockPriceGridItemPTO>(testStockPriceBulkPersister.GetGrid(testOuterKeyProperties, 0));
+            });
+
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
+            Assert.That(e.Message, Does.StartWith($"Parameter 'version' with value 0 must be greater than 0."));
+            Assert.That(e.ParamName == "version");
+        }
+
+        [Test]
+        public void GetGrid_ExceptionConnectingToSqlServer()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            var mockException = new Exception("Mock exception");
+            mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                List<StockPriceGridItemPTO> results = new(testStockPriceBulkPersister.GetGrid(testOuterKeyProperties, 1));
+            });
+
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
+            Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void GetGrid()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-05");
+            Int32 testVersion = 13;
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-06-03 23:54:31.0000202");
+            String expectedVersionQueryCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = @Version;";
+            String expectedGridQueryCommandText = @$"
+                SELECT Id, 
+                       Tag, 
+                       DataSource, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       Company, 
+                       Price, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = @Tag
+                  AND  DataSource = @DataSource
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER  BY Company;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false, true, false);
+            // Mock returns for grid version query
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-03T23:54:31.0000202");
+            // Mock returns for grid contents query
+            mockDataReader["Id"].Returns<Object>(1L);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["DataSource"].Returns<Object>(testDataSource);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Company"].Returns<Object>("Canon");
+            mockDataReader["Price"].Returns<Object>(new Decimal(4216));
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-06-05T11:12:41.0000303");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+
+            List<StockPriceGridItemPTO> results = new(testStockPriceBulkPersister.GetGrid(testOuterKeyProperties, testVersion));
+
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedVersionQueryCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedGridQueryCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(2).ExecuteReader(Arg.Any<SqlCommand>());
+            Assert.That(results.Count == 1);
+            Assert.That(results[0].Id == 1);
+            Assert.That(results[0].Tag == testTag);
+            Assert.That(results[0].DataSource == testDataSource);
+            Assert.That(results[0].Date == testDate);
+            Assert.That(results[0].Company == "Canon");
+            Assert.That(results[0].Price == 4216);
+            Assert.That(results[0].TransactionFrom == utils.CreateDataTimeFromString("2026-06-05 11:12:41.0000303"));
+            Assert.That(results[0].TransactionFrom.Kind == DateTimeKind.Utc);
+            Assert.That(results[0].TransactionTo == utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            Assert.That(results[0].TransactionTo.Kind == DateTimeKind.Utc);
+        }
+
+        [Test]
+        public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload_ExceptionReading()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.GetGridDetails(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 2);
+            Assert.That(e.Message, Does.StartWith($"Failed to read grid details for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-06-21' }} from SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void GetGridDetailsStockPriceGridOuterKeyPropertiesOverload()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-21");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                true, true, false
+            );
+            mockDataReader["Version"].Returns<Object>(1, 2);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-30T13:02:53.1837676", "2026-06-09T13:02:03.9134273");
+
+            IList<GridVersionAndTransactionTimestamp> result = testStockPriceBulkPersister.GetGridDetails(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+            mockDataReader.Received(3).Read();
+            mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridDetailsByOuterKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridDetailsByOuterKeyPropertiesRetrieved>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 3);
+            Assert.That(result.Count == 2);
+            Assert.That(result[0].Version == 1);
+            Assert.That(result[0].TransactionTimestamp == utils.CreateDataTimeFromString("2026-05-30 13:02:53.1837676"));
+            Assert.That(result[1].Version == 2);
+            Assert.That(result[1].TransactionTimestamp == utils.CreateDataTimeFromString("2026-06-09 13:02:03.9134273"));
+        }
+
+        [Test]
+        public void GetGridDetailsGridCommonKeyPropertiesOverload_ExceptionReading()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.GetGridDetails(testCommonKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 2);
+            Assert.That(e.Message, Does.StartWith($"Failed to read grid details for GridCommonKeyProperties {{ Tag = 'Market' }} from SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void GetGridDetailsGridCommonKeyPropertiesOverload()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibrated";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedCommandText = @$"
+                SELECT  Tag, 
+                        DataSource, 
+                        CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                        [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp, 126) AS TransactionTimestamp 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns
+            (
+                true, true, true, false
+            );
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["DataSource"].Returns<Object>("Bloomberg", "Bloomberg", "Reuters");
+            mockDataReader["Date"].Returns<Object>("2026-05-30", "2026-05-30", "2026-05-31");
+            mockDataReader["Version"].Returns<Object>(1, 2, 1);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-30T13:02:53.1837676", "2026-06-09T13:02:03.9134273", "2026-06-23T21:55:56.9750913");
+
+            IList<Tuple<StockPriceGridOuterKeyProperties, GridVersionAndTransactionTimestamp>> result = testStockPriceBulkPersister.GetGridDetails(testCommonKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+            mockDataReader.Received(4).Read();
+            mockSqlConnectionShim.Received(1).Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridDetailsByCommonKeyPropertiesRetrieveTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridDetailsByCommonKeyPropertiesRetrieved>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 3);
+            Assert.That(result.Count == 3);
+            Assert.That(result[0].Item1.Tag == testTag);
+            Assert.That(result[0].Item1.DataSource == "Bloomberg");
+            Assert.That(result[0].Item1.Date == utils.CreateDateOnlyFromString("2026-05-30"));
+            Assert.That(result[0].Item2.Version == 1);
+            Assert.That(result[0].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-05-30 13:02:53.1837676"));
+            Assert.That(result[1].Item1.Tag == testTag);
+            Assert.That(result[1].Item1.DataSource == "Bloomberg");
+            Assert.That(result[1].Item1.Date == utils.CreateDateOnlyFromString("2026-05-30"));
+            Assert.That(result[1].Item2.Version == 2);
+            Assert.That(result[1].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-06-09 13:02:03.9134273"));
+            Assert.That(result[2].Item1.Tag == testTag);
+            Assert.That(result[2].Item1.DataSource == "Reuters");
+            Assert.That(result[2].Item1.Date == utils.CreateDateOnlyFromString("2026-05-31"));
+            Assert.That(result[2].Item2.Version == 1);
+            Assert.That(result[2].Item2.TransactionTimestamp == utils.CreateDataTimeFromString("2026-06-23 21:55:56.9750913"));
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_ExceptionConnectingToSqlServer()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-25");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlConnectionShim.When((shim) => shim.Open(Arg.Any<SqlConnection>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Received(1).Open(Arg.Any<SqlConnection>());
+            Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
+            Assert.That(e.Message, Does.StartWith($"Failed to connect to SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_GridDoesntExist()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} does not exist."));
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid_ExceptionDeleting()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
+            String expectedDeleteCommandText = @$"
+                UPDATE  StockPrices 
+                SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<LatestGridSoftDeleteTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-26T21:56:42.0000031");
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(testDeleteTimestamp);
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+            mockMetricLogger.Received(1).Begin(Arg.Any<LatestGridSoftDeleteTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<LatestGridSoftDeleteTime>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete latest grid items for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-06-26' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void SoftDeleteLatestGrid()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-26");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testDeleteTimestamp = utils.CreateDataTimeFromString("2026-06-26 22:04:21.0000032");
+            String expectedDeleteCommandText = @$"
+                UPDATE  StockPrices 
+                SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   CONVERT(datetime2, @CurrentDateTime, 126) BETWEEN TransactionFrom AND TransactionTo;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<LatestGridSoftDeleteTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-26T21:56:42.0000031");
+            mockDateTimeProvider.UtcNow().Returns<DateTime>(testDeleteTimestamp);
+
+            testStockPriceBulkPersister.SoftDeleteLatestGrid(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CurrentDateTime", SqlDbType.NVarChar, testDeleteTimestamp.ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, testDeleteTimestamp.AddTicks(-1).ToString(transactSql126DateStyle));
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<LatestGridSoftDeleteTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<LatestGridSoftDeleteTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<LatestGridSoftDeleted>());
+        }
+
+        [Test]
+        public void HardDeleteGridsGridOuterKeyPropertiesOverload_ExceptionDeleting()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibration";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.HardDeleteGrids(testOuterKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete stock price grids for StockPriceGridOuterKeyProperties {{ Tag = 'Calibration', DataSource = 'Bloomberg', Date = '2026-06-27' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void HardDeleteGridsGridOuterKeyPropertiesOverload()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibration";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-27");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            String expectedStockPricesDeleteCommandText = @$"
+                DELETE 
+                FROM    StockPrices 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+
+            testStockPriceBulkPersister.HardDeleteGrids(testOuterKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPricesDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+            mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridsByOuterKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridsByOuterKeyPropertiesHardDeleted>());
+        }
+
+        [Test]
+        public void HardDeleteGridsCommonKeyPropertiesOverload_ExceptionDeleting()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibration";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            var e = Assert.Throws<Exception>(delegate
+            {
+                testStockPriceBulkPersister.HardDeleteGrids(testCommonKeyProperties);
+            });
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            Assert.That(e.Message, Does.StartWith($"Failed to delete stock price grids for GridCommonKeyProperties {{ Tag = 'Calibration' }} in SQL Server."));
+            Assert.That(e.InnerException == mockException);
+        }
+
+        [Test]
+        public void HardDeleteGridsCommonKeyPropertiesOverload()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibration";
+            GridCommonKeyProperties testCommonKeyProperties = new(testTag);
+            String expectedStockPriceGridsDeleteCommandText = @$"
+                DELETE 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag;";
+            String expectedStockPricesDeleteCommandText = @$"
+                DELETE 
+                FROM    StockPrices 
+                WHERE   Tag = @Tag;";
+            SqlRetryLogicOption sqlRetryLogicOption = new();
+            sqlRetryLogicOption.NumberOfTries = 1;
+            mockMetricLogger.Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>()).Returns(testBeginId);
+            mockSqlConnectionShim.GetRetryLogicProvider(Arg.Any<SqlConnection>()).Returns<SqlRetryLogicBaseProvider>(SqlConfigurableRetryFactory.CreateFixedRetryProvider(sqlRetryLogicOption));
+
+            testStockPriceBulkPersister.HardDeleteGrids(testCommonKeyProperties);
+
+            mockSqlConnectionShim.Received(1).SetRetryLogicProvider(Arg.Any<SqlConnection>(), Arg.Any<SqlRetryLogicBaseProvider>());
+            mockSqlConnectionShim.Received(1).GetRetryLogicProvider(Arg.Any<SqlConnection>());
+            mockSqlConnectionShim.Open(Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPriceGridsDeleteCommandText);
+            mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedStockPricesDeleteCommandText);
+            mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), Arg.Any<SqlConnection>());
+            mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+            mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), Arg.Any<SqlTransaction>());
+            mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+            mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            mockSqlTransactionShim.Received(1).Commit(Arg.Any<SqlTransaction>());
+            mockSqlConnectionShim.Close(Arg.Any<SqlConnection>());
+            mockMetricLogger.Received(1).Begin(Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridsByCommonKeyPropertiesHardDeleteTime>());
+            mockMetricLogger.Received(1).Increment(Arg.Any<GridsByCommonKeyPropertiesHardDeleted>());
+        }
+
+        [Test]
+        public void GetLatestGridVersion_ExceptionReading()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23)
+                        );";
+            var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }} from SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void GetLatestGridVersion_NoVersionExists()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                (Int32 versionNumberResult, DateTime transactionTimestampResult) = testStockPriceBulkPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieved>());
+                Assert.That(versionNumberResult == 0);
+                Assert.That(transactionTimestampResult == DateTime.MinValue);
+                Assert.That(transactionTimestampResult.Kind == DateTimeKind.Utc);
+            }
+        }
+
+        [Test]
+        public void GetLatestGridVersion_MultipleRecordsReturned()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, true);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-16T13:39:41.0000013");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to read latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }} from SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve latest stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Reuters', Date = '2026-05-16' }}."));
+            }
+        }
+
+        [Test]
+        public void GetLatestGridVersion()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  [Version], 
+                        CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = 
+                        (
+                          
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Version"].Returns<Object>(3);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-05-16T13:39:41.0000013");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                (Int32 versionNumberResult, DateTime transactionTimestampResult) = testStockPriceBulkPersister.GetLatestGridVersion(connection, testOuterKeyProperties);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridMaximumVersionAndTransactionTimestampRetrieved>());
+                Assert.That(versionNumberResult == 3);
+                Assert.That(transactionTimestampResult == utils.CreateDataTimeFromString("2026-05-16 13:39:41.0000013"));
+                Assert.That(transactionTimestampResult.Kind == DateTimeKind.Utc);
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp_MultipleRecordsReturned()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibrated";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            Int32 testVersion = 9;
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = @Version;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-01T23:02:45.0000101");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridTransactionTimestampRetrieveTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9 from SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Read multiple results from SQL Server when attempting to retrieve stock price grid version for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 9."));
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp_GridDoesntExist()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibrated";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            Int32 testVersion = 8;
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = @Version;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-01T23:02:45.0000101");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<ArgumentException>(delegate
+                {
+                    testStockPriceBulkPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridTransactionTimestampRetrieveTime>());
+                Assert.That(e.Message, Does.StartWith($"Stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 8 did not exist."));
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp_ExceptionReading()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibrated";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            Int32 testVersion = 7;
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = @Version;";
+            var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridTransactionTimestampRetrieveTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Calibrated', DataSource = 'Refinitiv', Date = '2026-06-01' }}, and version 7 from SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestamp()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Calibrated";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-06-01");
+            Int32 testVersion = 8;
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedCommandText = @$"
+                SELECT  CONVERT(nvarchar(30), TransactionTimestamp , 126) AS TransactionTimestamp
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23) 
+                  AND   [Version] = @Version;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridTransactionTimestampRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["TransactionTimestamp"].Returns<Object>("2026-06-01T23:02:45.0000101");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                DateTime result = testStockPriceBulkPersister.GetGridTransactionTimestamp(connection, testOuterKeyProperties, testVersion);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, testVersion);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridTransactionTimestampRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridTransactionTimestampRetrieveTime>());
+                Assert.That(utils.CreateDataTimeFromString("2026-06-01 23:02:45.0000101") == result);
+            }
+        }
+
+        [Test]
+        public void GetExistingGrid_ExceptionReading()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-05-16 11:45:40.0000012");
+            String expectedCommandText = @$"
+                SELECT Id, 
+                       Tag, 
+                       DataSource, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       Company, 
+                       Price, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = @Tag
+                  AND  DataSource = @DataSource
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER  BY Company;";
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    List<StockPriceGridItemPTO> results = new(testStockPriceBulkPersister.GetGrid(connection, testOuterKeyProperties, testTransactionTimestamp));
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
+                Assert.That(e.Message, Does.StartWith($"Failed to read stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-16' }}, and transaction timestamp '2026-05-16 11:45:40.0000012' from SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void GetGridTransactionTimestampOverload()
+        {
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            DateTime testTransactionTimestamp = utils.CreateDataTimeFromString("2026-05-16 11:45:40.0000012");
+            String expectedCommandText = @$"
+                SELECT Id, 
+                       Tag, 
+                       DataSource, 
+                       CONVERT(nvarchar(30), [Date], 23) AS [Date], 
+                       Company, 
+                       Price, 
+                       CONVERT(nvarchar(30), TransactionFrom, 126) AS TransactionFrom, 
+                       CONVERT(nvarchar(30), TransactionTo, 126) AS TransactionTo
+                FROM   StockPrices 
+                WHERE  Tag = @Tag
+                  AND  DataSource = @DataSource
+                  AND  [Date] = CONVERT(date, @Date, 23) 
+                  AND  CONVERT(datetime2, @TransactionTimestamp, 126) BETWEEN TransactionFrom AND TransactionTo 
+                ORDER  BY Company;";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["Id"].Returns<Object>(1L);
+            mockDataReader["Tag"].Returns<Object>(testTag);
+            mockDataReader["DataSource"].Returns<Object>(testDataSource);
+            mockDataReader["Date"].Returns<Object>(testDate.ToString(transactSql23DateStyle));
+            mockDataReader["Company"].Returns<Object>("Canon");
+            mockDataReader["Price"].Returns<Object>(new Decimal(4215));
+            mockDataReader["TransactionFrom"].Returns<Object>("2026-05-15T09:05:40.0000012");
+            mockDataReader["TransactionTo"].Returns<Object>("9999-12-31T23:59:59.9999999");
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                List<StockPriceGridItemPTO> results = new(testStockPriceBulkPersister.GetGrid(connection, testOuterKeyProperties, testTransactionTimestamp));
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TransactionTimestamp", SqlDbType.NVarChar, testTransactionTimestamp.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                Assert.That(mockMetricLogger.ReceivedCalls().Count() == 0);
+                Assert.That(results.Count == 1);
+                Assert.That(results[0].Id == 1);
+                Assert.That(results[0].Tag == testTag);
+                Assert.That(results[0].DataSource == testDataSource);
+                Assert.That(results[0].Date == testDate);
+                Assert.That(results[0].Company == "Canon");
+                Assert.That(results[0].Price == 4215);
+                Assert.That(results[0].TransactionFrom == utils.CreateDataTimeFromString("2026-05-15 09:05:40.0000012"));
+                Assert.That(results[0].TransactionFrom.Kind == DateTimeKind.Utc);
+                Assert.That(results[0].TransactionTo == utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+                Assert.That(results[0].TransactionTo.Kind == DateTimeKind.Utc);
+            }
+        }
+
+        [Test]
+        public void InsertGridItem_ExceptionInserting()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-08");
+            const String testCompany = "Hitachi";
+            StockPriceGridItem testItem = new(testTag, testDataSource, testDate, testCompany, 4732);
+            DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
+            String expectedCommandText = @$"
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
+            var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridItemInsertTime>()).Returns(testBeginId);
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemInsertTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridItemInsertTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to insert StockPriceGridItem {{ Tag = 'Market', DataSource = 'Bloomberg', Date = '2026-05-08', Company = 'Hitachi', Price = 4732 }} into SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void InsertGridItem()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-08");
+            const String testCompany = "Hitachi";
+            StockPriceGridItem testItem = new(testTag, testDataSource, testDate, testCompany, 4732);
+            DateTime testInsertDateTime = utils.CreateDataTimeFromString("2026-05-08 17:44:12.0000005");
+            String expectedCommandText = @$"
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
+            mockMetricLogger.Begin(Arg.Any<GridItemInsertTime>()).Returns(testBeginId);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPriceBulkPersister.InsertGridItem(connection, null, testItem, testInsertDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testInsertDateTime.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemInsertTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridItemInsertTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridItemInserted>());
+            }
+        }
+
+        [Test]
+        public void UpdateGridItem_ExceptionUpdating()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
+            const String testCompany = "Toyota";
+            StockPriceGridItem testNewItem = new(testTag, testDataSource, testDate, testCompany, 3210);
+            StockPriceGridItemPTO testSupersededItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
+            String expectedInsertCommandText = @$"
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+            var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridItemUpdateTime>()).Returns(testBeginId);
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemUpdateTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridItemUpdateTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to update stock price with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.Message, Does.StartWith($"Failed to delete stock price with id '{testSupersededItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void UpdateGridItem()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Reuters";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-13");
+            const String testCompany = "Toyota";
+            StockPriceGridItem testNewItem = new(testTag, testDataSource, testDate, testCompany, 3210);
+            StockPriceGridItemPTO testSupersededItem = new(124, testTag, testDataSource, testDate, testCompany, 3209, utils.CreateDataTimeFromString("2026-03-02 09:06:09.0000026"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testUpdateDateTime = utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000011");
+            String expectedInsertCommandText = @$"
+                INSERT 
+                INTO    StockPrices 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            Company, 
+                            Price, 
+                            TransactionFrom, 
+                            TransactionTo 
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Company, 
+                            @Price, 
+                            CONVERT(datetime2, @InsertDateTime, 126), 
+                            CONVERT(datetime2, @TemporalMaximumDateTime, 126)
+                        );";
+            String expectedDeleteCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+            mockMetricLogger.Begin(Arg.Any<GridItemUpdateTime>()).Returns(testBeginId);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPriceBulkPersister.UpdateGridItem(connection, null, testSupersededItem, testNewItem, testUpdateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedDeleteCommandText);
+                mockSqlCommandShim.Received(2).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testSupersededItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 10:51:21.0000010").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertCommandText);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Company", SqlDbType.NVarChar, testCompany);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Price", SqlDbType.Money, testNewItem.Price);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@InsertDateTime", SqlDbType.NVarChar, testUpdateDateTime.ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@TemporalMaximumDateTime", SqlDbType.NVarChar, DateTime.MaxValue.ToString(transactSql126DateStyle));
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemUpdateTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridItemUpdateTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridItemUpdated>());
+            }
+        }
+
+        [Test]
+        public void DeleteGridItem_ExceptionDeleting()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
+            const String testCompany = "Sony";
+            StockPriceGridItemPTO testItem = new(123, testTag, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
+            String expectedCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+            var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridItemDeleteTime>()).Returns(testBeginId);
+            mockSqlCommandShim.When((shim) => shim.SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText)).Do((callInfo) => throw mockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemDeleteTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridItemDeleteTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to delete stock price with id '{testItem.Id}' in SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void DeleteGridItem()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Bloomberg";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-14");
+            const String testCompany = "Sony";
+            StockPriceGridItemPTO testItem = new(123, testTag, testDataSource, testDate, testCompany, 4732, utils.CreateDataTimeFromString("2026-03-01 09:05:08.0000007"), utils.CreateDataTimeFromString("9999-12-31 23:59:59.9999999"));
+            DateTime testDeleteDateTime = utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000006");
+            String expectedCommandText = @$"
+            UPDATE  StockPrices 
+            SET     TransactionTo = CONVERT(datetime2, @DeleteDateTime, 126)
+            WHERE   Id = @Id;";
+            mockMetricLogger.Begin(Arg.Any<GridItemDeleteTime>()).Returns(testBeginId);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            {
+                testStockPriceBulkPersister.DeleteGridItem(connection, null, testItem, testDeleteDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedCommandText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), connection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Id", SqlDbType.BigInt, testItem.Id);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DeleteDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-14 22:23:13.0000005").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridItemDeleteTime>());
+                mockMetricLogger.Received(1).End(testBeginId, Arg.Any<GridItemDeleteTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridItemDeleted>());
+            }
+        }
+
+        [Test]
+        public void CreateGrid_ExceptionRetrievingLatestGridVersion()
+        {
+            Guid testBeginId = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedMaxVersionQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            var mockException = new Exception("Mock exception");
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId);
+            mockSqlCommandShim.When((shim) => shim.ExecuteReader(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            using (var readConnection = new SqlConnection(testConnectionString))
+            using (var writeConnection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
+                mockSqlCommandShim.Received(1).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId, Arg.Any<GridMaximumVersionRetrieveTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to retrieve latest grid version number while inserting stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} into SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void CreateGrid_ExceptionInserting()
+        {
+            Guid testBeginId1 = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            Guid testBeginId2 = Guid.Parse("cd9d3c57-3b60-4abd-993b-f684caf529f1");
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedMaxVersionQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            String expectedInsertStatementText = @$"
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId1);
+            mockMetricLogger.Begin(Arg.Any<GridCreateTime>()).Returns(testBeginId2);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+            var mockException = new Exception("Mock exception");
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw mockException);
+
+            using (var readConnection = new SqlConnection(testConnectionString))
+            using (var writeConnection = new SqlConnection(testConnectionString))
+            {
+                var e = Assert.Throws<Exception>(delegate
+                {
+                    testStockPriceBulkPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
+                });
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId1, Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).CancelBegin(testBeginId2, Arg.Any<GridCreateTime>());
+                Assert.That(e.Message, Does.StartWith($"Failed to insert stock price grid for StockPriceGridOuterKeyProperties {{ Tag = 'Market', DataSource = 'Refinitiv', Date = '2026-05-16' }} and version 2 into SQL Server."));
+                Assert.That(e.InnerException == mockException);
+            }
+        }
+
+        [Test]
+        public void CreateGrid_GridAlreadyExists()
+        {
+            Guid testBeginId1 = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            Guid testBeginId2 = Guid.Parse("cd9d3c57-3b60-4abd-993b-f684caf529f1");
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedMaxVersionQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            String expectedInsertStatementText = @$"
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId1);
+            mockMetricLogger.Begin(Arg.Any<GridCreateTime>()).Returns(testBeginId2);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(true, false);
+            mockDataReader["MaxVersion"].Returns<Object>(1);
+
+            using (var readConnection = new SqlConnection(testConnectionString))
+            using (var writeConnection = new SqlConnection(testConnectionString))
+            {
+                Int32 result = testStockPriceBulkPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteReader(Arg.Any<SqlCommand>());
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 2);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId1, Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).End(testBeginId2, Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridCreated>());
+                Assert.That(result == 2);
+            }
+        }
+
+        [Test]
+        public void CreateGrid_NoGridExists()
+        {
+            Guid testBeginId1 = Guid.Parse("39753d49-dfab-45cb-bd54-0efb1347660f");
+            Guid testBeginId2 = Guid.Parse("cd9d3c57-3b60-4abd-993b-f684caf529f1");
+            const String testTag = "Market";
+            const String testDataSource = "Refinitiv";
+            DateOnly testDate = utils.CreateDateOnlyFromString("2026-05-16");
+            DateTime testCreateDateTime = utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021");
+            StockPriceGridOuterKeyProperties testOuterKeyProperties = new(testTag, testDataSource, testDate);
+            String expectedMaxVersionQueryText = @$"
+                SELECT  MAX([Version]) AS MaxVersion 
+                FROM    StockPriceGrids 
+                WHERE   Tag = @Tag 
+                  AND   DataSource = @DataSource 
+                  AND   [Date] = CONVERT(date, @Date, 23);";
+            String expectedInsertStatementText = @$"
+                INSERT 
+                INTO    StockPriceGrids 
+                        (
+                            Tag, 
+                            DataSource, 
+                            [Date], 
+                            [Version], 
+                            TransactionTimestamp
+                        )
+                VALUES  (
+                            @Tag, 
+                            @DataSource, 
+                            CONVERT(date, @Date, 23), 
+                            @Version, 
+                            CONVERT(datetime2, @CreateDateTime, 126)
+                        );";
+            IDataReader mockDataReader = Substitute.For<IDataReader>();
+            mockMetricLogger.Begin(Arg.Any<GridMaximumVersionRetrieveTime>()).Returns(testBeginId1);
+            mockMetricLogger.Begin(Arg.Any<GridCreateTime>()).Returns(testBeginId2);
+            mockSqlCommandShim.ExecuteReader(Arg.Any<SqlCommand>()).Returns(mockDataReader);
+            mockDataReader.Read().Returns(false);
+
+            using (var readConnection = new SqlConnection(testConnectionString))
+            using (var writeConnection = new SqlConnection(testConnectionString))
+            {
+                Int32 result = testStockPriceBulkPersister.CreateGrid(readConnection, writeConnection, null, testOuterKeyProperties, testCreateDateTime);
+
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedMaxVersionQueryText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), readConnection);
+                mockSqlCommandShim.Received(1).SetTransaction(Arg.Any<SqlCommand>(), null);
+                mockSqlCommandShim.Received(2).SetCommandTimeout(Arg.Any<SqlCommand>(), 0);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Tag", SqlDbType.NVarChar, testTag);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@DataSource", SqlDbType.NVarChar, testDataSource);
+                mockSqlCommandShim.Received(2).AddParameter(Arg.Any<SqlCommand>(), "@Date", SqlDbType.NVarChar, testDate.ToString(transactSql23DateStyle));
+                mockSqlCommandShim.Received(1).SetCommandText(Arg.Any<SqlCommand>(), expectedInsertStatementText);
+                mockSqlCommandShim.Received(1).SetConnection(Arg.Any<SqlCommand>(), writeConnection);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@Version", SqlDbType.Int, 1);
+                mockSqlCommandShim.Received(1).AddParameter(Arg.Any<SqlCommand>(), "@CreateDateTime", SqlDbType.NVarChar, utils.CreateDataTimeFromString("2026-05-16 14:16:43.0000021").ToString(transactSql126DateStyle));
+                mockSqlCommandShim.Received(1).ExecuteNonQuery(Arg.Any<SqlCommand>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).End(testBeginId1, Arg.Any<GridMaximumVersionRetrieveTime>());
+                mockMetricLogger.Received(1).Begin(Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).End(testBeginId2, Arg.Any<GridCreateTime>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<GridCreated>());
+                Assert.That(result == 1);
+            }
+        }
+
+        [Test]
+        public void ExecuteNonQueryWithDeadlockRetry_DeadlockExceptionAndSuccessOnFirstRetry()
+        {
+            SqlException deadLockException = GetSqlException(1205, "Transaction (Process ID 123) was deadlocked on lock resources with another process and has been chosen as the deadlock victim. Rerun the transaction.", 2);
+            Boolean firstCall = true;
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) =>
+            {
+                if (firstCall == true)
+                {
+                    firstCall = false;
+                    throw deadLockException;
+                }
+            });
+
+            using (var connection = new SqlConnection(testConnectionString))
+            using (var command = new SqlCommand())
+            {
+                testStockPriceBulkPersister.ExecuteNonQueryWithDeadlockRetry(connection, null, command);
+
+                mockLogger.Received(1).Log(testStockPriceBulkPersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 1 of 5).", Arg.Any<SqlException>());
+                mockMetricLogger.Received(1).Increment(Arg.Any<SqlCommandExecutionRetried>());
+                mockSqlCommandShim.Received(2).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            }
+        }
+
+        [Test]
+        public void ExecuteNonQueryWithDeadlockRetry_DeadlockExceptionAndFailureOnAllRetries()
+        {
+
+            SqlException deadLockException = GetSqlException(1205, "Transaction (Process ID 123) was deadlocked on lock resources with another process and has been chosen as the deadlock victim. Rerun the transaction.", 2);
+            mockSqlCommandShim.When((shim) => shim.ExecuteNonQuery(Arg.Any<SqlCommand>())).Do((callInfo) => throw deadLockException);
+
+            using (var connection = new SqlConnection(testConnectionString))
+            using (var command = new SqlCommand())
+            {
+                var e = Assert.Throws<AggregateException>(delegate
+                {
+                    testStockPriceBulkPersister.ExecuteNonQueryWithDeadlockRetry(connection, null, command);
+                });
+
+                mockLogger.Received(1).Log(testStockPriceBulkPersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 1 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPriceBulkPersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 2 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPriceBulkPersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 3 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPriceBulkPersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 4 of 5).", Arg.Any<SqlException>());
+                mockLogger.Received(1).Log(testStockPriceBulkPersister, LogLevel.Warning, "SQL Server error with number 1205 occurred when executing command.  Retrying in 0 seconds (retry 5 of 5).", Arg.Any<SqlException>());
+                mockMetricLogger.Received(5).Increment(Arg.Any<SqlCommandExecutionRetried>());
+                mockSqlCommandShim.Received(6).ExecuteNonQuery(Arg.Any<SqlCommand>());
+            }
+        }
+
+        #region Nested Classes
+
+        #pragma warning disable 1591
+
+        /// <summary>
+        /// Version of the StockPriceBulkPersister class where private and protected methods are exposed as public so that they can be unit tested.
+        /// </summary>
+        protected class StockPriceBulkPersisterWithProtectedMembers : StockPriceBulkPersister
+        {
+            public StockPriceBulkPersisterWithProtectedMembers
+            (
+                String connectionString,
+                Int32 bufferSizeLimit,
+                Int32 retryCount,
+                Int32 retryInterval,
+                Int32 operationTimeout,
+                IApplicationLogger logger,
+                IMetricLogger metricLogger,
+                IDateTimeProvider dateTimeProvider,
+                ISqlConnectionShim sqlConnectionShim,
+                ISqlTransactionShim sqlTransactionShim,
+                ISqlCommandShim sqlCommandShim
+            ) : base(connectionString, bufferSizeLimit, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
+            {
+            }
+
+            public new (Int32 Version, DateTime TransactionTimestamp) GetLatestGridVersion(SqlConnection connection, StockPriceGridOuterKeyProperties outerKeyProperties)
+            {
+                return base.GetLatestGridVersion(connection, outerKeyProperties);
+            }
+
+            public new DateTime GetGridTransactionTimestamp(SqlConnection connection, StockPriceGridOuterKeyProperties outerKeyProperties, Int32 version)
+            {
+                return base.GetGridTransactionTimestamp(connection, outerKeyProperties, version);
+            }
+
+            public new IEnumerable<StockPriceGridItemPTO> GetGrid(SqlConnection connection, StockPriceGridOuterKeyProperties outerKeyProperties, DateTime transactionTimestamp)
+            {
+                return base.GetGrid(connection, outerKeyProperties, transactionTimestamp);
+            }
+
+            public new void InsertGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItem item, DateTime insertDateTime)
+            {
+                base.InsertGridItem(connection, transaction, item, insertDateTime);
+            }
+
+            public new void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO supersededItem, StockPriceGridItem newItem, DateTime udpateDateTime)
+            {
+                base.UpdateGridItem(connection, transaction, supersededItem, newItem, udpateDateTime);
+            }
+
+            public new void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, StockPriceGridItemPTO item, DateTime deleteDateTime)
+            {
+                base.DeleteGridItem(connection, transaction, item, deleteDateTime);
+            }
+
+            public new Int32 CreateGrid(SqlConnection readConnection, SqlConnection writeConnection, SqlTransaction transaction, StockPriceGridOuterKeyProperties outerKeyProperties, DateTime createDateTime)
+            {
+                return base.CreateGrid(readConnection, writeConnection, transaction, outerKeyProperties, createDateTime);
+            }
+
+            public new void ExecuteNonQueryWithDeadlockRetry(SqlConnection connection, SqlTransaction transaction, SqlCommand command)
+            {
+                base.ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+            }
+        }
+
+        #pragma warning restore 1591
+
+        #endregion
     }
 }
