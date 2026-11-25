@@ -445,7 +445,7 @@ namespace PowerGrid.Persistence.SqlServer
 
         #region Private/Protected Methods
 
-        #region Abstract Poperties and Methods
+        #region Abstract Properties and Methods
 
         /// <summary>
         /// The name of the table which stores the grid items.

@@ -31,10 +31,260 @@ namespace PowerGrid.Persistence.SqlServer
     /// <summary>
     /// Reads and bulk writes <see cref="WeatherForecast"/> objects from and to a Microsoft SQL Server database.
     /// </summary>
-    public class WeatherForecastBulkPersister : WeatherForecastPersister
+    public class WeatherForecastBulkPersister : BulkPersisterBase<WeatherForecast, GridCommonKeyProperties, WeatherForecastGridOuterKeyProperties, WeatherForecastGridItem, WeatherForecastGridItemPTO>
     {
-        /// <summary>The maximum number of <see cref="WeatherForecastGridItem"/> objects buffer before writing in bulk.</summary>
-        protected Int32 bufferSizeLimit;
+        const String tagParameterName = "@Tag";
+        const String dateParameterName = "@Date";
+        const String timeParameterName = "@Time";
+        const String countryParameterName = "@Country";
+        const String cityParameterName = "@City";
+        const String temperatureParameterName = "@Temperature";
+
+        const String tagColumnName = "Tag";
+        const String dateColumnName = "Date";
+        const String timeColumnName = "Time";
+        const String countryColumnName = "Country";
+        const String cityColumnName = "City";
+        const String temperatureColumnName = "Temperature";
+
+        #region Base Class Property Implementations
+
+        /// <inheritdoc/>
+        protected override String GridItemTableName
+        {
+            get { return "WeatherForecasts"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridTableName
+        {
+            get { return "WeatherForecastGrids"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridItemEntityName
+        {
+            get { return "weather forecast"; }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridMaxVersionQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  MAX([{versionColumnName}]) AS {maxVersionColumnAlias} 
+                FROM    {GridTableName} 
+                WHERE   Tag = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24)";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridMaxVersionAndTransactionTimestampQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  [{versionColumnName}] AS [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   [{versionColumnName}] = 
+                        (
+                          {GridMaxVersionQuery}
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridTransactionTimestampQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  CONVERT(nvarchar(30), {transactionTimestampColumnName} , 126) AS {transactionTimestampColumnName}
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   [{versionColumnName}] = {versionParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridContentsQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  {idColumnName}, 
+                        {tagColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        CONVERT(nvarchar(30), [{timeColumnName}], 24) AS [{timeColumnName}], 
+                        {countryColumnName}, 
+                        {cityColumnName}, 
+                        {temperatureColumnName}, 
+                        CONVERT(nvarchar(30), {transactionFromColumnName}, 126) AS {transactionFromColumnName}, 
+                        CONVERT(nvarchar(30), {transactionToColumnName}, 126) AS {transactionToColumnName}
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   CONVERT(datetime2, {transactionTimestampParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName} 
+                ORDER   BY {countryColumnName}, 
+                           {cityColumnName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridDetailsByCommonKeyPropertiesQuery
+        {
+            get
+            {
+                return @$"{GridDetailsBaseQuery}
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        protected override String GridDetailsByOuterKeyPropertiesQuery
+        {
+            get
+            {
+                return @$"{GridDetailsBaseQuery}
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String SoftDeleteLatestGridStatementSqlText
+        {
+            get
+            {
+                return @$"
+                UPDATE  {GridItemTableName} 
+                SET     {transactionToColumnName} = CONVERT(datetime2, {deleteDateTimeParameterName}, 126) 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24) 
+                  AND   CONVERT(datetime2, {currentDateTimeParameterName}, 126) BETWEEN {transactionFromColumnName} AND {transactionToColumnName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridsByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByCommonKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName};";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridsByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String HardDeleteGridItemssByOuterKeyPropertiesStatementSqlText
+        {
+            get
+            {
+                return @$"
+                DELETE 
+                FROM    {GridItemTableName} 
+                WHERE   {tagColumnName} = {tagParameterName} 
+                  AND   [{dateColumnName}] = CONVERT(date, {dateParameterName}, 23) 
+                  AND   [{timeColumnName}] = CONVERT(time, {timeParameterName}, 24);";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridInsertStatementSqlText
+        {
+            get
+            {
+                return $@"
+                INSERT 
+                INTO    {GridTableName} 
+                        (
+                            {tagColumnName}, 
+                            [{dateColumnName}], 
+                            [{timeColumnName}], 
+                            [{versionColumnName}], 
+                            {transactionTimestampColumnName}
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            CONVERT(time, {timeParameterName}, 24), 
+                            {versionParameterName}, 
+                            CONVERT(datetime2, {createDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override String GridItemsInsertStatementSqlText
+        {
+            get
+            {
+                return @$"
+                INSERT 
+                INTO    {GridItemTableName} 
+                        (
+                            {tagColumnName}, 
+                            [{dateColumnName}], 
+                            [{timeColumnName}], 
+                            {countryColumnName}, 
+                            {cityColumnName}, 
+                            {temperatureColumnName}, 
+                            {transactionFromColumnName}, 
+                            {transactionToColumnName} 
+                        )
+                VALUES  (
+                            {tagParameterName}, 
+                            CONVERT(date, {dateParameterName}, 23), 
+                            CONVERT(time, {timeParameterName}, 24), 
+                            {countryParameterName}, 
+                            {cityParameterName}, 
+                            {temperatureParameterName}, 
+                            CONVERT(datetime2, {insertDateTimeParameterName}, 126), 
+                            CONVERT(datetime2, {temporalMaximumDateTimeParameterName}, 126)
+                        );";
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Initialises a new instance of the PowerGrid.Persistence.SqlServer.WeatherForecastBulkPersister class.
@@ -54,11 +304,8 @@ namespace PowerGrid.Persistence.SqlServer
             Int32 operationTimeout,
             IApplicationLogger logger
         )
-            : base(connectionString, retryCount, retryInterval, operationTimeout, logger)
+            : base(connectionString, bufferSizeLimit, retryCount, retryInterval, operationTimeout, logger)
         {
-            ValidateBufferSizeLimitParameter(bufferSizeLimit);
-
-            this.bufferSizeLimit = bufferSizeLimit;
         }
 
         /// <summary>
@@ -81,11 +328,8 @@ namespace PowerGrid.Persistence.SqlServer
             IApplicationLogger logger,
             IMetricLogger metricLogger
         )
-            : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger)
+            : base(connectionString, bufferSizeLimit, retryCount, retryInterval, operationTimeout, logger, metricLogger)
         {
-            ValidateBufferSizeLimitParameter(bufferSizeLimit);
-
-            this.bufferSizeLimit = bufferSizeLimit;
         }
 
         /// <summary>
@@ -114,146 +358,118 @@ namespace PowerGrid.Persistence.SqlServer
             ISqlConnectionShim sqlConnectionShim,
             ISqlTransactionShim sqlTransactionShim,
             ISqlCommandShim sqlCommandShim
-        ) : base(connectionString, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
+        ) : base(connectionString, bufferSizeLimit, retryCount, retryInterval, operationTimeout, logger, metricLogger, dateTimeProvider, sqlConnectionShim, sqlTransactionShim, sqlCommandShim)
         {
-            ValidateBufferSizeLimitParameter(bufferSizeLimit);
-
-            this.bufferSizeLimit = bufferSizeLimit;
-        }
-
-        /// <inheritdoc/>
-        public override (Int32 Version, GridComparisonStatistics GridComparisonStatistics) PersistGrid(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, IList<WeatherForecast> items, PersistComparisonStrategy persistComparisonStrategy = PersistComparisonStrategy.Syncronise)
-        {
-            if (items.Count == 0)
-                throw new ArgumentException($"Parameter '{nameof(items)}' contained no items.", nameof(items));
-
-            using (var readConnection = new SqlConnection(connectionString))
-            using (var writeConnection = new SqlConnection(connectionString))
-            {
-                Int32 gridVersion;
-                GridComparisonStatistics comparisonStatistics;
-                try
-                {
-                    PrepareConnection(readConnection);
-                    sqlConnectionShim.Open(writeConnection);
-                    PrepareConnection(writeConnection, SessionDeadlockPriority.High);
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to connect to SQL Server.", e);
-                }
-
-                DateTime transactionTimestamp = dateTimeProvider.UtcNow();
-                using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(writeConnection))
-                {
-                    BulkAddEmitter addedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
-                    BulkDeleteEmitter deletedItemEmitter = new(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, writeConnection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
-                    Action<SqlConnection, SqlTransaction, Tuple<WeatherForecastGridItemPTO, WeatherForecastGridItem>, DateTime> updatedItemsEmitterOperationAction = (SqlConnection connection, SqlTransaction transaction, Tuple<WeatherForecastGridItemPTO, WeatherForecastGridItem> updatedGridItems, DateTime transactionDateTime) =>
-                    {
-                        deletedItemEmitter.Emit(updatedGridItems.Item1);
-                        addedItemEmitter.Emit(updatedGridItems.Item2);
-                    };
-                    DataBaseOperationEmitter<Tuple<WeatherForecastGridItemPTO, WeatherForecastGridItem>> updatedItemsEmitter = new(writeConnection, transaction, transactionTimestamp, updatedItemsEmitterOperationAction);
-                    GridComparer<WeatherForecastGridItemPTO, WeatherForecastGridItem> gridComparer;
-                    if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
-                    {
-                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, new NullEmitter<WeatherForecastGridItemPTO>());
-                    }
-                    else
-                    {
-                        gridComparer = new(addedItemEmitter, updatedItemsEmitter, deletedItemEmitter);
-                    }
-
-                    // Setup IEnumerable 'chains' 
-                    GridContentsValidator<WeatherForecast> newItemValidator = new();
-                    GridContentsDuplicateChecker<WeatherForecast> newItemsDuplicateChecker = new();
-                    // Order of below chain is 1 validate, 2 order, 3 dup check
-                    IEnumerable<WeatherForecast> newGridContents = newItemsDuplicateChecker.CheckForDuplicates
-                    (
-                        newItemValidator.ValidateItems
-                        (
-                            items,
-                            NewEntityValidationAction
-                        ).Order(Comparer<WeatherForecast>.Create
-                        (
-                            (WeatherForecast first, WeatherForecast second) => { return first.KeyCompareTo(second); }
-                        ))
-                    );
-                    IEnumerable<WeatherForecastGridItem> ConvertEntitiesToGridItems(IEnumerable<WeatherForecast> items)
-                    {
-                        foreach (WeatherForecast currentItem in items)
-                        {
-                            yield return ConvertEntityAndOuterKeyPropertiesToGridItem(gridOuterKeyProperties, currentItem);
-                        }
-                    }
-
-                    try
-                    {
-                        sqlConnectionShim.Open(readConnection);
-                        IEnumerable<WeatherForecastGridItemPTO> existingGridContents;
-                        try
-                        {
-                            existingGridContents = GetGrid(readConnection, gridOuterKeyProperties, transactionTimestamp);
-                        }
-                        catch (Exception e)
-                        {
-                            throw new Exception($"Failed to read existing {GridItemEntityName} grid from SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
-                        }
-                        {
-                            try
-                            {
-                                comparisonStatistics = gridComparer.Compare(existingGridContents, ConvertEntitiesToGridItems(newGridContents));
-                                deletedItemEmitter.Flush();
-                                addedItemEmitter.Flush();
-                            }
-                            catch (Exception e)
-                            {
-                                Exception compareException = new($"Failed to compare new {GridItemEntityName} grid to existing grid in SQL Server for {gridOuterKeyProperties.ToString()}, and transaction time '{transactionTimestamp.ToString(transactSql126DateStyle)}'.", e);
-                                try
-                                {
-                                    // As per https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqltransaction.rollback?view=sqlclient-dotnet-core-6.1, exception can occur on rollback
-                                    sqlTransactionShim.Rollback(transaction);
-                                }
-                                catch (Exception rollbackException)
-                                {
-                                    throw new AggregateException($"Failed to rollback transaction after exception comparing {GridItemEntityName} grid to existing data.", rollbackException, compareException);
-                                }
-                                throw compareException;
-                            }
-                        }
-                        gridVersion = CreateGrid(readConnection, writeConnection, transaction, gridOuterKeyProperties, transactionTimestamp);
-                        sqlTransactionShim.Commit(transaction);
-
-                        sqlConnectionShim.Close(writeConnection);
-                        sqlConnectionShim.Close(readConnection);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new Exception("Failed to persist grid to SQL Server.", e);
-                    }
-                }
-                TeardownConnection(readConnection);
-                TeardownConnection(writeConnection);
-                if (persistComparisonStrategy == PersistComparisonStrategy.AddAndUpdateOnly)
-                {
-                    comparisonStatistics = new GridComparisonStatistics(comparisonStatistics.ItemsAddedCount, comparisonStatistics.ItemsUpdatedCount, 0);
-                }
-
-                return (gridVersion, comparisonStatistics);
-            }
         }
 
         #region Private/Protected Methods
 
-        #pragma warning disable 1591
+        #region Base Class Method Implementations
 
-        protected void ValidateBufferSizeLimitParameter(Int32 bufferSizeLimit)
+        /// <inheritdoc/>
+        protected override Action<WeatherForecast> NewEntityValidationAction
         {
-            if (bufferSizeLimit < 1)
-                throw new ArgumentOutOfRangeException(nameof(bufferSizeLimit), bufferSizeLimit, $"Parameter '{nameof(bufferSizeLimit)}' with value {bufferSizeLimit} must be greater than 0.");
+            get
+            {
+                return (WeatherForecast weatherForecast) =>
+                {
+                    // Test for less than absolute zero
+                    const Int32 absoluteZero = -274;
+                    if (weatherForecast.Temperature < absoluteZero)
+                        throw new GridContentsValidationException<WeatherForecast>($"{weatherForecast.ToString()} {nameof(WeatherForecast.Temperature)} {weatherForecast.Temperature} cannot be less than {absoluteZero}.", weatherForecast);
+                };
+            }
         }
 
-        #pragma warning restore 1591
+        /// <inheritdoc/>
+        protected override WeatherForecastGridOuterKeyProperties GetOuterKeyPropertiesFromDataReader(IDataReader dataReader)
+        {
+            String tag = (String)dataReader[tagColumnName];
+            DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+            TimeOnly time = TimeOnly.ParseExact((String)dataReader[timeColumnName], transactSql24TimeStyle, DateTimeFormatInfo.InvariantInfo);
+
+            return new WeatherForecastGridOuterKeyProperties(tag, date, time);
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridItemPTO GetGridItemPTOFromDataReader(IDataReader dataReader)
+        {
+            Int64 id = (Int64)dataReader[idColumnName];
+            String tag = (String)dataReader[tagColumnName];
+            DateOnly date = DateOnly.ParseExact((String)dataReader[dateColumnName], transactSql23DateStyle, DateTimeFormatInfo.InvariantInfo);
+            TimeOnly time = TimeOnly.ParseExact((String)dataReader[timeColumnName], transactSql24TimeStyle, DateTimeFormatInfo.InvariantInfo);
+            String country = (String)dataReader[countryColumnName];
+            String city = (String)dataReader[cityColumnName];
+            Int32 temperature = (Int32)dataReader[temperatureColumnName];
+            (DateTime transactionFrom, DateTime transactionTo) = GetTransactionFromAndToDateTimesFromDataReader(dataReader);
+
+            return new WeatherForecastGridItemPTO(id, tag, date, time, country, city, temperature, transactionFrom, transactionTo);
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridCommonKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, GridCommonKeyProperties gridCommonKeyProperties)
+        {
+            sqlCommandShim.AddParameter(command, tagParameterName, SqlDbType.NVarChar, gridCommonKeyProperties.Tag);
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridOuterKeyPropertyQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecastGridOuterKeyProperties gridOuterKeyProperties)
+        {
+            AddGridCommonKeyPropertyQueryParameters(sqlCommandShim, command, new GridCommonKeyProperties(gridOuterKeyProperties.Tag));
+            sqlCommandShim.AddParameter(command, dateParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Date.ToString(transactSql23DateStyle));
+            sqlCommandShim.AddParameter(command, timeParameterName, SqlDbType.NVarChar, gridOuterKeyProperties.Time.ToString(transactSql24TimeStyle));
+        }
+
+        /// <inheritdoc/>
+        protected override void AddGridItemQueryParameters(ISqlCommandShim sqlCommandShim, SqlCommand command, WeatherForecast entity)
+        {
+            sqlCommandShim.AddParameter(command, countryParameterName, SqlDbType.NVarChar, entity.Country);
+            sqlCommandShim.AddParameter(command, cityParameterName, SqlDbType.NVarChar, entity.City);
+            sqlCommandShim.AddParameter(command, temperatureParameterName, SqlDbType.Int, entity.Temperature);
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridOuterKeyProperties ExtractOuterKeyPropertiesFromGridItem(WeatherForecastGridItem gridItem)
+        {
+            return new WeatherForecastGridOuterKeyProperties(gridItem.Tag, gridItem.Date, gridItem.Time);
+        }
+
+        /// <inheritdoc/>
+        protected override WeatherForecastGridItem ConvertEntityAndOuterKeyPropertiesToGridItem(WeatherForecastGridOuterKeyProperties gridOuterKeyProperties, WeatherForecast entity)
+        {
+            return new WeatherForecastGridItem(gridOuterKeyProperties.Tag, gridOuterKeyProperties.Date, gridOuterKeyProperties.Time, entity.Country, entity.City, entity.Temperature);
+        }
+
+        #endregion
+
+        /// <summary>
+        /// The text for a SQL query which returns the details of all grids for a set of outer key properties.
+        /// </summary>
+        protected String GridDetailsBaseQuery
+        {
+            get
+            {
+                return @$"
+                SELECT  {tagColumnName}, 
+                        CONVERT(nvarchar(30), [{dateColumnName}], 23) AS [{dateColumnName}], 
+                        CONVERT(nvarchar(30), [{timeColumnName}], 24) AS [{timeColumnName}], 
+                        [{versionColumnName}], 
+                        CONVERT(nvarchar(30), {transactionTimestampColumnName}, 126) AS {transactionTimestampColumnName} 
+                FROM    {GridTableName} ";
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override BulkAddStoredProcedureEmitterBase<WeatherForecastGridItem> InitializeBulkAddEmitter(DateTime transactionTimestamp, SqlConnection connection, SqlTransaction transaction)
+        {
+            return new BulkAddEmitter(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, connection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
+        }
+
+        /// <inheritdoc/>
+        protected override BulkDeleteStoredProcedureEmitterBase<WeatherForecastGridItemPTO> InitializeBulkDeleteEmitter(DateTime transactionTimestamp, SqlConnection connection, SqlTransaction transaction)
+        {
+            return new BulkDeleteEmitter(transactionTimestamp, bufferSizeLimit, sqlConnectionShim, sqlCommandShim, connection, transaction, sqlRetryLogicOption, operationTimeout, connectionRetryAction);
+        }
 
         #endregion
 

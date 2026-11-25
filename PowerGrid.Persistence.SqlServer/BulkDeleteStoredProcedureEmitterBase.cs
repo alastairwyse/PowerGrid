@@ -59,7 +59,7 @@ namespace PowerGrid.Persistence.SqlServer
 
         #region Private/Protected Methods
 
-        #region Abstract Poperties and Methods
+        #region Abstract Properties and Methods
 
         /// <summary>
         /// The name of the stored procedure which performs bulk delete for a collection of grid item PTOs.

@@ -59,7 +59,7 @@ namespace PowerGrid.Hosting.Rest
                 new StockPriceBulkPersister(connectionString, 1_000, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(stockPricePersisterLogger))
             );
             ILogger weatherForecastPersisterLogger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<WeatherForecastPersister>>();
-            builder.Services.AddSingleton<WeatherForecastPersister>
+            builder.Services.AddSingleton<Persistence.SqlServer.PersisterCommonBase<WeatherForecast, GridCommonKeyProperties, WeatherForecastGridOuterKeyProperties, WeatherForecastGridItem, WeatherForecastGridItemPTO>>
             (
                 new WeatherForecastBulkPersister(connectionString, 50, retryCount, retryInterval, operationTimeout, new ApplicationLoggingMicrosoftLoggingExtensionsAdapter(weatherForecastPersisterLogger))
             );
