@@ -248,5 +248,101 @@ namespace PowerGrid.Persistence.SqlServer
                 return (gridVersion, comparisonStatistics);
             }
         }
+
+        #region Private/Protected Methods
+
+        /// <summary>
+        /// Adds an item to the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to insert.</param>
+        /// <param name="transaction">The transaction to execute the add operation in.</param>
+        /// <param name="item">The item to add.</param>
+        /// <param name="insertDateTime">The UTC date and time the addition occurred.</param>
+        protected void InsertGridItem(SqlConnection connection, SqlTransaction transaction, TGridItem item, DateTime insertDateTime)
+        {
+            Guid beginId = metricLogger.Begin(new GridItemInsertTime());
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, GridItemsInsertStatementSqlText);
+                    PrepareCommand(connection, transaction, command);
+                    AddGridOuterKeyPropertyQueryParameters(sqlCommandShim, command, ExtractOuterKeyPropertiesFromGridItem(item));
+                    AddGridItemQueryParameters(sqlCommandShim, command, item);
+                    sqlCommandShim.AddParameter(command, insertDateTimeParameterName, SqlDbType.NVarChar, insertDateTime.ToString(transactSql126DateStyle));
+                    sqlCommandShim.AddParameter(command, temporalMaximumDateTimeParameterName, SqlDbType.NVarChar, temporalMaximumDateTime.ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(beginId, new GridItemInsertTime());
+                throw new Exception($"Failed to insert {item.ToString()} into SQL Server.", e);
+            }
+            metricLogger.End(beginId, new GridItemInsertTime());
+            metricLogger.Increment(new GridItemInserted());
+        }
+
+        /// <summary>
+        /// Updates an existing item in the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to update.</param>
+        /// <param name="transaction">The transaction to execute the update operation in.</param>
+        /// <param name="supersededItem">The item superseded in the existing grid as part of the update.</param>
+        /// <param name="newItem">The new item to insert into the grid as part of the update.</param>
+        /// <param name="udpateDateTime">The UTC date and time the update occurred.</param>
+        protected void UpdateGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO supersededItem, TGridItem newItem, DateTime udpateDateTime)
+        {
+            Guid beginId = metricLogger.Begin(new GridItemUpdateTime());
+            try
+            {
+                DeleteGridItem(connection, transaction, supersededItem, udpateDateTime);
+                InsertGridItem(connection, transaction, newItem, udpateDateTime);
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(beginId, new GridItemUpdateTime());
+                throw new Exception($"Failed to update {GridItemEntityName} with id '{supersededItem.Id}' in SQL Server.", e);
+            }
+            metricLogger.End(beginId, new GridItemUpdateTime());
+            metricLogger.Increment(new GridItemUpdated());
+        }
+
+        /// <summary>
+        /// Deletes an existing item from the current/latest grid.
+        /// </summary>
+        /// <param name="connection">The connection to use to delete.</param>
+        /// <param name="transaction">The transaction to execute the delete operation in.</param>
+        /// <param name="item">The item to delete.</param>
+        /// <param name="deleteDateTime">The UTC date and time the delete occurred.</param>
+        protected void DeleteGridItem(SqlConnection connection, SqlTransaction transaction, TGridItemPTO item, DateTime deleteDateTime)
+        {
+            String deleteStatement = @$"
+            UPDATE  {GridItemTableName} 
+            SET     TransactionTo = CONVERT(datetime2, {deleteDateTimeParameterName}, 126)
+            WHERE   Id = {idParameterName};";
+
+            Guid beginId = metricLogger.Begin(new GridItemDeleteTime());
+            try
+            {
+                using (var command = new SqlCommand())
+                {
+                    sqlCommandShim.SetCommandText(command, deleteStatement);
+                    PrepareCommand(connection, transaction, command);
+                    sqlCommandShim.AddParameter(command, idParameterName, SqlDbType.BigInt, item.Id);
+                    sqlCommandShim.AddParameter(command, deleteDateTimeParameterName, SqlDbType.NVarChar, deleteDateTime.AddTicks(-1).ToString(transactSql126DateStyle));
+                    ExecuteNonQueryWithDeadlockRetry(connection, transaction, command);
+                }
+            }
+            catch (Exception e)
+            {
+                metricLogger.CancelBegin(beginId, new GridItemDeleteTime());
+                throw new Exception($"Failed to delete {GridItemEntityName} with id '{item.Id}' in SQL Server.", e);
+            }
+            metricLogger.End(beginId, new GridItemDeleteTime());
+            metricLogger.Increment(new GridItemDeleted());
+        }
+
+        #endregion
     }
 }
