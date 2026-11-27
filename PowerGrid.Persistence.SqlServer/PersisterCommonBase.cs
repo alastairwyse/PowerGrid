@@ -288,7 +288,7 @@ namespace PowerGrid.Persistence.SqlServer
             using (var connection = new SqlConnection(connectionString))
             using (var command = new SqlCommand())
             {
-                Guid beginId = metricLogger.Begin(new GridDetailsByCommonKeyPropertiesRetrieveTime());
+                Guid beginId = metricLogger.Begin(GridDetailsByCommonKeyPropertiesRetrieveTimeMetric);
                 try
                 {
                     PrepareConnection(connection);
@@ -310,14 +310,14 @@ namespace PowerGrid.Persistence.SqlServer
                         }
                     }
                     sqlConnectionShim.Close(connection);
-                    metricLogger.End(beginId, new GridDetailsByCommonKeyPropertiesRetrieveTime());
-                    metricLogger.Increment(new GridDetailsByCommonKeyPropertiesRetrieved());
+                    metricLogger.End(beginId, GridDetailsByCommonKeyPropertiesRetrieveTimeMetric);
+                    metricLogger.Increment(GridDetailsByCommonKeyPropertiesRetrievedMetric);
 
                     return returnList;
                 }
                 catch (Exception e)
                 {
-                    metricLogger.CancelBegin(beginId, new GridDetailsByCommonKeyPropertiesRetrieveTime());
+                    metricLogger.CancelBegin(beginId, GridDetailsByCommonKeyPropertiesRetrieveTimeMetric);
                     throw new Exception($"Failed to read grid details for {gridCommonKeyProperties.ToString()} from SQL Server.", e);
                 }
             }
@@ -346,7 +346,7 @@ namespace PowerGrid.Persistence.SqlServer
                 using (var command = new SqlCommand())
                 using (SqlTransaction transaction = sqlConnectionShim.BeginTransaction(connection))
                 {
-                    Guid beginId = metricLogger.Begin(new LatestGridSoftDeleteTime());
+                    Guid beginId = metricLogger.Begin(LatestGridSoftDeleteTimeMetric);
                     try
                     {
                         DateTime deleteTimestamp = dateTimeProvider.UtcNow();
@@ -361,11 +361,11 @@ namespace PowerGrid.Persistence.SqlServer
                     }
                     catch (Exception e)
                     {
-                        metricLogger.CancelBegin(beginId, new LatestGridSoftDeleteTime());
+                        metricLogger.CancelBegin(beginId, LatestGridSoftDeleteTimeMetric);
                         throw new Exception($"Failed to delete latest grid items for {gridOuterKeyProperties.ToString()} in SQL Server.", e);
                     }
-                    metricLogger.End(beginId, new LatestGridSoftDeleteTime());
-                    metricLogger.Increment(new LatestGridSoftDeleted());
+                    metricLogger.End(beginId, LatestGridSoftDeleteTimeMetric);
+                    metricLogger.Increment(LatestGridSoftDeletedMetric);
                 }
             }
         }
@@ -597,6 +597,14 @@ namespace PowerGrid.Persistence.SqlServer
         protected virtual IntervalMetric GridDetailsByOuterKeyPropertiesRetrieveTimeMetric { get => new GridDetailsByOuterKeyPropertiesRetrieveTime(); }
 
         protected virtual CountMetric GridDetailsByOuterKeyPropertiesRetrievedMetric { get => new GridDetailsByOuterKeyPropertiesRetrieved(); }
+
+        protected virtual IntervalMetric GridDetailsByCommonKeyPropertiesRetrieveTimeMetric { get => new GridDetailsByCommonKeyPropertiesRetrieveTime(); }
+
+        protected virtual CountMetric GridDetailsByCommonKeyPropertiesRetrievedMetric { get => new GridDetailsByCommonKeyPropertiesRetrieved(); }
+
+        protected virtual IntervalMetric LatestGridSoftDeleteTimeMetric { get => new LatestGridSoftDeleteTime(); }
+
+        protected virtual CountMetric LatestGridSoftDeletedMetric { get => new LatestGridSoftDeleted(); }
 
         #pragma warning restore 1591
 
